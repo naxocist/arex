@@ -36,7 +36,7 @@ export default function TopNav({ title, showSearch = false }: TopNavProps) {
         
         <div className="hidden sm:flex items-center bg-emerald-900/40 rounded-full px-4 py-1.5 gap-2 border border-emerald-800/50">
           <Bolt className="w-4 h-4 text-emerald-400" />
-          <span className="text-emerald-100 font-medium text-xs">Demo Mode</span>
+          <span className="text-emerald-100 font-medium text-xs">Live API</span>
         </div>
 
         <div className="flex items-center gap-2">

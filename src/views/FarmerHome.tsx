@@ -1,231 +1,382 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { 
-  CheckCircle2, 
-  Truck, 
-  Factory, 
-  PlusCircle, 
-  MapPin, 
-  Cloud,
-  ChevronRight
-} from 'lucide-react';
-import { cn } from '@/src/lib/utils';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Clock3, RefreshCw, Truck, XCircle } from 'lucide-react';
+import StatusBadge from '@/src/components/StatusBadge';
+import {
+  ApiError,
+  farmerApi,
+  type CreateSubmissionPayload,
+  type FarmerRewardItem,
+  type FarmerRewardRequestItem,
+  type FarmerSubmissionItem,
+} from '@/src/lib/apiClient';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-};
+const MATERIAL_OPTIONS: Array<{
+  value: CreateSubmissionPayload['material_type'];
+  label: string;
+}> = [
+  { value: 'rice_straw', label: 'ฟางข้าว' },
+  { value: 'cassava_root', label: 'เหง้ามันสำปะหลัง' },
+  { value: 'sugarcane_bagasse', label: 'ชานอ้อย' },
+  { value: 'corn_stover', label: 'ตอซังข้าวโพด' },
+];
 
-const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1
+function hasAccessToken(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
   }
-};
+  return Boolean(localStorage.getItem('AREX_ACCESS_TOKEN'));
+}
+
+function formatMaterial(materialType: string): string {
+  const map: Record<string, string> = {
+    rice_straw: 'ฟางข้าว',
+    cassava_root: 'เหง้ามันสำปะหลัง',
+    sugarcane_bagasse: 'ชานอ้อย',
+    corn_stover: 'ตอซังข้าวโพด',
+  };
+  return map[materialType] ?? materialType;
+}
+
+function formatSubmissionStatus(status: string): string {
+  const map: Record<string, string> = {
+    submitted: 'ส่งคำขอแล้ว',
+    pickup_scheduled: 'จัดคิวรถแล้ว',
+    picked_up: 'รับวัสดุแล้ว',
+    delivered_to_factory: 'ส่งถึงโรงงานแล้ว',
+    factory_confirmed: 'โรงงานยืนยันแล้ว',
+    points_credited: 'ได้รับคะแนนแล้ว',
+  };
+  return map[status] ?? status;
+}
+
+function formatRewardRequestStatus(status: string): string {
+  const map: Record<string, string> = {
+    requested: 'รอคลังตรวจสอบ',
+    warehouse_approved: 'คลังอนุมัติแล้ว',
+    warehouse_rejected: 'คลังปฏิเสธ',
+  };
+  return map[status] ?? status;
+}
+
+function formatDeliveryStatus(status: string): string {
+  const map: Record<string, string> = {
+    reward_delivery_scheduled: 'จัดรอบส่งแล้ว',
+    out_for_delivery: 'กำลังนำส่ง',
+    reward_delivered: 'ส่งมอบสำเร็จ',
+  };
+  return map[status] ?? status;
+}
 
 export default function FarmerHome() {
+  const [materialType, setMaterialType] = useState<CreateSubmissionPayload['material_type']>('rice_straw');
+  const [quantityValue, setQuantityValue] = useState('');
+  const [pickupLocation, setPickupLocation] = useState('ต.นาเฉลียง อ.หนองไผ่ จ.เพชรบูรณ์');
+
+  const [isSubmittingMaterial, setIsSubmittingMaterial] = useState(false);
+  const [requestingRewardId, setRequestingRewardId] = useState<string | null>(null);
+
+  const [submissions, setSubmissions] = useState<FarmerSubmissionItem[]>([]);
+  const [availablePoints, setAvailablePoints] = useState<number>(0);
+  const [rewardsCatalog, setRewardsCatalog] = useState<FarmerRewardItem[]>([]);
+  const [rewardRequests, setRewardRequests] = useState<FarmerRewardRequestItem[]>([]);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const stats = useMemo(() => {
+    const pendingRewards = rewardRequests.filter((item) => item.status === 'requested').length;
+    return {
+      submissions: submissions.length,
+      pendingRewards,
+    };
+  }, [submissions, rewardRequests]);
+
+  const rewardNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const reward of rewardsCatalog) {
+      map[reward.id] = reward.name_th;
+    }
+    return map;
+  }, [rewardsCatalog]);
+
+  const loadDashboard = async () => {
+    if (!hasAccessToken()) {
+      setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const [submissionsResponse, pointsResponse, rewardsResponse, rewardRequestsResponse] = await Promise.all([
+        farmerApi.listSubmissions(),
+        farmerApi.getPoints(),
+        farmerApi.listRewards(),
+        farmerApi.listRewardRequests(),
+      ]);
+
+      setSubmissions(submissionsResponse.submissions);
+      setAvailablePoints(pointsResponse.available_points);
+      setRewardsCatalog(rewardsResponse.rewards);
+      setRewardRequests(rewardRequestsResponse.requests);
+      setMessage(null);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setMessage(`โหลดข้อมูลไม่สำเร็จ: ${error.message}`);
+      } else {
+        setMessage('โหลดข้อมูลไม่สำเร็จ');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadDashboard();
+  }, []);
+
+  const handleSubmitMaterial = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!hasAccessToken()) {
+      setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI');
+      return;
+    }
+
+    const parsedQuantity = Number(quantityValue);
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      setMessage('กรุณาระบุปริมาณมากกว่า 0');
+      return;
+    }
+
+    setIsSubmittingMaterial(true);
+    setMessage(null);
+    try {
+      await farmerApi.createSubmission({
+        material_type: materialType,
+        quantity_value: parsedQuantity,
+        quantity_unit: 'ton',
+        pickup_location_text: pickupLocation,
+      });
+      setQuantityValue('');
+      setMessage('ส่งรายการวัสดุสำเร็จแล้ว');
+      await loadDashboard();
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setMessage(`ส่งรายการไม่สำเร็จ: ${error.message}`);
+      } else {
+        setMessage('ส่งรายการไม่สำเร็จ กรุณาลองใหม่');
+      }
+    } finally {
+      setIsSubmittingMaterial(false);
+    }
+  };
+
+  const handleCreateRewardRequest = async (reward: FarmerRewardItem) => {
+    if (!hasAccessToken()) {
+      setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI');
+      return;
+    }
+
+    setRequestingRewardId(reward.id);
+    setMessage(null);
+    try {
+      await farmerApi.createRewardRequest({ reward_id: reward.id, quantity: 1 });
+      setMessage(`ส่งคำขอแลกรางวัล ${reward.name_th} สำเร็จแล้ว`);
+      await loadDashboard();
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setMessage(`ส่งคำขอแลกรางวัลไม่สำเร็จ: ${error.message}`);
+      } else {
+        setMessage('ส่งคำขอแลกรางวัลไม่สำเร็จ');
+      }
+    } finally {
+      setRequestingRewardId(null);
+    }
+  };
+
   return (
-    <motion.div 
-      className="space-y-12"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {/* Header & Greeting */}
-      <motion.header 
-        className="flex flex-col md:flex-row md:items-end justify-between gap-6"
-        variants={itemVariants}
-      >
+    <div className="space-y-6">
+      <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-light tracking-tight text-on-surface mb-2">สวัสดีคุณสมชาย</h1>
-          <p className="text-on-surface-variant text-lg">ยินดีต้อนรับกลับสู่ระบบ AREX เพื่อโลกที่ยั่งยืน</p>
+          <h1 className="text-3xl font-semibold text-on-surface">หน้าทำงานเกษตรกร</h1>
+          <p className="text-sm text-on-surface-variant mt-1">แจ้งส่งวัสดุ, ยื่นขอแลกรางวัล, และติดตามผลแบบเรียลไทม์</p>
+          {message && <p className="text-sm text-on-surface-variant mt-2 bg-surface-container-high px-3 py-2 rounded-lg w-fit">{message}</p>}
         </div>
-        
-        {/* Points Card */}
-        <div className="primary-gradient p-6 rounded-full px-10 flex items-center gap-6 shadow-xl shadow-primary/10">
-          <div className="text-white">
-            <p className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">คะแนนสะสม</p>
-            <p className="text-3xl font-medium">2,500 <span className="text-sm font-light">PMUC Coin</span></p>
-          </div>
-          <button className="bg-white text-primary px-6 py-2 rounded-full text-sm font-semibold hover:bg-emerald-50 transition-colors">
-            แลกรับรางวัล
-          </button>
+        <button
+          type="button"
+          onClick={() => void loadDashboard()}
+          disabled={isLoading}
+          className="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold disabled:opacity-60 flex items-center gap-2"
+        >
+          <RefreshCw className="w-4 h-4" /> รีเฟรช
+        </button>
+      </section>
+
+      <section className="bg-white border border-outline-variant/20 rounded-xl p-4">
+        <h2 className="text-base font-semibold">ลำดับงานในกระบวนการ</h2>
+        <p className="text-sm text-on-surface-variant mt-1">Step 1 แจ้งชนิด/ปริมาณวัสดุ และ Step 6 ยื่นคำขอแลกรางวัล หลังคะแนนถูกเครดิตจากโรงงาน</p>
+      </section>
+
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
+          <p className="text-xs uppercase tracking-widest text-on-surface-variant">คะแนนคงเหลือ</p>
+          <p className="text-3xl font-semibold mt-2">{availablePoints.toLocaleString('th-TH')}</p>
         </div>
-      </motion.header>
+        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
+          <p className="text-xs uppercase tracking-widest text-on-surface-variant">รายการวัสดุทั้งหมด</p>
+          <p className="text-3xl font-semibold mt-2">{stats.submissions.toLocaleString('th-TH')}</p>
+        </div>
+        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
+          <p className="text-xs uppercase tracking-widest text-on-surface-variant">คำขอรอคลังตรวจสอบ</p>
+          <p className="text-3xl font-semibold mt-2">{stats.pendingRewards.toLocaleString('th-TH')}</p>
+        </div>
+      </section>
 
-      {/* Bento Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Tracking Section */}
-        <motion.section className="lg:col-span-8 space-y-6" variants={itemVariants}>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-medium text-emerald-900">รายการที่กำลังดำเนินการ</h2>
-            <span className="text-primary font-medium text-sm cursor-pointer hover:underline flex items-center gap-1">
-              ดูทั้งหมด <ChevronRight className="w-4 h-4" />
-            </span>
-          </div>
-
-          {/* Progress Card */}
-          <div className="bg-white rounded-xl p-8 border border-outline-variant/15 shadow-sm">
-            <div className="flex flex-col md:flex-row justify-between mb-10 gap-4">
-              <div>
-                <span className="bg-secondary-container text-on-secondary-container text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">Order #AREX-2024-089</span>
-                <h3 className="text-xl font-medium mt-3">เศษฟางข้าวอัดก้อน (15 ตัน)</h3>
-                <p className="text-on-surface-variant text-sm mt-1">ปลายทาง: โรงงานชีวมวลสระบุรี</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-on-surface-variant">อัปเดตล่าสุด</p>
-                <p className="font-medium">14 มี.ค. 2024 • 10:30 น.</p>
-              </div>
-            </div>
-
-            {/* Status Stepper */}
-            <div className="relative flex justify-between items-start">
-              {/* Line */}
-              <div className="absolute top-4 left-0 w-full h-0.5 bg-surface-container-highest -z-0">
-                <div className="h-full bg-primary w-1/2"></div>
-              </div>
-              
-              {/* Step 1 */}
-              <div className="relative z-10 flex flex-col items-center text-center">
-                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center mb-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
-                <span className="text-sm font-medium text-primary">ส่งคำขอแล้ว</span>
-              </div>
-
-              {/* Step 2 */}
-              <div className="relative z-10 flex flex-col items-center text-center">
-                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center mb-2 ring-4 ring-primary/20">
-                  <Truck className="w-4 h-4" />
-                </div>
-                <span className="text-sm font-medium text-primary">มอบหมายรถขนส่ง</span>
-              </div>
-
-              {/* Step 3 */}
-              <div className="relative z-10 flex flex-col items-center text-center">
-                <div className="w-8 h-8 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center mb-2">
-                  <Factory className="w-4 h-4" />
-                </div>
-                <span className="text-sm font-medium text-on-surface-variant">ถึงโรงงานแล้ว</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Form Section */}
-          <div className="bg-surface-container-low rounded-xl p-8">
-            <div className="flex items-center gap-3 mb-8">
-              <PlusCircle className="w-8 h-8 text-primary" />
-              <h2 className="text-2xl font-medium text-emerald-900">แบบฟอร์มแจ้งส่งวัสดุ</h2>
-            </div>
-            
-            <form className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase text-on-surface-variant tracking-wider">ประเภทวัสดุ</label>
-                <select className="w-full bg-surface-container-high border-none rounded-lg p-3 text-on-surface focus:ring-2 focus:ring-primary/20 transition-all outline-none">
-                  <option>เลือกประเภทวัสดุ</option>
-                  <option>ฟางข้าว</option>
-                  <option>เหง้ามันสำปะหลัง</option>
-                  <option>ชานอ้อย</option>
-                </select>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase text-on-surface-variant tracking-wider">ปริมาณโดยประมาณ (ตัน)</label>
-                <input 
-                  type="number" 
-                  placeholder="เช่น 10" 
-                  className="w-full bg-surface-container-high border-none rounded-lg p-3 text-on-surface focus:ring-2 focus:ring-primary/20 transition-all outline-none"
-                />
-              </div>
-              
-              <div className="md:col-span-2 space-y-2">
-                <label className="text-xs font-semibold uppercase text-on-surface-variant tracking-wider">สถานที่นัดรับ</label>
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    defaultValue="ต.นาเฉลียง อ.หนองไผ่ จ.เพชรบูรณ์" 
-                    className="w-full bg-surface-container-high border-none rounded-lg p-3 pl-10 text-on-surface outline-none"
-                  />
-                  <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-primary" />
-                </div>
-              </div>
-              
-              <div className="md:col-span-2 pt-4">
-                <button className="w-full primary-gradient text-white py-4 rounded-full font-semibold text-lg hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98]">
-                  แจ้งส่งวัสดุใหม่
-                </button>
-              </div>
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
+            <h2 className="text-lg font-semibold mb-3">แจ้งส่งวัสดุใหม่</h2>
+            <form className="grid grid-cols-1 gap-3" onSubmit={handleSubmitMaterial}>
+              <select
+                value={materialType}
+                onChange={(event) => setMaterialType(event.target.value as CreateSubmissionPayload['material_type'])}
+                className="bg-surface-container-high rounded-lg px-3 py-2 outline-none"
+              >
+                {MATERIAL_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={quantityValue}
+                onChange={(event) => setQuantityValue(event.target.value)}
+                placeholder="ปริมาณ (ตัน)"
+                className="bg-surface-container-high rounded-lg px-3 py-2 outline-none"
+              />
+              <input
+                type="text"
+                value={pickupLocation}
+                onChange={(event) => setPickupLocation(event.target.value)}
+                placeholder="สถานที่นัดรับ"
+                className="bg-surface-container-high rounded-lg px-3 py-2 outline-none"
+              />
+              <button
+                type="submit"
+                disabled={isSubmittingMaterial}
+                className="px-4 py-2 rounded-lg bg-primary text-white font-semibold disabled:opacity-60"
+              >
+                {isSubmittingMaterial ? 'กำลังส่ง...' : 'ส่งรายการวัสดุ'}
+              </button>
             </form>
           </div>
-        </motion.section>
 
-        {/* Side Cards */}
-        <motion.aside className="lg:col-span-4 space-y-8" variants={itemVariants}>
-          {/* Weather Info */}
-          <div className="bg-secondary-container/30 rounded-xl p-6 border border-secondary-container/50">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-on-secondary-container font-medium">สภาพอากาศวันนี้</span>
-              <Cloud className="w-5 h-5 text-on-secondary-container" />
+          <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
+            <h2 className="text-lg font-semibold mb-3">รายการวัสดุล่าสุด</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-on-surface-variant">
+                    <th className="py-2">เวลา</th>
+                    <th className="py-2">วัสดุ</th>
+                    <th className="py-2">ปริมาณ</th>
+                    <th className="py-2">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {submissions.slice(0, 8).map((item) => (
+                    <tr key={item.id} className="border-t border-outline-variant/10">
+                      <td className="py-2">{new Date(item.created_at).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                      <td className="py-2">{formatMaterial(item.material_type)}</td>
+                      <td className="py-2">{Number(item.quantity_value).toLocaleString('th-TH')} {item.quantity_unit}</td>
+                      <td className="py-2">
+                        <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} />
+                      </td>
+                    </tr>
+                  ))}
+                  {submissions.length === 0 && (
+                    <tr>
+                      <td className="py-3 text-on-surface-variant" colSpan={4}>ยังไม่มีรายการวัสดุ</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-4xl font-light text-on-secondary-container">32°C</span>
-              <div className="text-sm text-on-secondary-container/80">
-                <p>มีเมฆบางส่วน</p>
-                <p>ความชื้น 45%</p>
-              </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
+            <h2 className="text-lg font-semibold mb-3">แคตตาล็อกรางวัล</h2>
+            <div className="space-y-3">
+              {rewardsCatalog.slice(0, 6).map((reward) => (
+                <div key={reward.id} className="border border-outline-variant/15 rounded-lg p-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{reward.name_th}</p>
+                    <p className="text-xs text-on-surface-variant">{Number(reward.points_cost).toLocaleString('th-TH')} คะแนน</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateRewardRequest(reward)}
+                    disabled={requestingRewardId === reward.id}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold bg-surface-container-high hover:bg-primary hover:text-white disabled:opacity-60"
+                  >
+                    {requestingRewardId === reward.id ? 'กำลังส่ง...' : 'ขอแลก'}
+                  </button>
+                </div>
+              ))}
+              {rewardsCatalog.length === 0 && <p className="text-sm text-on-surface-variant">ยังไม่มีรางวัลในระบบ</p>}
             </div>
           </div>
 
-          {/* Rewards Preview */}
-          <div className="space-y-4">
-            <h3 className="text-xl font-medium text-emerald-900 px-1">แลกรับรางวัล</h3>
-            
-            {/* Reward Card 1 */}
-            <div className="bg-white rounded-xl overflow-hidden border border-outline-variant/15 shadow-sm group cursor-pointer">
-              <div className="h-40 overflow-hidden">
-                <img 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBG6zH4Y_Xgl6moSIU3UX0-lKpdh0GH5Ch4bVO05ph-6C3S5wdXJXGVCznHy4unPjVBudQjxOinjXJAhsw-UJadwnlBQ4NrA92aBLX_iNzCFppTudVYF5jUMTt-fGRG3JJK1sMAdKbif1ps8LDdVREaoEmFU5yJGYWqbcSZD6HX_Dg9z2DfE-ZgKiIVRjuFDjehjzDR3O8C4TCLoNkZsbIDeQjpUJOVQajlYRkZRSYUIyAUZ0gMsh0GegKWi69Yq_uA-NcnYpnnQO4" 
-                  alt="Fertilizer product" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <div className="p-4">
-                <h4 className="font-medium text-on-surface">ปุ๋ยอินทรีย์สูตรพรีเมียม</h4>
-                <div className="flex justify-between items-center mt-3">
-                  <span className="text-primary font-bold">1,200 <span className="text-xs font-normal">PMUC Coin</span></span>
-                  <button className="text-xs bg-surface-container-highest px-3 py-1.5 rounded-full hover:bg-primary hover:text-white transition-colors">แลกเลย</button>
-                </div>
-              </div>
-            </div>
+          <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
+            <h2 className="text-lg font-semibold mb-3">สถานะคำขอแลกรางวัล</h2>
+            <div className="space-y-3">
+              {rewardRequests.slice(0, 8).map((request) => {
+                const deliveryJob = request.reward_delivery_jobs?.[0] ?? null;
+                const rewardName = rewardNameById[request.reward_id] ?? 'รางวัลที่เลือก';
+                return (
+                  <div key={request.id} className="border border-outline-variant/15 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium">{rewardName}</p>
+                        <p className="text-xs text-on-surface-variant">ใช้ {Number(request.requested_points).toLocaleString('th-TH')} คะแนน • จำนวน {Number(request.quantity).toLocaleString('th-TH')}</p>
+                      </div>
+                      <p className="text-xs text-on-surface-variant">
+                        {new Date(request.requested_at).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
 
-            {/* Reward Card 2 */}
-            <div className="bg-white rounded-xl overflow-hidden border border-outline-variant/15 shadow-sm group cursor-pointer">
-              <div className="h-40 overflow-hidden">
-                <img 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXCRxV8WAx4DcLJWPvEQYUbToHAgi7h6k71g-Jku4UjhQEmhQa7i-J4_y6iqZbHjYrhlJC2voAFnRvim7rmHhjA27sxjdIB_4IZSpuglTNHwhjn0OQJBx5J3c3b3L6WUW7Sz5buglGhXIl882zzlGUliYRz40xIwmwL0yza7WLYjmUuB8DS1IkT5Y4WoBw2zPhRChyevT5GST70QgcOD7wCjJlTaC_J26MyeCGOaKKLvP092lPkFjCjuJnrAA_WtN-yctSUGAGth4" 
-                  alt="Agriculture tools" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <div className="p-4">
-                <h4 className="font-medium text-on-surface">ชุดกรรไกรตัดแต่งกิ่ง</h4>
-                <div className="flex justify-between items-center mt-3">
-                  <span className="text-primary font-bold">850 <span className="text-xs font-normal">PMUC Coin</span></span>
-                  <button className="text-xs bg-surface-container-highest px-3 py-1.5 rounded-full hover:bg-primary hover:text-white transition-colors">แลกเลย</button>
-                </div>
-              </div>
+                    <div className="mt-2 text-sm flex items-center gap-2">
+                      {request.status === 'warehouse_rejected' ? (
+                        <XCircle className="w-4 h-4 text-red-600" />
+                      ) : request.status === 'warehouse_approved' ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <Clock3 className="w-4 h-4 text-amber-600" />
+                      )}
+                      <StatusBadge status={request.status} label={formatRewardRequestStatus(request.status)} />
+                    </div>
+
+                    {deliveryJob && (
+                      <div className="mt-1 text-sm flex items-center gap-2">
+                        <Truck className="w-4 h-4" />
+                        <StatusBadge status={deliveryJob.status} label={formatDeliveryStatus(deliveryJob.status)} />
+                      </div>
+                    )}
+
+                    {request.rejection_reason && (
+                      <p className="mt-2 text-xs text-red-700">เหตุผลที่ปฏิเสธ: {request.rejection_reason}</p>
+                    )}
+                  </div>
+                );
+              })}
+              {rewardRequests.length === 0 && <p className="text-sm text-on-surface-variant">ยังไม่มีคำขอแลกรางวัล</p>}
             </div>
           </div>
-        </motion.aside>
-      </div>
-    </motion.div>
+        </div>
+      </section>
+    </div>
   );
 }

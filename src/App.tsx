@@ -11,6 +11,7 @@ import FarmerHome from './views/FarmerHome';
 import ExecutiveDashboard from './views/ExecutiveDashboard';
 import LogisticsTracking from './views/LogisticsTracking';
 import FactoryIntake from './views/FactoryIntake';
+import WarehouseApproval from './views/WarehouseApproval';
 import UserSelection from './views/UserSelection';
 
 function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode, allowedRole: string }) {
@@ -26,7 +27,8 @@ function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode, 
       farmer: '/',
       executive: '/dashboard',
       logistics: '/logistics',
-      factory: '/factory'
+      factory: '/factory',
+      warehouse: '/warehouse'
     };
     return <Navigate to={rolePaths[role]} replace />;
   }
@@ -35,8 +37,6 @@ function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode, 
 }
 
 function AppRoutes() {
-  const { role } = useUser();
-
   return (
     <Routes>
       <Route path="/login" element={<UserSelection />} />
@@ -62,16 +62,9 @@ function AppRoutes() {
             <FactoryIntake />
           </ProtectedRoute>
         } />
-        
-        {/* Fallback routes for demo purposes */}
-        <Route path="announcements" element={
-          <ProtectedRoute allowedRole="farmer">
-            <FarmerHome />
-          </ProtectedRoute>
-        } />
-        <Route path="settings" element={
-          <ProtectedRoute allowedRole="farmer">
-            <FarmerHome />
+        <Route path="warehouse" element={
+          <ProtectedRoute allowedRole="warehouse">
+            <WarehouseApproval />
           </ProtectedRoute>
         } />
       </Route>
