@@ -1,0 +1,5 @@
+{
+  "name": "AREX Platform",
+  "description": "Sustainable agricultural waste management and logistics platform.",
+  "requestFramePermissions": ["geolocation"]
+}

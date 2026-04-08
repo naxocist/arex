@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@100;200;300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Prompt", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-primary: #0f5238;
+  --color-primary-container: #2d6a4f;
+  --color-surface: #f8faf9;
+  --color-surface-container-low: #f2f4f3;
+  --color-surface-container: #eceeed;
+  --color-surface-container-high: #e6e9e8;
+  --color-surface-container-highest: #e1e3e2;
+  --color-on-surface: #191c1c;
+  --color-on-surface-variant: #404943;
+  --color-outline-variant: #bfc9c1;
+  --color-tertiary: #713638;
+  --color-secondary-container: #bee8dc;
+  --color-on-secondary-container: #436a60;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-sans;
+  }
+}
+
+.primary-gradient {
+  background: linear-gradient(135deg, #0f5238 0%, #2d6a4f 100%);
+}
+
+.glass-header {
+  background: rgba(248, 250, 249, 0.8);
+  backdrop-filter: blur(24px);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
