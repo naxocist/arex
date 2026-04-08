@@ -8,7 +8,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './contexts/UserContext';
 import Layout from './components/Layout';
 import FarmerHome from './views/FarmerHome';
+import FarmerRewards from './views/FarmerRewards';
 import ExecutiveDashboard from './views/ExecutiveDashboard';
+import ExecutiveSettings from './views/ExecutiveSettings';
 import LogisticsTracking from './views/LogisticsTracking';
 import FactoryIntake from './views/FactoryIntake';
 import WarehouseApproval from './views/WarehouseApproval';
@@ -47,9 +49,19 @@ function AppRoutes() {
             <FarmerHome />
           </ProtectedRoute>
         } />
+        <Route path="farmer-rewards" element={
+          <ProtectedRoute allowedRole="farmer">
+            <FarmerRewards />
+          </ProtectedRoute>
+        } />
         <Route path="dashboard" element={
           <ProtectedRoute allowedRole="executive">
             <ExecutiveDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="executive-settings" element={
+          <ProtectedRoute allowedRole="executive">
+            <ExecutiveSettings />
           </ProtectedRoute>
         } />
         <Route path="logistics" element={

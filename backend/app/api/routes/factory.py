@@ -17,11 +17,8 @@ def list_pending_intakes(
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:
     try:
-        queue = workflow_service.list_factory_pending_intakes()
-        return {
-            "queue": queue,
-            "actor": current_user.role.value,
-        }
+        data = workflow_service.list_factory_pending_intakes()
+        return {**data, "actor": current_user.role.value}
     except WorkflowError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

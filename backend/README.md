@@ -59,12 +59,15 @@ All routes are mounted under `/api/v1` by default.
 - `GET /api/v1/auth/me`
 - `POST /api/v1/auth/login`
 - `GET /api/v1/farmer/me`
+- `GET /api/v1/farmer/material-types`
+- `GET /api/v1/farmer/measurement-units`
 - `GET /api/v1/farmer/rewards`
 - `GET /api/v1/farmer/reward-requests`
 - `POST /api/v1/farmer/submissions`
 - `GET /api/v1/farmer/submissions`
 - `GET /api/v1/farmer/points`
 - `POST /api/v1/farmer/reward-requests`
+- `POST /api/v1/farmer/reward-requests/{request_id}/cancel`
 - `GET /api/v1/logistics/pickup-queue`
 - `GET /api/v1/logistics/pickup-jobs`
 - `GET /api/v1/logistics/reward-requests/approved`

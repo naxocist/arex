@@ -4,6 +4,15 @@ export const API_BASE_URL =
 const ACCESS_TOKEN_KEY = 'AREX_ACCESS_TOKEN';
 const REFRESH_TOKEN_KEY = 'AREX_REFRESH_TOKEN';
 const AUTH_ROLE_KEY = 'AREX_AUTH_ROLE';
+const DEFAULT_GET_CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface CacheEntry {
+  expiresAt: number;
+  data: unknown;
+}
+
+const GET_RESPONSE_CACHE = new Map<string, CacheEntry>();
+let authRefreshInFlight: Promise<boolean> | null = null;
 
 export class ApiError extends Error {
   status: number;
@@ -19,21 +28,78 @@ function getStoredToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
+function getStoredRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function buildCacheKey(path: string, token: string | null): string {
+  return `${token ?? 'anon'}::${path}`;
+}
+
+function getCachedResponse<T>(cacheKey: string): T | null {
+  const entry = GET_RESPONSE_CACHE.get(cacheKey);
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    GET_RESPONSE_CACHE.delete(cacheKey);
+    return null;
+  }
+
+  return entry.data as T;
+}
+
+function setCachedResponse(cacheKey: string, data: unknown, ttlMs: number): void {
+  if (ttlMs <= 0) {
+    return;
+  }
+
+  GET_RESPONSE_CACHE.set(cacheKey, {
+    expiresAt: Date.now() + ttlMs,
+    data,
+  });
+}
+
+function clearApiResponseCache(): void {
+  GET_RESPONSE_CACHE.clear();
+}
+
+export function clearApiCache(): void {
+  clearApiResponseCache();
+}
+
+export interface RequestBehaviorOptions {
+  forceRefresh?: boolean;
+  cacheTtlMs?: number;
+  retryOnAuthError?: boolean;
+}
+
 export function setAuthSession(params: {
   accessToken: string;
   refreshToken?: string | null;
   role?: string | null;
 }): void {
+  clearApiResponseCache();
   localStorage.setItem(ACCESS_TOKEN_KEY, params.accessToken);
-  if (params.refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, params.refreshToken);
+  if (params.refreshToken !== undefined) {
+    if (params.refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_KEY, params.refreshToken);
+    } else {
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
   }
-  if (params.role) {
-    localStorage.setItem(AUTH_ROLE_KEY, params.role);
+  if (params.role !== undefined) {
+    if (params.role) {
+      localStorage.setItem(AUTH_ROLE_KEY, params.role);
+    } else {
+      localStorage.removeItem(AUTH_ROLE_KEY);
+    }
   }
 }
 
 export function clearAuthSession(): void {
+  clearApiResponseCache();
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(AUTH_ROLE_KEY);
@@ -41,6 +107,69 @@ export function clearAuthSession(): void {
 
 export function getStoredRole(): string | null {
   return localStorage.getItem(AUTH_ROLE_KEY);
+}
+
+function shouldRetryWithRefresh(error: ApiError): boolean {
+  if (error.status === 401) {
+    return true;
+  }
+
+  if (error.status !== 403) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes('role not assigned') || message.includes('invalid token');
+}
+
+async function tryRefreshAccessToken(): Promise<boolean> {
+  const refreshToken = getStoredRefreshToken();
+  if (!refreshToken) {
+    return false;
+  }
+
+  if (authRefreshInFlight) {
+    return authRefreshInFlight;
+  }
+
+  authRefreshInFlight = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const body = (await response.json()) as {
+        access_token?: string | null;
+        refresh_token?: string | null;
+        user?: { role?: string | null };
+      };
+
+      if (!body?.access_token) {
+        return false;
+      }
+
+      setAuthSession({
+        accessToken: body.access_token,
+        refreshToken: body.refresh_token ?? null,
+        role: body.user?.role ?? null,
+      });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      authRefreshInFlight = null;
+    }
+  })();
+
+  return authRefreshInFlight;
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -58,14 +187,37 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return body as T;
 }
 
+export type ApiRequestOptions = RequestInit & RequestBehaviorOptions;
+
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit = {},
+  options: ApiRequestOptions = {},
 ): Promise<T> {
+  const {
+    forceRefresh = false,
+    cacheTtlMs = DEFAULT_GET_CACHE_TTL_MS,
+    retryOnAuthError = true,
+    ...requestOptions
+  } = options;
   const token = getStoredToken();
-  const headers = new Headers(options.headers || {});
+  const method = (requestOptions.method || 'GET').toUpperCase();
+  const isGetRequest = method === 'GET';
+  const cacheKey = isGetRequest ? buildCacheKey(path, token) : null;
 
-  if (!headers.has('Content-Type') && options.body) {
+  if (isGetRequest && cacheKey && !forceRefresh) {
+    const cached = getCachedResponse<T>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+  }
+
+  if (isGetRequest && cacheKey && forceRefresh) {
+    GET_RESPONSE_CACHE.delete(cacheKey);
+  }
+
+  const headers = new Headers(requestOptions.headers || {});
+
+  if (!headers.has('Content-Type') && requestOptions.body) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -74,19 +226,139 @@ export async function apiRequest<T>(
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
+    ...requestOptions,
+    method,
     headers,
   });
 
-  return parseResponse<T>(response);
+  let parsed: T;
+  try {
+    parsed = await parseResponse<T>(response);
+  } catch (error) {
+    if (error instanceof ApiError && retryOnAuthError && shouldRetryWithRefresh(error)) {
+      const refreshed = await tryRefreshAccessToken();
+      if (refreshed) {
+        return apiRequest<T>(path, {
+          ...options,
+          retryOnAuthError: false,
+          forceRefresh: isGetRequest ? true : forceRefresh,
+        });
+      }
+      clearAuthSession();
+    }
+
+    throw error;
+  }
+
+  if (isGetRequest && cacheKey) {
+    setCachedResponse(cacheKey, parsed, cacheTtlMs);
+  } else {
+    clearApiResponseCache();
+  }
+
+  return parsed;
 }
 
 export interface CreateSubmissionPayload {
-  material_type: 'rice_straw' | 'cassava_root' | 'sugarcane_bagasse' | 'corn_stover';
+  material_type: string;
   quantity_value: number;
-  quantity_unit: 'kg' | 'ton' | 'm3';
+  quantity_unit: string;
   pickup_location_text: string;
+  pickup_lat: number;
+  pickup_lng: number;
   notes?: string;
+}
+
+export interface FarmerMaterialTypeItem {
+  code: string;
+  name_th: string;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface FarmerMeasurementUnitItem {
+  code: string;
+  name_th: string;
+  to_kg_factor: number | null;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface ExecutiveMaterialTypeItem {
+  code: string;
+  name_th: string;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface ExecutiveMeasurementUnitItem {
+  code: string;
+  name_th: string;
+  to_kg_factor: number | null;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface ExecutiveMaterialPointRuleItem {
+  material_type: string;
+  material_name_th: string;
+  material_sort_order: number;
+  material_active: boolean;
+  points_per_kg: number | null;
+}
+
+export interface UpsertMaterialTypePayload {
+  code: string;
+  name_th: string;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface UpsertMeasurementUnitPayload {
+  code: string;
+  name_th: string;
+  to_kg_factor: number | null;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface UpsertMaterialPointRulePayload {
+  points_per_kg: number;
+}
+
+export interface ExecutiveSubmissionMaterialBreakdownItem {
+  material_type: string;
+  material_name_th?: string | null;
+  submissions_count: number;
+  declared_quantity_total: number;
+  estimated_weight_kg_total: number;
+}
+
+export interface ExecutiveRewardRequestStatusSummary {
+  requested: number;
+  warehouse_approved: number;
+  warehouse_rejected: number;
+  cancelled: number;
+}
+
+export interface ExecutiveOverview {
+  submissions_total: number;
+  unique_farmers_total: number;
+  submissions_pending_pickup: number;
+  pickup_jobs_active: number;
+  reward_requests_pending_warehouse: number;
+  submitted_weight_estimated_kg_total: number;
+  submitted_weight_estimated_ton_total: number;
+  factory_confirmed_weight_kg_total: number;
+  factory_confirmed_weight_ton_total: number;
+  points_credited_total: number;
+  points_reserved_total: number;
+  points_spent_total: number;
+  reward_requests_total: number;
+  reward_requested_points_total: number;
+  reward_approved_points_total: number;
+  reward_requests_status_summary: ExecutiveRewardRequestStatusSummary;
+  submissions_material_breakdown: ExecutiveSubmissionMaterialBreakdownItem[];
 }
 
 export interface FarmerSubmissionItem {
@@ -95,8 +367,13 @@ export interface FarmerSubmissionItem {
   quantity_value: number;
   quantity_unit: string;
   pickup_location_text: string;
+  pickup_lat?: number | null;
+  pickup_lng?: number | null;
   status: string;
   created_at: string;
+  pickup_window_start_at?: string | null;
+  pickup_window_end_at?: string | null;
+  pickup_job_status?: string | null;
 }
 
 export interface CreateRewardRequestPayload {
@@ -117,6 +394,7 @@ export interface FarmerRewardDeliveryJobItem {
   id: string;
   status: 'reward_delivery_scheduled' | 'out_for_delivery' | 'reward_delivered' | string;
   planned_delivery_at: string | null;
+  delivery_window_end_at?: string | null;
   out_for_delivery_at: string | null;
   delivered_at: string | null;
 }
@@ -126,7 +404,7 @@ export interface FarmerRewardRequestItem {
   reward_id: string;
   quantity: number;
   requested_points: number;
-  status: 'requested' | 'warehouse_approved' | 'warehouse_rejected' | string;
+  status: 'requested' | 'warehouse_approved' | 'warehouse_rejected' | 'cancelled' | string;
   requested_at: string;
   warehouse_decision_at: string | null;
   rejection_reason: string | null;
@@ -134,7 +412,8 @@ export interface FarmerRewardRequestItem {
 }
 
 export interface SchedulePickupPayload {
-  planned_pickup_at: string;
+  pickup_window_start_at: string;
+  pickup_window_end_at: string;
   notes?: string;
 }
 
@@ -143,8 +422,10 @@ export interface LogisticsPickupQueueItem {
   farmer_profile_id: string;
   material_type: 'rice_straw' | 'cassava_root' | 'sugarcane_bagasse' | 'corn_stover' | string;
   quantity_value: number;
-  quantity_unit: 'kg' | 'ton' | 'm3' | string;
+  quantity_unit: string;
   pickup_location_text: string;
+  pickup_lat?: number | null;
+  pickup_lng?: number | null;
   status: 'submitted' | 'pickup_scheduled' | string;
   created_at: string;
 }
@@ -155,6 +436,7 @@ export interface LogisticsPickupJobItem {
   logistics_profile_id: string;
   status: 'pickup_scheduled' | 'picked_up' | 'delivered_to_factory' | string;
   planned_pickup_at: string;
+  pickup_window_end_at?: string | null;
   picked_up_at: string | null;
   delivered_factory_at: string | null;
   created_at: string;
@@ -162,6 +444,8 @@ export interface LogisticsPickupJobItem {
   quantity_value: number;
   quantity_unit: string;
   pickup_location_text: string;
+  pickup_lat?: number | null;
+  pickup_lng?: number | null;
   submission_status: string;
 }
 
@@ -175,7 +459,8 @@ export interface SchedulePickupResponse {
 }
 
 export interface ScheduleRewardDeliveryPayload {
-  planned_delivery_at: string;
+  delivery_window_start_at: string;
+  delivery_window_end_at: string;
   notes?: string;
 }
 
@@ -183,6 +468,12 @@ export interface LogisticsApprovedRewardRequestItem {
   id: string;
   farmer_profile_id: string;
   reward_id: string;
+  reward_name_th?: string | null;
+  reward_description_th?: string | null;
+  reward_points_cost?: number | null;
+  pickup_location_text?: string | null;
+  pickup_lat?: number | null;
+  pickup_lng?: number | null;
   quantity: number;
   requested_points: number;
   status: string;
@@ -195,12 +486,16 @@ export interface LogisticsRewardDeliveryJobItem {
   logistics_profile_id: string;
   status: 'reward_delivery_scheduled' | 'out_for_delivery' | string;
   planned_delivery_at: string;
+  delivery_window_end_at?: string | null;
   out_for_delivery_at: string | null;
   delivered_at: string | null;
   created_at: string;
   farmer_profile_id: string;
   reward_id: string | null;
   reward_name_th: string | null;
+  pickup_location_text?: string | null;
+  pickup_lat?: number | null;
+  pickup_lng?: number | null;
   quantity: number;
   requested_points: number;
 }
@@ -228,9 +523,36 @@ export interface FactoryPendingIntakeItem {
   picked_up_at: string | null;
   delivered_factory_at: string | null;
   material_type: string;
+  material_name_th?: string | null;
   quantity_value: number;
   quantity_unit: string;
+  quantity_to_kg_factor?: number | null;
   pickup_location_text: string;
+}
+
+export interface FactoryConfirmedIntakeItem {
+  intake_id: string;
+  pickup_job_id: string;
+  submission_id: string;
+  material_type: string;
+  material_name_th?: string | null;
+  quantity_value: number;
+  quantity_unit: string;
+  measured_weight_kg: number;
+  measured_weight_ton: number;
+  pickup_location_text: string;
+  confirmed_at: string;
+  status: string;
+  factory_profile_id: string;
+  discrepancy_note: string | null;
+}
+
+export interface FactoryIntakeSummary {
+  arrived_count: number;
+  confirmed_count: number;
+  arrived_estimated_weight_kg_total: number;
+  confirmed_weight_kg_total: number;
+  confirmed_weight_ton_total: number;
 }
 
 export interface RejectRewardRequestPayload {
@@ -241,6 +563,9 @@ export interface WarehousePendingRequestItem {
   id: string;
   farmer_profile_id: string;
   reward_id: string;
+  reward_name_th?: string | null;
+  reward_description_th?: string | null;
+  reward_points_cost?: number | null;
   quantity: number;
   requested_points: number;
   status: string;
@@ -268,34 +593,53 @@ export const authApi = {
     apiRequest<LoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(payload),
+      retryOnAuthError: false,
     }),
 };
 
 export const farmerApi = {
-  getMe: () => apiRequest<{ user_id: string; email: string | null; role: string }>('/farmer/me'),
-  listRewards: () => apiRequest<{ rewards: FarmerRewardItem[]; actor: string }>('/farmer/rewards'),
-  listRewardRequests: () => apiRequest<{ requests: FarmerRewardRequestItem[]; actor: string }>('/farmer/reward-requests'),
-  listSubmissions: () => apiRequest<{ submissions: FarmerSubmissionItem[] }>('/farmer/submissions'),
+  getMe: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ user_id: string; email: string | null; role: string }>('/farmer/me', options),
+  listMaterialTypes: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ material_types: FarmerMaterialTypeItem[]; actor: string }>('/farmer/material-types', options),
+  listMeasurementUnits: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ units: FarmerMeasurementUnitItem[]; actor: string }>('/farmer/measurement-units', options),
+  listRewards: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ rewards: FarmerRewardItem[]; actor: string }>('/farmer/rewards', options),
+  listRewardRequests: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ requests: FarmerRewardRequestItem[]; actor: string }>('/farmer/reward-requests', options),
+  listSubmissions: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ submissions: FarmerSubmissionItem[] }>('/farmer/submissions', options),
   createSubmission: (payload: CreateSubmissionPayload) =>
     apiRequest('/farmer/submissions', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  getPoints: () => apiRequest<{ available_points: number; ledger: unknown[] }>('/farmer/points'),
+  getPoints: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ available_points: number; ledger: unknown[] }>('/farmer/points', options),
   createRewardRequest: (payload: CreateRewardRequestPayload) =>
     apiRequest<{ message: string; request: FarmerRewardRequestItem }>('/farmer/reward-requests', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  cancelRewardRequest: (requestId: string) =>
+    apiRequest<{ message: string; result: { request_id: string; request_status: string; available_points: number } }>(
+      `/farmer/reward-requests/${requestId}/cancel`,
+      {
+        method: 'POST',
+      },
+    ),
 };
 
 export const logisticsApi = {
-  getPickupQueue: () => apiRequest<{ queue: LogisticsPickupQueueItem[]; actor: string }>('/logistics/pickup-queue'),
-  getPickupJobs: () => apiRequest<{ jobs: LogisticsPickupJobItem[]; actor: string }>('/logistics/pickup-jobs'),
-  getApprovedRewardRequests: () =>
-    apiRequest<{ queue: LogisticsApprovedRewardRequestItem[]; actor: string }>('/logistics/reward-requests/approved'),
-  getRewardDeliveryJobs: () =>
-    apiRequest<{ jobs: LogisticsRewardDeliveryJobItem[]; actor: string }>('/logistics/reward-delivery-jobs'),
+  getPickupQueue: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ queue: LogisticsPickupQueueItem[]; actor: string }>('/logistics/pickup-queue', options),
+  getPickupJobs: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ jobs: LogisticsPickupJobItem[]; actor: string }>('/logistics/pickup-jobs', options),
+  getApprovedRewardRequests: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ queue: LogisticsApprovedRewardRequestItem[]; actor: string }>('/logistics/reward-requests/approved', options),
+  getRewardDeliveryJobs: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ jobs: LogisticsRewardDeliveryJobItem[]; actor: string }>('/logistics/reward-delivery-jobs', options),
   schedulePickup: (submissionId: string, payload: SchedulePickupPayload) =>
     apiRequest<SchedulePickupResponse>(`/logistics/pickup-jobs/${submissionId}/schedule`, {
       method: 'POST',
@@ -325,8 +669,13 @@ export const logisticsApi = {
 };
 
 export const factoryApi = {
-  listPendingIntakes: () =>
-    apiRequest<{ queue: FactoryPendingIntakeItem[]; actor: string }>('/factory/intakes/pending'),
+  listPendingIntakes: (options?: RequestBehaviorOptions) =>
+    apiRequest<{
+      queue: FactoryPendingIntakeItem[];
+      confirmed: FactoryConfirmedIntakeItem[];
+      summary: FactoryIntakeSummary;
+      actor: string;
+    }>('/factory/intakes/pending', options),
   confirmIntake: (payload: ConfirmFactoryIntakePayload) =>
     apiRequest('/factory/intakes/confirm', {
       method: 'POST',
@@ -335,8 +684,8 @@ export const factoryApi = {
 };
 
 export const warehouseApi = {
-  listPendingRewardRequests: () =>
-    apiRequest<{ requests: WarehousePendingRequestItem[]; actor: string }>('/warehouse/reward-requests/pending'),
+  listPendingRewardRequests: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ requests: WarehousePendingRequestItem[]; actor: string }>('/warehouse/reward-requests/pending', options),
   approveRewardRequest: (requestId: string) =>
     apiRequest<{ message: string; result: unknown }>(`/warehouse/reward-requests/${requestId}/approve`, {
       method: 'POST',
@@ -349,5 +698,49 @@ export const warehouseApi = {
 };
 
 export const executiveApi = {
-  getOverview: () => apiRequest<{ overview: Record<string, number>; actor: string }>('/executive/dashboard/overview'),
+  getOverview: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ overview: ExecutiveOverview; actor: string }>('/executive/dashboard/overview', options),
+  listMaterialTypes: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ material_types: ExecutiveMaterialTypeItem[]; actor: string }>('/executive/material-types', options),
+  createMaterialType: (payload: UpsertMaterialTypePayload) =>
+    apiRequest<{ message: string; material_type: ExecutiveMaterialTypeItem; actor: string }>('/executive/material-types', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateMaterialType: (materialCode: string, payload: UpsertMaterialTypePayload) =>
+    apiRequest<{ message: string; material_type: ExecutiveMaterialTypeItem; actor: string }>(
+      `/executive/material-types/${encodeURIComponent(materialCode)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+    ),
+  listMeasurementUnits: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ units: ExecutiveMeasurementUnitItem[]; actor: string }>('/executive/measurement-units', options),
+  createMeasurementUnit: (payload: UpsertMeasurementUnitPayload) =>
+    apiRequest<{ message: string; unit: ExecutiveMeasurementUnitItem; actor: string }>('/executive/measurement-units', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateMeasurementUnit: (unitCode: string, payload: UpsertMeasurementUnitPayload) =>
+    apiRequest<{ message: string; unit: ExecutiveMeasurementUnitItem; actor: string }>(
+      `/executive/measurement-units/${encodeURIComponent(unitCode)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+    ),
+  listMaterialPointRules: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ rules: ExecutiveMaterialPointRuleItem[]; formula: string; actor: string }>(
+      '/executive/material-point-rules',
+      options,
+    ),
+  upsertMaterialPointRule: (materialCode: string, payload: UpsertMaterialPointRulePayload) =>
+    apiRequest<{ message: string; rule: { material_type: string; points_per_kg: number }; actor: string }>(
+      `/executive/material-point-rules/${encodeURIComponent(materialCode)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+    ),
 };

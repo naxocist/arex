@@ -14,7 +14,7 @@ export default function Layout() {
 
           <footer className="mt-12 pt-5 border-t border-stone-200 text-xs text-stone-500 flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
             <p>AREX Platform</p>
-            <p>© 2026 บพข. (PMUC) และผู้พัฒนาระบบ</p>
+            <p>เจ้าของระบบ: บพข. และ LAWDEE CO., LTD • Development: CEDT</p>
           </footer>
         </main>
       </div>
