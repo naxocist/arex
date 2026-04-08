@@ -10,7 +10,6 @@ def _build_client(api_key: str) -> Client:
     return create_client(settings.supabase_url, api_key)
 
 
-@lru_cache
 def get_anon_client() -> Client:
     settings = get_settings()
     return _build_client(settings.supabase_anon_key)

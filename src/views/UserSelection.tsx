@@ -42,7 +42,7 @@ const roles: { id: UserRole, name: string, role: string, icon: any, color: strin
     role: 'ฝ่ายโรงงาน', 
     icon: Factory, 
     color: 'bg-purple-100 text-purple-700',
-    desc: 'บันทึกน้ำหนักจริงและยืนยันรับเข้าเพื่อเครดิตคะแนน'
+    desc: 'บันทึกน้ำหนักจริงและยืนยันรับเข้าเพื่อเครดิต PMUC Coin'
   },
   {
     id: 'warehouse',
@@ -122,13 +122,13 @@ export default function UserSelection() {
 
         <form
           onSubmit={handleApiLogin}
-          className="bg-white border border-outline-variant/20 rounded-2xl p-5 md:p-6 space-y-4"
+          className="bg-white border border-outline-variant/20 rounded-2xl p-5 md:p-6 space-y-4 max-w-xl w-full mx-auto"
         >
           <div>
             <h2 className="text-lg font-medium text-on-surface">เข้าสู่ระบบ</h2>
             <p className="text-sm text-on-surface-variant">ระบบจะนำไปยังหน้าของบทบาทที่ล็อกอินสำเร็จโดยอัตโนมัติ</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-3">
             <input
               type="email"
               value={email}
@@ -149,7 +149,7 @@ export default function UserSelection() {
           {loginMessage && (
             <p className="text-sm text-on-surface-variant bg-surface-container-high rounded-lg px-3 py-2">{loginMessage}</p>
           )}
-          <div className="flex justify-end">
+          <div className="pt-1">
             <button
               type="submit"
               disabled={isLoggingIn}
@@ -165,7 +165,7 @@ export default function UserSelection() {
           <ol className="list-decimal pl-5 text-sm text-on-surface-variant space-y-1">
             <li>เกษตรกรแจ้งวัสดุ และยื่นคำขอแลกรางวัล</li>
             <li>ขนส่งจัดคิวและส่งวัสดุถึงโรงงาน</li>
-            <li>โรงงานยืนยันรับเข้าเพื่อเครดิตคะแนน</li>
+            <li>โรงงานยืนยันรับเข้าเพื่อเครดิต PMUC Coin</li>
             <li>คลังสินค้าอนุมัติหรือปฏิเสธคำขอแลกรางวัล</li>
             <li>ขนส่งดำเนินการส่งมอบของรางวัล</li>
           </ol>
@@ -194,26 +194,8 @@ export default function UserSelection() {
           </div>
         </section>
 
-        <div className="flex items-center justify-between gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => {
-              const path = rolePathMap[(localStorage.getItem('AREX_AUTH_ROLE') as UserRole) || 'farmer'];
-              const storedRole = localStorage.getItem('AREX_AUTH_ROLE') as UserRole | null;
-              const token = localStorage.getItem('AREX_ACCESS_TOKEN');
-              if (!storedRole || !token || !path) {
-                setLoginMessage('ยังไม่พบ session ที่ใช้งานได้ กรุณาเข้าสู่ระบบก่อน');
-                return;
-              }
-              setRole(storedRole);
-              navigate(path);
-            }}
-            className="text-sm px-4 py-2 rounded-lg bg-surface-container-high hover:bg-surface-container transition-colors"
-          >
-            เข้าต่อด้วย session ล่าสุด
-          </button>
-
-          <p className="text-xs text-on-surface-variant">© 2026 AREX Platform</p>
+        <div className="pt-2">
+          <p className="text-xs text-on-surface-variant text-center">© 2026 บพข. และ LAWDEE CO., LTD • Development: CEDT</p>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
+import DateRangePicker, { type DateRangeValue } from '@/src/components/DateRangePicker';
 import StatusBadge from '@/src/components/StatusBadge';
 import {
   ApiError,
@@ -55,6 +56,43 @@ function formatDeliveryStatus(status: string): string {
   return map[status] ?? status;
 }
 
+function formatDateTime(dateTime: string | null | undefined): string {
+  if (!dateTime) {
+    return '-';
+  }
+  return new Date(dateTime).toLocaleString('th-TH', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function dateOnlyToStartIso(dateValue: string): string {
+  return new Date(`${dateValue}T00:00:00`).toISOString();
+}
+
+function dateOnlyToEndIso(dateValue: string): string {
+  return new Date(`${dateValue}T23:59:59`).toISOString();
+}
+
+function fallbackThaiUnit(unitCode: string): string {
+  const map: Record<string, string> = {
+    kg: 'กิโลกรัม',
+    ton: 'ตัน',
+    m3: 'ลูกบาศก์เมตร',
+  };
+  return map[unitCode] ?? unitCode;
+}
+
+function hasValidCoordinates(lat: number | null | undefined, lng: number | null | undefined): boolean {
+  return typeof lat === 'number' && Number.isFinite(lat) && typeof lng === 'number' && Number.isFinite(lng);
+}
+
+function buildOpenStreetMapUrl(lat: number, lng: number): string {
+  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
+}
+
 export default function LogisticsTracking() {
   const [pickupQueue, setPickupQueue] = useState<LogisticsPickupQueueItem[]>([]);
   const [pickupJobs, setPickupJobs] = useState<LogisticsPickupJobItem[]>([]);
@@ -68,6 +106,8 @@ export default function LogisticsTracking() {
   const [updatingPickupJobId, setUpdatingPickupJobId] = useState<string | null>(null);
   const [schedulingRewardRequestId, setSchedulingRewardRequestId] = useState<string | null>(null);
   const [updatingDeliveryJobId, setUpdatingDeliveryJobId] = useState<string | null>(null);
+  const [pickupRangeBySubmissionId, setPickupRangeBySubmissionId] = useState<Record<string, DateRangeValue>>({});
+  const [deliveryRangeByRequestId, setDeliveryRangeByRequestId] = useState<Record<string, DateRangeValue>>({});
 
   const submittedQueue = useMemo(
     () => pickupQueue.filter((item) => item.status === 'submitted'),
@@ -89,7 +129,7 @@ export default function LogisticsTracking() {
     [approvedRewardRequests, rewardRequestIdsInDelivery],
   );
 
-  const loadAll = async () => {
+  const loadAll = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
       setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
       return;
@@ -98,10 +138,10 @@ export default function LogisticsTracking() {
     setIsLoading(true);
     try {
       const [queueResponse, pickupJobsResponse, approvedResponse, deliveryJobsResponse] = await Promise.all([
-        logisticsApi.getPickupQueue(),
-        logisticsApi.getPickupJobs(),
-        logisticsApi.getApprovedRewardRequests(),
-        logisticsApi.getRewardDeliveryJobs(),
+        logisticsApi.getPickupQueue({ forceRefresh }),
+        logisticsApi.getPickupJobs({ forceRefresh }),
+        logisticsApi.getApprovedRewardRequests({ forceRefresh }),
+        logisticsApi.getRewardDeliveryJobs({ forceRefresh }),
       ]);
 
       setPickupQueue(queueResponse.queue);
@@ -125,15 +165,30 @@ export default function LogisticsTracking() {
   }, []);
 
   const handleSchedulePickup = async (submissionId: string) => {
+    const dateRange = pickupRangeBySubmissionId[submissionId] || { from: null, to: null };
+    const startDate = dateRange.from || '';
+    const endDate = dateRange.to || '';
+
+    if (!startDate || !endDate) {
+      setMessage('กรุณาระบุช่วงวันนัดรับให้ครบทั้งวันเริ่มและวันสิ้นสุด');
+      return;
+    }
+
+    if (new Date(endDate).getTime() < new Date(startDate).getTime()) {
+      setMessage('วันสิ้นสุดของช่วงนัดรับต้องไม่น้อยกว่าวันเริ่มต้น');
+      return;
+    }
+
     setSchedulingSubmissionId(submissionId);
     setMessage(null);
     try {
       await logisticsApi.schedulePickup(submissionId, {
-        planned_pickup_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        pickup_window_start_at: dateOnlyToStartIso(startDate),
+        pickup_window_end_at: dateOnlyToEndIso(endDate),
         notes: 'จัดคิวโดยฝ่ายขนส่ง',
       });
       setMessage('จัดคิวรับวัสดุสำเร็จแล้ว');
-      await loadAll();
+      await loadAll(true);
     } catch (error) {
       if (error instanceof ApiError) {
         setMessage(`จัดคิวรับวัสดุไม่สำเร็จ: ${error.message}`);
@@ -151,7 +206,7 @@ export default function LogisticsTracking() {
     try {
       await logisticsApi.markPickedUp(pickupJobId);
       setMessage('อัปเดตสถานะเป็นรับวัสดุแล้ว');
-      await loadAll();
+      await loadAll(true);
     } catch (error) {
       if (error instanceof ApiError) {
         setMessage(`อัปเดตสถานะไม่สำเร็จ: ${error.message}`);
@@ -169,7 +224,7 @@ export default function LogisticsTracking() {
     try {
       await logisticsApi.markDeliveredToFactory(pickupJobId);
       setMessage('อัปเดตสถานะเป็นส่งถึงโรงงานแล้ว');
-      await loadAll();
+      await loadAll(true);
     } catch (error) {
       if (error instanceof ApiError) {
         setMessage(`อัปเดตสถานะไม่สำเร็จ: ${error.message}`);
@@ -182,15 +237,30 @@ export default function LogisticsTracking() {
   };
 
   const handleScheduleRewardDelivery = async (requestId: string) => {
+    const dateRange = deliveryRangeByRequestId[requestId] || { from: null, to: null };
+    const startAt = dateRange.from || '';
+    const endAt = dateRange.to || '';
+
+    if (!startAt || !endAt) {
+      setMessage('กรุณาระบุช่วงวันนำส่งให้ครบทั้งวันเริ่มและวันสิ้นสุด');
+      return;
+    }
+
+    if (new Date(endAt).getTime() < new Date(startAt).getTime()) {
+      setMessage('วันสิ้นสุดของช่วงนำส่งต้องไม่น้อยกว่าวันเริ่มต้น');
+      return;
+    }
+
     setSchedulingRewardRequestId(requestId);
     setMessage(null);
     try {
       await logisticsApi.scheduleRewardDelivery(requestId, {
-        planned_delivery_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+        delivery_window_start_at: dateOnlyToStartIso(startAt),
+        delivery_window_end_at: dateOnlyToEndIso(endAt),
         notes: 'จัดรอบส่งโดยฝ่ายขนส่ง',
       });
       setMessage('จัดรอบส่งรางวัลสำเร็จแล้ว');
-      await loadAll();
+      await loadAll(true);
     } catch (error) {
       if (error instanceof ApiError) {
         setMessage(`จัดรอบส่งรางวัลไม่สำเร็จ: ${error.message}`);
@@ -208,7 +278,7 @@ export default function LogisticsTracking() {
     try {
       await logisticsApi.markRewardOutForDelivery(deliveryJobId);
       setMessage('อัปเดตสถานะรางวัลเป็นกำลังนำส่งแล้ว');
-      await loadAll();
+      await loadAll(true);
     } catch (error) {
       if (error instanceof ApiError) {
         setMessage(`อัปเดตสถานะรางวัลไม่สำเร็จ: ${error.message}`);
@@ -226,7 +296,7 @@ export default function LogisticsTracking() {
     try {
       await logisticsApi.markRewardDelivered(deliveryJobId);
       setMessage('ยืนยันส่งมอบรางวัลสำเร็จแล้ว');
-      await loadAll();
+      await loadAll(true);
     } catch (error) {
       if (error instanceof ApiError) {
         setMessage(`ยืนยันส่งมอบรางวัลไม่สำเร็จ: ${error.message}`);
@@ -248,7 +318,7 @@ export default function LogisticsTracking() {
         </div>
         <button
           type="button"
-          onClick={() => void loadAll()}
+          onClick={() => void loadAll(true)}
           disabled={isLoading}
           className="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold disabled:opacity-60 flex items-center gap-2"
         >
@@ -282,7 +352,7 @@ export default function LogisticsTracking() {
 
       <section className="bg-white border border-outline-variant/20 rounded-xl p-4">
         <h2 className="text-lg font-semibold mb-3">คิวรับวัสดุใหม่ (submitted)</h2>
-        <div className="overflow-x-auto">
+        <div className="max-h-[22rem] overflow-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-on-surface-variant">
@@ -291,6 +361,7 @@ export default function LogisticsTracking() {
                 <th className="py-2">ปริมาณ</th>
                 <th className="py-2">สถานที่นัดรับ</th>
                 <th className="py-2">สถานะ</th>
+                <th className="py-2">ช่วงนัดรับ</th>
                 <th className="py-2">การจัดคิว</th>
               </tr>
             </thead>
@@ -299,16 +370,49 @@ export default function LogisticsTracking() {
                 <tr key={item.id} className="border-t border-outline-variant/10">
                   <td className="py-2">{new Date(item.created_at).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
                   <td className="py-2">{formatMaterial(item.material_type)}</td>
-                  <td className="py-2">{Number(item.quantity_value).toLocaleString('th-TH')} {item.quantity_unit}</td>
-                  <td className="py-2">{item.pickup_location_text}</td>
+                  <td className="py-2">{Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</td>
+                  <td className="py-2">
+                    <div className="space-y-1">
+                      <p>{item.pickup_location_text}</p>
+                      {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
+                        <a
+                          href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary underline underline-offset-2"
+                        >
+                          ดูรายละเอียดบนแผนที่
+                        </a>
+                      ) : (
+                        <p className="text-xs text-on-surface-variant">ไม่มีพิกัดแผนที่</p>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-2">
                     <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} />
+                  </td>
+                  <td className="py-2">
+                    <DateRangePicker
+                      value={pickupRangeBySubmissionId[item.id] || { from: null, to: null }}
+                      onChange={(nextRange) =>
+                        setPickupRangeBySubmissionId((prev) => ({
+                          ...prev,
+                          [item.id]: nextRange,
+                        }))
+                      }
+                      minDate={new Date()}
+                      placeholder="เลือกช่วงวันนัดรับ"
+                    />
                   </td>
                   <td className="py-2">
                     <button
                       type="button"
                       onClick={() => void handleSchedulePickup(item.id)}
-                      disabled={schedulingSubmissionId === item.id}
+                      disabled={
+                        schedulingSubmissionId === item.id ||
+                        !pickupRangeBySubmissionId[item.id]?.from ||
+                        !pickupRangeBySubmissionId[item.id]?.to
+                      }
                       className="px-3 py-1.5 rounded-full text-xs font-semibold bg-surface-container-high hover:bg-primary hover:text-white disabled:opacity-60"
                     >
                       {schedulingSubmissionId === item.id ? 'กำลังจัดคิว...' : 'จัดคิวรับงาน'}
@@ -318,7 +422,7 @@ export default function LogisticsTracking() {
               ))}
               {submittedQueue.length === 0 && (
                 <tr>
-                  <td className="py-3 text-on-surface-variant" colSpan={6}>ไม่มีคิวใหม่ในสถานะ submitted</td>
+                  <td className="py-3 text-on-surface-variant" colSpan={7}>ไม่มีคิวใหม่ในสถานะ submitted</td>
                 </tr>
               )}
             </tbody>
@@ -328,13 +432,13 @@ export default function LogisticsTracking() {
 
       <section className="bg-white border border-outline-variant/20 rounded-xl p-4">
         <h2 className="text-lg font-semibold mb-3">งานขนส่งวัสดุ (pickup jobs)</h2>
-        <div className="overflow-x-auto">
+        <div className="max-h-[22rem] overflow-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-on-surface-variant">
-                <th className="py-2">งาน</th>
                 <th className="py-2">วัสดุ</th>
                 <th className="py-2">สถานะ</th>
+                <th className="py-2">ช่วงนัดรับ</th>
                 <th className="py-2">สถานที่</th>
                 <th className="py-2">การอัปเดต</th>
               </tr>
@@ -342,12 +446,30 @@ export default function LogisticsTracking() {
             <tbody>
               {pickupJobs.map((item) => (
                 <tr key={item.id} className="border-t border-outline-variant/10">
-                  <td className="py-2">{item.id.slice(0, 8)}</td>
-                  <td className="py-2">{formatMaterial(item.material_type)} • {Number(item.quantity_value).toLocaleString('th-TH')} {item.quantity_unit}</td>
+                  <td className="py-2">{formatMaterial(item.material_type)} • {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</td>
                   <td className="py-2">
                     <StatusBadge status={item.status} label={formatPickupJobStatus(item.status)} />
                   </td>
-                  <td className="py-2">{item.pickup_location_text}</td>
+                  <td className="py-2">
+                    {formatDateTime(item.planned_pickup_at)} - {formatDateTime(item.pickup_window_end_at ?? null)}
+                  </td>
+                  <td className="py-2">
+                    <div className="space-y-1">
+                      <p>{item.pickup_location_text}</p>
+                      {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
+                        <a
+                          href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary underline underline-offset-2"
+                        >
+                          ดูรายละเอียดบนแผนที่
+                        </a>
+                      ) : (
+                        <p className="text-xs text-on-surface-variant">ไม่มีพิกัดแผนที่</p>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-2 flex items-center gap-2">
                     {item.status === 'pickup_scheduled' && (
                       <button
@@ -385,20 +507,57 @@ export default function LogisticsTracking() {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
           <h2 className="text-lg font-semibold mb-3">คำขอรางวัลที่พร้อมจัดรอบส่ง</h2>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[22rem] overflow-y-auto pr-1">
             {approvedReadyToSchedule.map((item) => (
               <div key={item.id} className="border border-outline-variant/15 rounded-lg p-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium">Request {item.id.slice(0, 8)}</p>
+                  <p className="font-medium">{item.reward_name_th ?? `รหัสรางวัล ${item.reward_id.slice(0, 8)}`}</p>
                   <div className="mt-1">
                     <StatusBadge status={item.status} label="คลังอนุมัติแล้ว" />
                   </div>
-                  <p className="text-xs text-on-surface-variant mt-1">จำนวน {Number(item.quantity).toLocaleString('th-TH')} • {Number(item.requested_points).toLocaleString('th-TH')} คะแนน</p>
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    Farmer จะได้รับ {Number(item.quantity).toLocaleString('th-TH')} ชิ้น • ใช้ {Number(item.requested_points).toLocaleString('th-TH')} PMUC Coin
+                  </p>
+                  <div className="mt-1 space-y-1 text-xs text-on-surface-variant">
+                    <p>ที่อยู่ส่งมอบ: {item.pickup_location_text || '-'}</p>
+                    {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
+                      <a
+                        href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline underline-offset-2"
+                      >
+                        ดูรายละเอียดบนแผนที่
+                      </a>
+                    ) : (
+                      <p>ไม่มีพิกัดแผนที่</p>
+                    )}
+                  </div>
+                  {item.reward_description_th ? (
+                    <p className="text-xs text-on-surface-variant mt-1">{item.reward_description_th}</p>
+                  ) : null}
+                  <div className="mt-2 min-w-[13rem]">
+                    <DateRangePicker
+                      value={deliveryRangeByRequestId[item.id] || { from: null, to: null }}
+                      onChange={(nextRange) =>
+                        setDeliveryRangeByRequestId((prev) => ({
+                          ...prev,
+                          [item.id]: nextRange,
+                        }))
+                      }
+                      minDate={new Date()}
+                      placeholder="เลือกช่วงวันนำส่ง"
+                    />
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => void handleScheduleRewardDelivery(item.id)}
-                  disabled={schedulingRewardRequestId === item.id}
+                  disabled={
+                    schedulingRewardRequestId === item.id ||
+                    !deliveryRangeByRequestId[item.id]?.from ||
+                    !deliveryRangeByRequestId[item.id]?.to
+                  }
                   className="px-3 py-1.5 rounded-full text-xs font-semibold bg-surface-container-high hover:bg-primary hover:text-white disabled:opacity-60"
                 >
                   {schedulingRewardRequestId === item.id ? 'กำลังจัดรอบ...' : 'จัดรอบส่ง'}
@@ -411,15 +570,32 @@ export default function LogisticsTracking() {
 
         <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
           <h2 className="text-lg font-semibold mb-3">งานส่งรางวัลที่กำลังดำเนินการ</h2>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[22rem] overflow-y-auto pr-1">
             {activeRewardDeliveryJobs.map((item) => (
               <div key={item.id} className="border border-outline-variant/15 rounded-lg p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="font-medium">{item.reward_name_th ?? `Reward ${item.reward_id ?? '-'}`}</p>
-                    <p className="text-xs text-on-surface-variant">Job {item.id.slice(0, 8)}</p>
                     <div className="mt-1">
                       <StatusBadge status={item.status} label={formatDeliveryStatus(item.status)} />
+                    </div>
+                    <p className="text-xs text-on-surface-variant mt-1">
+                      ช่วงนำส่ง: {formatDateTime(item.planned_delivery_at)} - {formatDateTime(item.delivery_window_end_at ?? null)}
+                    </p>
+                    <div className="mt-1 space-y-1 text-xs text-on-surface-variant">
+                      <p>ที่อยู่ส่งมอบ: {item.pickup_location_text || '-'}</p>
+                      {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
+                        <a
+                          href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline underline-offset-2"
+                        >
+                          ดูรายละเอียดบนแผนที่
+                        </a>
+                      ) : (
+                        <p>ไม่มีพิกัดแผนที่</p>
+                      )}
                     </div>
                   </div>
                   <p className="text-xs text-on-surface-variant">{Number(item.quantity).toLocaleString('th-TH')} ชิ้น</p>

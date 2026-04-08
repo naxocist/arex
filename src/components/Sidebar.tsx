@@ -1,15 +1,17 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { BarChart3, Factory, Home, LogOut, PackageCheck, Truck } from 'lucide-react';
+import { BarChart3, Factory, Gift, Home, LogOut, PackageCheck, SlidersHorizontal, Truck } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useUser } from '../contexts/UserContext';
 
 const navItems = [
-  { icon: Home, label: 'เกษตรกร', path: '/', roles: ['farmer'] },
+  { icon: Home, label: 'งานวัสดุ', path: '/', roles: ['farmer'] },
+  { icon: Gift, label: 'แลกของรางวัล', path: '/farmer-rewards', roles: ['farmer'] },
   { icon: Truck, label: 'ขนส่ง', path: '/logistics', roles: ['logistics'] },
   { icon: Factory, label: 'โรงงาน', path: '/factory', roles: ['factory'] },
   { icon: PackageCheck, label: 'คลังสินค้า', path: '/warehouse', roles: ['warehouse'] },
   { icon: BarChart3, label: 'ผู้บริหาร', path: '/dashboard', roles: ['executive'] },
+  { icon: SlidersHorizontal, label: 'ตั้งค่าระบบ', path: '/executive-settings', roles: ['executive'] },
 ];
 
 export default function Sidebar() {

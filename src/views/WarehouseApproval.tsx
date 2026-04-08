@@ -32,7 +32,7 @@ export default function WarehouseApproval() {
     return { totalRequests, totalPoints };
   }, [requests]);
 
-  const loadPendingRequests = async () => {
+  const loadPendingRequests = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
       setMessage('ยังไม่พบโทเคนสำหรับเรียก API กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
       return;
@@ -40,7 +40,7 @@ export default function WarehouseApproval() {
 
     setIsLoading(true);
     try {
-      const response = await warehouseApi.listPendingRewardRequests();
+      const response = await warehouseApi.listPendingRewardRequests({ forceRefresh });
       setRequests(response.requests);
       setMessage(null);
     } catch (error) {
@@ -65,7 +65,7 @@ export default function WarehouseApproval() {
     try {
       await warehouseApi.approveRewardRequest(requestId);
       setMessage('อนุมัติคำขอสำเร็จแล้ว');
-      await loadPendingRequests();
+      await loadPendingRequests(true);
     } catch (error) {
       if (error instanceof ApiError) {
         setMessage(`อนุมัติคำขอไม่สำเร็จ: ${error.message}`);
@@ -86,7 +86,7 @@ export default function WarehouseApproval() {
     try {
       await warehouseApi.rejectRewardRequest(requestId, { reason });
       setMessage('ปฏิเสธคำขอสำเร็จแล้ว');
-      await loadPendingRequests();
+      await loadPendingRequests(true);
     } catch (error) {
       if (error instanceof ApiError) {
         setMessage(`ปฏิเสธคำขอไม่สำเร็จ: ${error.message}`);
@@ -113,7 +113,8 @@ export default function WarehouseApproval() {
 
         <button
           type="button"
-          onClick={() => void loadPendingRequests()}
+          onClick={() => void loadPendingRequests(true)}
+          disabled={isLoading}
           className="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold flex items-center gap-2"
         >
           <RefreshCw className="w-4 h-4" />
@@ -132,7 +133,7 @@ export default function WarehouseApproval() {
           <p className="text-3xl font-semibold mt-2">{summary.totalRequests.toLocaleString('th-TH')}</p>
         </div>
         <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">คะแนนรวมในคิว</p>
+          <p className="text-xs uppercase tracking-widest text-on-surface-variant">PMUC Coin รวมในคิว</p>
           <p className="text-3xl font-semibold mt-2">{summary.totalPoints.toLocaleString('th-TH')}</p>
         </div>
         <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
@@ -149,15 +150,15 @@ export default function WarehouseApproval() {
           <h2 className="text-lg font-semibold">รายการรออนุมัติ</h2>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-[28rem] overflow-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-container-low/50">
                 <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">เวลา</th>
-                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">Request</th>
+                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">ของที่ขอแลก</th>
                 <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">สถานะ</th>
                 <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">จำนวน</th>
-                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">คะแนน</th>
+                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">PMUC Coin</th>
                 <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">เหตุผลปฏิเสธ</th>
                 <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant text-center">การตัดสินใจ</th>
               </tr>
@@ -190,7 +191,15 @@ export default function WarehouseApproval() {
                       minute: '2-digit',
                     })}
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium">{item.id.slice(0, 8)}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <p className="font-medium">{item.reward_name_th ?? 'ไม่พบชื่อรางวัล'}</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      {item.reward_description_th ?? 'ไม่มีรายละเอียดเพิ่มเติม'}
+                    </p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      แต้มต่อชิ้น {Number(item.reward_points_cost ?? 0).toLocaleString('th-TH')}
+                    </p>
+                  </td>
                   <td className="px-6 py-4 text-sm">
                     <StatusBadge status={item.status} label={formatRewardRequestStatus(item.status)} />
                   </td>

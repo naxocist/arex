@@ -45,16 +45,13 @@ def _extract_role_from_user(user: Any) -> Role | None:
 def _fetch_role_from_profile(user_id: str) -> Role | None:
     service_client = get_service_client()
 
-    try:
-        response = (
-            service_client.table("profiles")
-            .select("role")
-            .eq("id", user_id)
-            .limit(1)
-            .execute()
-        )
-    except Exception:
-        return None
+    response = (
+        service_client.table("profiles")
+        .select("role")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
 
     data = response.data or []
     if not data:
@@ -81,7 +78,16 @@ def get_current_user(token: str = Depends(get_bearer_token)) -> AuthenticatedUse
             detail="User not found for token",
         )
 
-    role = _extract_role_from_user(user) or _fetch_role_from_profile(str(user.id))
+    role = _extract_role_from_user(user)
+    if role is None:
+        try:
+            role = _fetch_role_from_profile(str(user.id))
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Unable to resolve user role",
+            ) from exc
+
     if role is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

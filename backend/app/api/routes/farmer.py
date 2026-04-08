@@ -50,6 +50,36 @@ def list_submissions(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.get("/material-types")
+def list_material_types(
+    current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
+    workflow_service: WorkflowService = Depends(get_workflow_service),
+) -> dict[str, Any]:
+    try:
+        material_types = workflow_service.list_material_types()
+        return {
+            "material_types": material_types,
+            "actor": current_user.role.value,
+        }
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/measurement-units")
+def list_measurement_units(
+    current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
+    workflow_service: WorkflowService = Depends(get_workflow_service),
+) -> dict[str, Any]:
+    try:
+        units = workflow_service.list_measurement_units()
+        return {
+            "units": units,
+            "actor": current_user.role.value,
+        }
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 @router.get("/rewards")
 def list_rewards(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
@@ -102,6 +132,22 @@ def create_reward_request(
         return {
             "message": "Reward request created",
             "request": request_data,
+        }
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/reward-requests/{request_id}/cancel")
+def cancel_reward_request(
+    request_id: str,
+    current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
+    workflow_service: WorkflowService = Depends(get_workflow_service),
+) -> dict[str, Any]:
+    try:
+        result = workflow_service.cancel_reward_request(current_user.user_id, request_id)
+        return {
+            "message": "Reward request cancelled",
+            "result": result,
         }
     except WorkflowError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
