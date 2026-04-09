@@ -13,6 +13,7 @@ import ExecutiveDashboard from './views/ExecutiveDashboard';
 import ExecutiveSettings from './views/ExecutiveSettings';
 import LogisticsTracking from './views/LogisticsTracking';
 import FactoryIntake from './views/FactoryIntake';
+import FactorySettings from './views/FactorySettings';
 import WarehouseApproval from './views/WarehouseApproval';
 import UserSelection from './views/UserSelection';
 
@@ -72,6 +73,11 @@ function AppRoutes() {
         <Route path="factory" element={
           <ProtectedRoute allowedRole="factory">
             <FactoryIntake />
+          </ProtectedRoute>
+        } />
+        <Route path="factory/settings" element={
+          <ProtectedRoute allowedRole="factory">
+            <FactorySettings />
           </ProtectedRoute>
         } />
         <Route path="warehouse" element={

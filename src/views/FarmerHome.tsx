@@ -185,6 +185,26 @@ export default function FarmerHome() {
       return;
     }
 
+    const materialLabel = materialNameByCode[materialType] ?? materialType;
+    const unitLabel = unitNameByCode[quantityUnit] ?? fallbackThaiUnit(quantityUnit);
+    const confirmMessage = [
+      'ยืนยันการส่งรายการวัสดุ',
+      '',
+      `วัสดุ: ${materialLabel}`,
+      `ปริมาณ: ${parsedQuantity.toLocaleString('th-TH')} ${unitLabel}`,
+      `จุดนัดรับ: ${pickupLocation}`,
+      '',
+      'หากข้อมูลถูกต้อง กด OK เพื่อส่งรายการ',
+    ].join('\n');
+
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm(confirmMessage);
+      if (!confirmed) {
+        setMessage('ยกเลิกการส่งรายการวัสดุ');
+        return;
+      }
+    }
+
     setIsSubmittingMaterial(true);
     setMessage(null);
     try {
@@ -265,87 +285,87 @@ export default function FarmerHome() {
           <h2 className="text-lg font-semibold">แจ้งส่งวัสดุใหม่</h2>
           <p className="text-sm text-on-surface-variant mt-1 mb-4">กรอกข้อมูลสั้นๆ ทางซ้าย และปักหมุดจุดนัดรับบนแผนที่ทางขวา</p>
 
-          <form className="grid grid-cols-1 md:grid-cols-[0.42fr,1.58fr] gap-4" onSubmit={handleSubmitMaterial}>
-            <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50/70 p-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-stone-700">ชนิดวัสดุ</label>
-                <select
-                  value={materialType}
-                  onChange={(event) => setMaterialType(event.target.value)}
-                  className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-full"
-                  required
-                >
-                  {materialTypes.length === 0 && <option value="">เลือกชนิดวัสดุ</option>}
-                  {materialTypes.map((material) => (
-                    <option key={material.code} value={material.code}>{material.name_th}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-stone-700">ปริมาณและหน่วย</label>
-                <div className="grid grid-cols-[1fr,0.9fr] gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={quantityValue}
-                    onChange={(event) => setQuantityValue(event.target.value)}
-                    placeholder="เช่น 120"
-                    className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-full"
-                  />
+          <form className="space-y-4" onSubmit={handleSubmitMaterial}>
+            <div className="flex flex-col xl:flex-row gap-4 items-stretch">
+              <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50/70 p-3 w-full xl:w-[360px] xl:min-w-[360px] xl:max-w-[360px]">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-stone-700">ชนิดวัสดุ</label>
                   <select
-                    value={quantityUnit}
-                    onChange={(event) => setQuantityUnit(event.target.value)}
+                    value={materialType}
+                    onChange={(event) => setMaterialType(event.target.value)}
                     className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-full"
                     required
                   >
-                    {measurementUnits.length === 0 && <option value="">เลือกหน่วย</option>}
-                    {measurementUnits.map((unit) => (
-                      <option key={unit.code} value={unit.code}>{unit.name_th}</option>
+                    {materialTypes.length === 0 && <option value="">เลือกชนิดวัสดุ</option>}
+                    {materialTypes.map((material) => (
+                      <option key={material.code} value={material.code}>{material.name_th}</option>
                     ))}
                   </select>
                 </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-stone-700">ปริมาณและหน่วย</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={quantityValue}
+                      onChange={(event) => setQuantityValue(event.target.value)}
+                      placeholder="เช่น 120"
+                      className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-full min-w-0"
+                    />
+                    <select
+                      value={quantityUnit}
+                      onChange={(event) => setQuantityUnit(event.target.value)}
+                      className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-[42%] min-w-[120px]"
+                      required
+                    >
+                      {measurementUnits.length === 0 && <option value="">เลือกหน่วย</option>}
+                      {measurementUnits.map((unit) => (
+                        <option key={unit.code} value={unit.code}>{unit.name_th}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-stone-700">สถานที่นัดรับ (ข้อความ)</label>
-                <input
-                  type="text"
-                  value={pickupLocation}
-                  onChange={(event) => setPickupLocation(event.target.value)}
-                  placeholder="เช่น หน้าวัด/จุดสังเกต"
-                  className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-full"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
-              <p className="text-sm font-semibold text-on-surface">เลือกจุดนัดรับบนแผนที่ OpenStreetMap</p>
-              <p className="text-xs text-on-surface-variant">แตะ/คลิกเพื่อปักหมุด หรือกดปุ่มใช้ตำแหน่งปัจจุบัน</p>
-              <PickupLocationMapPicker
-                lat={pickupLat}
-                lng={pickupLng}
-                onChange={({ lat, lng }) => {
-                  setPickupLat(lat);
-                  setPickupLng(lng);
-                }}
-                onAddressResolved={(address) => {
-                  if (!pickupLocation || pickupLocation.trim().length < 3) {
+              <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3 flex-1 min-w-0">
+                <p className="text-sm font-semibold text-on-surface">เลือกจุดนัดรับบนแผนที่ OpenStreetMap</p>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-stone-700">สถานที่นัดรับ (ข้อความ)</label>
+                  <input
+                    type="text"
+                    value={pickupLocation}
+                    onChange={(event) => setPickupLocation(event.target.value)}
+                    placeholder="เช่น หน้าวัด/จุดสังเกต"
+                    className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-full"
+                    required
+                  />
+                  <p className="text-xs text-on-surface-variant">เมื่อกดแผนที่ ข้อความที่อยู่จะเปลี่ยนตามตำแหน่งที่เลือกให้อัตโนมัติ</p>
+                </div>
+                <p className="text-xs text-on-surface-variant">แตะ/คลิกเพื่อปักหมุด หรือกดปุ่มใช้ตำแหน่งปัจจุบัน</p>
+                <PickupLocationMapPicker
+                  lat={pickupLat}
+                  lng={pickupLng}
+                  onChange={({ lat, lng }) => {
+                    setPickupLat(lat);
+                    setPickupLng(lng);
+                  }}
+                  onAddressResolved={(address) => {
                     setPickupLocation(address);
-                  }
-                }}
-              />
-              <p className="text-xs text-on-surface-variant">
-                พิกัดที่เลือก: {pickupLat !== null && pickupLng !== null ? `${pickupLat.toFixed(6)}, ${pickupLng.toFixed(6)}` : 'ยังไม่ได้เลือก'}
-              </p>
+                  }}
+                />
+                <p className="text-xs text-on-surface-variant">
+                  พิกัดที่เลือก: {pickupLat !== null && pickupLng !== null ? `${pickupLat.toFixed(6)}, ${pickupLng.toFixed(6)}` : 'ยังไม่ได้เลือก'}
+                </p>
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={isSubmittingMaterial || measurementUnits.length === 0 || materialTypes.length === 0}
-              className="md:col-span-2 px-4 py-2.5 rounded-lg bg-primary text-white font-semibold disabled:opacity-60"
+              className="w-full px-4 py-2.5 rounded-lg bg-primary text-white font-semibold disabled:opacity-60"
             >
               {isSubmittingMaterial ? 'กำลังส่ง...' : 'ส่งรายการวัสดุ'}
             </button>

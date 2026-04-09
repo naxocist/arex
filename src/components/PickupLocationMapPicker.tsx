@@ -118,6 +118,19 @@ export default function PickupLocationMapPicker(props: PickupLocationMapPickerPr
 
   return (
     <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-stone-600">
+        <button
+          type="button"
+          onClick={handleUseCurrentLocation}
+          className="px-4 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm shadow-sm"
+        >
+          ใช้ตำแหน่งปัจจุบัน
+        </button>
+        <span>คลิกบนแผนที่เพื่อปักหมุดจุดนัดรับ</span>
+      </div>
+
+      {geoErrorMessage ? <p className="text-xs text-rose-700">{geoErrorMessage}</p> : null}
+
       <MapContainer
         style={{ width: '100%', height: '420px' }}
         center={center}
@@ -143,16 +156,7 @@ export default function PickupLocationMapPicker(props: PickupLocationMapPickerPr
       </MapContainer>
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-stone-600">
-        <button
-          type="button"
-          onClick={handleUseCurrentLocation}
-          className="px-3 py-1.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700"
-        >
-          ใช้ตำแหน่งปัจจุบัน
-        </button>
-        <span>คลิกบนแผนที่เพื่อปักหมุดจุดนัดรับ</span>
         {isResolvingAddress ? <span>กำลังดึงที่อยู่...</span> : null}
-        {geoErrorMessage ? <span className="text-rose-700">{geoErrorMessage}</span> : null}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ from app.models.workflow import (
     RejectRewardRequest,
     SchedulePickupRequest,
     ScheduleRewardDeliveryRequest,
+    UpsertFactoryInfoRequest,
     UpsertMaterialPointRuleRequest,
     UpsertMaterialTypeRequest,
     UpsertMeasurementUnitRequest,
@@ -585,12 +586,25 @@ class WorkflowService:
         except Exception as exc:
             raise WorkflowError(f"Failed to fetch pickup queue: {exc}") from exc
 
+    def list_active_factories(self) -> list[dict[str, Any]]:
+        try:
+            response = (
+                self.client.table("factories")
+                .select("id, name_th, location_text, active")
+                .eq("active", True)
+                .order("name_th", desc=False)
+                .execute()
+            )
+            return response.data or []
+        except Exception as exc:
+            raise WorkflowError(f"Failed to fetch active factories: {exc}") from exc
+
     def list_logistics_pickup_jobs(self, logistics_profile_id: str) -> list[dict[str, Any]]:
         try:
             jobs_response = (
                 self.client.table("pickup_jobs")
                 .select(
-                    "id, submission_id, logistics_profile_id, status, planned_pickup_at, pickup_window_end_at, picked_up_at, delivered_factory_at, created_at"
+                    "id, submission_id, logistics_profile_id, destination_factory_id, status, planned_pickup_at, pickup_window_end_at, picked_up_at, delivered_factory_at, created_at"
                 )
                 .eq("logistics_profile_id", logistics_profile_id)
                 .in_("status", ["pickup_scheduled", "picked_up", "delivered_to_factory"])
@@ -615,6 +629,26 @@ class WorkflowService:
             submissions = submissions_response.data or []
             submissions_by_id = {str(row["id"]): row for row in submissions if row.get("id")}
 
+            destination_factory_ids = [
+                str(job["destination_factory_id"])
+                for job in jobs
+                if job.get("destination_factory_id") is not None
+            ]
+            destination_factory_by_id: dict[str, dict[str, Any]] = {}
+            if destination_factory_ids:
+                factories_response = (
+                    self.client.table("factories")
+                    .select("id, name_th, location_text")
+                    .in_("id", list(set(destination_factory_ids)))
+                    .execute()
+                )
+                factories = factories_response.data or []
+                destination_factory_by_id = {
+                    str(row["id"]): row
+                    for row in factories
+                    if row.get("id") is not None
+                }
+
             result: list[dict[str, Any]] = []
             for job in jobs:
                 submission_id = str(job.get("submission_id"))
@@ -627,6 +661,13 @@ class WorkflowService:
                         "id": str(job["id"]),
                         "submission_id": submission_id,
                         "logistics_profile_id": str(job.get("logistics_profile_id")),
+                        "destination_factory_id": str(job.get("destination_factory_id")) if job.get("destination_factory_id") else None,
+                        "destination_factory_name_th": (
+                            destination_factory_by_id.get(str(job.get("destination_factory_id") or ""), {}).get("name_th")
+                        ),
+                        "destination_factory_location_text": (
+                            destination_factory_by_id.get(str(job.get("destination_factory_id") or ""), {}).get("location_text")
+                        ),
                         "status": job.get("status"),
                         "planned_pickup_at": job.get("planned_pickup_at"),
                         "pickup_window_end_at": job.get("pickup_window_end_at"),
@@ -657,17 +698,61 @@ class WorkflowService:
             if payload.pickup_window_end_at < payload.pickup_window_start_at:
                 raise WorkflowError("Pickup window end must be greater than or equal to pickup window start")
 
-            response = self.client.rpc(
-                "schedule_pickup_job",
-                {
-                    "p_submission_id": submission_id,
-                    "p_logistics_profile_id": logistics_profile_id,
-                    "p_planned_pickup_at": payload.pickup_window_start_at.isoformat(),
-                    "p_pickup_window_end_at": payload.pickup_window_end_at.isoformat(),
-                    "p_notes": payload.notes,
-                },
-            ).execute()
-            return _first_row(response.data)
+            destination_factory_response = (
+                self.client.table("factories")
+                .select("id, active")
+                .eq("id", payload.destination_factory_id)
+                .limit(1)
+                .execute()
+            )
+            destination_factories = destination_factory_response.data or []
+            if not destination_factories:
+                raise WorkflowError("Destination factory not found")
+            if not bool(destination_factories[0].get("active")):
+                raise WorkflowError("Destination factory is inactive")
+
+            try:
+                response = self.client.rpc(
+                    "schedule_pickup_job",
+                    {
+                        "p_submission_id": submission_id,
+                        "p_logistics_profile_id": logistics_profile_id,
+                        "p_planned_pickup_at": payload.pickup_window_start_at.isoformat(),
+                        "p_pickup_window_end_at": payload.pickup_window_end_at.isoformat(),
+                        "p_destination_factory_id": payload.destination_factory_id,
+                        "p_notes": payload.notes,
+                    },
+                ).execute()
+                return _first_row(response.data)
+            except Exception as rpc_exc:
+                # Backward compatibility for environments where migration 0009 is not applied yet.
+                message = str(rpc_exc)
+                if "Could not find the function public.schedule_pickup_job" not in message:
+                    raise
+
+                legacy_response = self.client.rpc(
+                    "schedule_pickup_job",
+                    {
+                        "p_submission_id": submission_id,
+                        "p_logistics_profile_id": logistics_profile_id,
+                        "p_planned_pickup_at": payload.pickup_window_start_at.isoformat(),
+                        "p_pickup_window_end_at": payload.pickup_window_end_at.isoformat(),
+                        "p_notes": payload.notes,
+                    },
+                ).execute()
+                legacy_result = _first_row(legacy_response.data)
+
+                pickup_job_id = legacy_result.get("pickup_job_id")
+                if pickup_job_id is None:
+                    raise WorkflowError("Failed to schedule pickup: missing pickup_job_id from legacy function")
+
+                self.client.table("pickup_jobs").update(
+                    {
+                        "destination_factory_id": payload.destination_factory_id,
+                    }
+                ).eq("id", pickup_job_id).execute()
+
+                return legacy_result
         except Exception as exc:
             raise WorkflowError(f"Failed to schedule pickup: {exc}") from exc
 
@@ -922,14 +1007,20 @@ class WorkflowService:
         except Exception as exc:
             raise WorkflowError(f"Failed to mark reward delivered: {exc}") from exc
 
-    def list_factory_pending_intakes(self) -> dict[str, Any]:
+    def list_factory_pending_intakes(self, factory_profile_id: str) -> dict[str, Any]:
         try:
+            my_factory = self.get_or_create_factory_for_profile(factory_profile_id)
+            my_factory_id = str(my_factory.get("id") or "")
+            if not my_factory_id:
+                raise WorkflowError("Factory record not found")
+
             pickup_response = (
                 self.client.table("pickup_jobs")
                 .select(
-                    "id, submission_id, logistics_profile_id, status, planned_pickup_at, picked_up_at, delivered_factory_at"
+                    "id, submission_id, logistics_profile_id, destination_factory_id, status, planned_pickup_at, picked_up_at, delivered_factory_at"
                 )
                 .eq("status", "delivered_to_factory")
+                .eq("destination_factory_id", my_factory_id)
                 .order("delivered_factory_at", desc=True)
                 .execute()
             )
@@ -939,6 +1030,7 @@ class WorkflowService:
             intake_response = (
                 self.client.table("factory_intakes")
                 .select("id, pickup_job_id, factory_profile_id, measured_weight_kg, discrepancy_note, status, confirmed_at")
+                .eq("factory_profile_id", factory_profile_id)
                 .order("confirmed_at", desc=True)
                 .execute()
             )
@@ -957,7 +1049,7 @@ class WorkflowService:
                 confirmed_pickup_response = (
                     self.client.table("pickup_jobs")
                     .select(
-                        "id, submission_id, logistics_profile_id, status, planned_pickup_at, picked_up_at, delivered_factory_at"
+                        "id, submission_id, logistics_profile_id, destination_factory_id, status, planned_pickup_at, picked_up_at, delivered_factory_at"
                     )
                     .in_("id", intake_pickup_job_ids)
                     .execute()
@@ -1025,21 +1117,11 @@ class WorkflowService:
                 units = units_response.data or []
                 units_by_code = {str(row["code"]): row for row in units if row.get("code")}
 
-            def _estimate_kg(quantity_value: Any, to_kg_factor: Any) -> float:
+            def _to_float(value: Any) -> float:
                 try:
-                    quantity = float(quantity_value)
+                    return float(value)
                 except (TypeError, ValueError):
-                    quantity = 0.0
-
-                try:
-                    factor = float(to_kg_factor) if to_kg_factor is not None else None
-                except (TypeError, ValueError):
-                    factor = None
-
-                if factor is not None and factor > 0:
-                    return quantity * factor
-
-                return max(quantity, 1.0)
+                    return 0.0
 
             queue: list[dict[str, Any]] = []
             for job in pickup_jobs_arrived:
@@ -1102,16 +1184,30 @@ class WorkflowService:
                     }
                 )
 
+            arrived_estimated_weight_kg_total = 0.0
+            arrived_convertible_count = 0
+            arrived_non_convertible_count = 0
+            arrived_non_convertible_quantity_total = 0.0
+            for item in queue:
+                quantity_value = _to_float(item.get("quantity_value"))
+                factor = _to_float(item.get("quantity_to_kg_factor"))
+                if factor > 0:
+                    arrived_convertible_count += 1
+                    arrived_estimated_weight_kg_total += quantity_value * factor
+                else:
+                    arrived_non_convertible_count += 1
+                    arrived_non_convertible_quantity_total += quantity_value
+
             return {
                 "queue": queue,
                 "confirmed": confirmed,
                 "summary": {
                     "arrived_count": len(queue),
                     "confirmed_count": len(confirmed),
-                    "arrived_estimated_weight_kg_total": round(
-                        sum(_estimate_kg(item.get("quantity_value"), item.get("quantity_to_kg_factor")) for item in queue),
-                        3,
-                    ),
+                    "arrived_estimated_weight_kg_total": round(arrived_estimated_weight_kg_total, 3),
+                    "arrived_convertible_count": arrived_convertible_count,
+                    "arrived_non_convertible_count": arrived_non_convertible_count,
+                    "arrived_non_convertible_quantity_total": round(arrived_non_convertible_quantity_total, 3),
                     "confirmed_weight_kg_total": round(confirmed_weight_kg_total, 3),
                     "confirmed_weight_ton_total": round(confirmed_weight_kg_total / 1000, 3),
                 },
@@ -1125,6 +1221,26 @@ class WorkflowService:
         payload: ConfirmFactoryIntakeRequest,
     ) -> dict[str, Any]:
         try:
+            my_factory = self.get_or_create_factory_for_profile(factory_profile_id)
+            my_factory_id = str(my_factory.get("id") or "")
+            if not my_factory_id:
+                raise WorkflowError("Factory record not found")
+
+            pickup_job_response = (
+                self.client.table("pickup_jobs")
+                .select("id, destination_factory_id")
+                .eq("id", payload.pickup_job_id)
+                .limit(1)
+                .execute()
+            )
+            pickup_job_rows = pickup_job_response.data or []
+            if not pickup_job_rows:
+                raise WorkflowError("Pickup job not found")
+
+            destination_factory_id = pickup_job_rows[0].get("destination_factory_id")
+            if destination_factory_id is not None and str(destination_factory_id) != my_factory_id:
+                raise WorkflowError("Pickup job is assigned to another factory")
+
             response = self.client.rpc(
                 "confirm_factory_intake",
                 {
@@ -1137,6 +1253,91 @@ class WorkflowService:
             return _first_row(response.data)
         except Exception as exc:
             raise WorkflowError(f"Failed to confirm factory intake: {exc}") from exc
+
+    def get_or_create_factory_for_profile(self, factory_profile_id: str) -> dict[str, Any]:
+        try:
+            existing_response = (
+                self.client.table("factories")
+                .select("id, factory_profile_id, name_th, location_text, lat, lng, active, created_at")
+                .eq("factory_profile_id", factory_profile_id)
+                .limit(1)
+                .execute()
+            )
+            existing_rows = existing_response.data or []
+            if existing_rows:
+                return _first_row(existing_rows)
+
+            profile_response = (
+                self.client.table("profiles")
+                .select("display_name")
+                .eq("id", factory_profile_id)
+                .limit(1)
+                .execute()
+            )
+            profile_rows = profile_response.data or []
+            if not profile_rows:
+                raise WorkflowError("Factory profile not found")
+
+            display_name = str(profile_rows[0].get("display_name") or "").strip()
+            default_name = display_name or f"โรงงาน {factory_profile_id[:8]}"
+            create_response = (
+                self.client.table("factories")
+                .insert(
+                    {
+                        "factory_profile_id": factory_profile_id,
+                        "name_th": default_name,
+                        "active": True,
+                    }
+                )
+                .execute()
+            )
+
+            return _first_row(create_response.data)
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to load factory info: {exc}") from exc
+
+    def update_factory_for_profile(
+        self,
+        factory_profile_id: str,
+        payload: UpsertFactoryInfoRequest,
+    ) -> dict[str, Any]:
+        try:
+            if (payload.lat is None) != (payload.lng is None):
+                raise WorkflowError("lat and lng must be provided together")
+
+            factory = self.get_or_create_factory_for_profile(factory_profile_id)
+            factory_id = str(factory.get("id") or "")
+            if not factory_id:
+                raise WorkflowError("Factory record not found")
+
+            name_th = payload.name_th.strip()
+            if not name_th:
+                raise WorkflowError("Factory name is required")
+
+            location_text = payload.location_text.strip() if payload.location_text else None
+
+            update_response = (
+                self.client.table("factories")
+                .update(
+                    {
+                        "name_th": name_th,
+                        "location_text": location_text,
+                        "lat": payload.lat,
+                        "lng": payload.lng,
+                    }
+                )
+                .eq("id", factory_id)
+                .eq("factory_profile_id", factory_profile_id)
+                .execute()
+            )
+
+            return _first_row(update_response.data)
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to update factory info: {exc}") from exc
 
     def list_pending_reward_requests(self) -> list[dict[str, Any]]:
         try:
@@ -1276,6 +1477,9 @@ class WorkflowService:
 
             submissions_by_material: dict[str, dict[str, Any]] = {}
             submitted_weight_estimated_kg_total = 0.0
+            submissions_convertible_count = 0
+            submissions_non_convertible_count = 0
+            submissions_non_convertible_quantity_total = 0.0
             unique_farmers: set[str] = set()
 
             for row in submissions:
@@ -1287,8 +1491,14 @@ class WorkflowService:
                 quantity_value = _to_float(row.get("quantity_value"))
                 quantity_unit = str(row.get("quantity_unit") or "")
                 unit_factor = units_to_kg_factor.get(quantity_unit)
-                estimated_kg = quantity_value * unit_factor if unit_factor else 0.0
+                is_convertible = unit_factor is not None and unit_factor > 0
+                estimated_kg = quantity_value * unit_factor if is_convertible else 0.0
                 submitted_weight_estimated_kg_total += estimated_kg
+                if is_convertible:
+                    submissions_convertible_count += 1
+                else:
+                    submissions_non_convertible_count += 1
+                    submissions_non_convertible_quantity_total += quantity_value
 
                 material_stat = submissions_by_material.setdefault(
                     material_code,
@@ -1298,11 +1508,17 @@ class WorkflowService:
                         "submissions_count": 0,
                         "declared_quantity_total": 0.0,
                         "estimated_weight_kg_total": 0.0,
+                        "convertible_submissions_count": 0,
+                        "non_convertible_submissions_count": 0,
                     },
                 )
                 material_stat["submissions_count"] += 1
                 material_stat["declared_quantity_total"] += quantity_value
                 material_stat["estimated_weight_kg_total"] += estimated_kg
+                if is_convertible:
+                    material_stat["convertible_submissions_count"] += 1
+                else:
+                    material_stat["non_convertible_submissions_count"] += 1
 
             submissions_material_breakdown = sorted(
                 submissions_by_material.values(),
@@ -1348,6 +1564,11 @@ class WorkflowService:
             factory_confirmed_weight_kg_total = sum(
                 _to_float(row.get("measured_weight_kg")) for row in factory_intakes
             )
+            pickup_jobs_status_summary = {
+                "pickup_scheduled": sum(1 for row in pickup_jobs if row.get("status") == "pickup_scheduled"),
+                "picked_up": sum(1 for row in pickup_jobs if row.get("status") == "picked_up"),
+                "delivered_to_factory": sum(1 for row in pickup_jobs if row.get("status") == "delivered_to_factory"),
+            }
 
             return {
                 "submissions_total": len(submissions),
@@ -1356,11 +1577,15 @@ class WorkflowService:
                 "pickup_jobs_active": sum(
                     1 for row in pickup_jobs if row.get("status") in {"pickup_scheduled", "picked_up", "delivered_to_factory"}
                 ),
+                "pickup_jobs_status_summary": pickup_jobs_status_summary,
                 "reward_requests_pending_warehouse": sum(
                     1 for row in reward_requests if row.get("status") == "requested"
                 ),
                 "submitted_weight_estimated_kg_total": round(submitted_weight_estimated_kg_total, 3),
                 "submitted_weight_estimated_ton_total": round(submitted_weight_estimated_kg_total / 1000, 3),
+                "submissions_convertible_count": submissions_convertible_count,
+                "submissions_non_convertible_count": submissions_non_convertible_count,
+                "submissions_non_convertible_quantity_total": round(submissions_non_convertible_quantity_total, 3),
                 "factory_confirmed_weight_kg_total": round(factory_confirmed_weight_kg_total, 3),
                 "factory_confirmed_weight_ton_total": round(factory_confirmed_weight_kg_total / 1000, 3),
                 "points_credited_total": points_credited_total,
