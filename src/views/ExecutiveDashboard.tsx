@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, RefreshCw } from 'lucide-react';
+import { ArrowRight, BarChart3, Boxes, Coins, RefreshCw, Users } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import AlertBanner from '@/src/components/AlertBanner';
+import EmptyState from '@/src/components/EmptyState';
+import PageHeader from '@/src/components/PageHeader';
+import SectionCard from '@/src/components/SectionCard';
+import StatCard from '@/src/components/StatCard';
 import { ApiError, executiveApi, type ExecutiveOverview } from '@/src/lib/apiClient';
 
 function formatNumber(value: number): string {
   return value.toLocaleString('th-TH');
-}
-
-function formatTons(value: number): string {
-  return `${value.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 3 })} ตัน`;
 }
 
 function formatKg(value: number): string {
@@ -25,6 +27,13 @@ function formatMaterialLabel(nameTh: string | null | undefined, code: string): s
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
+  if (!message) {
+    return 'info';
+  }
+  return message.includes('ไม่สำเร็จ') ? 'error' : 'info';
+}
+
 export default function ExecutiveDashboard() {
   const [overview, setOverview] = useState<ExecutiveOverview | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -35,18 +44,11 @@ export default function ExecutiveDashboard() {
     const uniqueFarmersTotal = overview?.unique_farmers_total ?? 0;
     const submissionsPendingPickup = overview?.submissions_pending_pickup ?? 0;
     const pickupJobsActive = overview?.pickup_jobs_active ?? 0;
-    const pickupJobsStatusSummary = overview?.pickup_jobs_status_summary ?? {
-      pickup_scheduled: 0,
-      picked_up: 0,
-      delivered_to_factory: 0,
-    };
     const rewardRequestsTotal = overview?.reward_requests_total ?? 0;
     const rewardRequestsPendingWarehouse = overview?.reward_requests_pending_warehouse ?? 0;
     const submittedWeightConvertibleKg = overview?.submitted_weight_estimated_kg_total ?? 0;
     const submissionsConvertibleCount = overview?.submissions_convertible_count ?? 0;
     const submissionsNonConvertibleCount = overview?.submissions_non_convertible_count ?? 0;
-    const submissionsNonConvertibleQuantityTotal = overview?.submissions_non_convertible_quantity_total ?? 0;
-    const confirmedWeightTon = overview?.factory_confirmed_weight_ton_total ?? 0;
     const confirmedWeightKg = overview?.factory_confirmed_weight_kg_total ?? 0;
     const pointsCredited = overview?.points_credited_total ?? 0;
     const pointsReserved = overview?.points_reserved_total ?? 0;
@@ -58,14 +60,11 @@ export default function ExecutiveDashboard() {
       uniqueFarmersTotal,
       submissionsPendingPickup,
       pickupJobsActive,
-      pickupJobsStatusSummary,
       rewardRequestsTotal,
       rewardRequestsPendingWarehouse,
       submittedWeightConvertibleKg,
       submissionsConvertibleCount,
       submissionsNonConvertibleCount,
-      submissionsNonConvertibleQuantityTotal,
-      confirmedWeightTon,
       confirmedWeightKg,
       pointsCredited,
       pointsReserved,
@@ -73,6 +72,17 @@ export default function ExecutiveDashboard() {
       pointsNetAvailable,
     };
   }, [overview]);
+
+  const materialChartData = useMemo(
+    () =>
+      (overview?.submissions_material_breakdown ?? []).map((item, index) => ({
+        name: formatMaterialLabel(item.material_name_th, item.material_type),
+        weight: Number(item.estimated_weight_kg_total.toFixed(2)),
+        count: item.submissions_count,
+        fill: ['#1f6b4f', '#c67a25', '#2563eb', '#7c3aed'][index % 4],
+      })),
+    [overview],
+  );
 
   const loadOverview = async (forceRefresh = false) => {
     setIsLoading(true);
@@ -97,162 +107,138 @@ export default function ExecutiveDashboard() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold text-on-surface">หน้าภาพรวมผู้บริหาร</h1>
-          <p className="text-sm text-on-surface-variant mt-1">ภาพรวมเชิงลึกของการแลกวัสดุและการใช้แต้มของเกษตรกร</p>
-          {message && <p className="text-sm text-red-700 mt-2">{message}</p>}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void loadOverview(true)}
-            disabled={isLoading}
-            className="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold disabled:opacity-60 flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" /> รีเฟรช
-          </button>
-          <Link
-            to="/executive-settings"
-            className="px-4 py-2 rounded-full border border-outline-variant/40 text-sm font-semibold text-on-surface hover:bg-stone-100/70 flex items-center gap-2"
-          >
-            จัดการสูตรแต้มและ master data <ArrowRight className="w-4 h-4" />
+      <PageHeader
+        eyebrow="Executive Overview"
+        title="ภาพรวมผู้บริหารที่แยก KPI, งานค้าง และโครงสร้างวัสดุออกจากกันชัดเจน"
+        description="ข้อมูลบริหารควรตอบคำถามได้เร็วว่า ตอนนี้ระบบค้างตรงไหน วัสดุเข้าเท่าไร และแต้มกำลังหมุนเวียนอย่างไร หน้านี้จึงจัดเป็น summary, bottlenecks และ material mix"
+        actions={[
+          {
+            label: 'จัดการสูตรแต้มและ master data',
+            to: '/executive-settings',
+            variant: 'secondary',
+          },
+          {
+            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
+            onClick: () => void loadOverview(true),
+          },
+        ]}
+      />
+
+      {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="เกษตรกรที่เคยทำรายการ" value={formatNumber(metrics.uniqueFarmersTotal)} detail="นับเฉพาะบัญชีที่มีธุรกรรมอย่างน้อย 1 ครั้ง" icon={Users} tone="emerald" />
+        <StatCard label="น้ำหนักประมาณการที่แปลงได้" value={formatKg(metrics.submittedWeightConvertibleKg)} detail={`แปลงได้ ${formatNumber(metrics.submissionsConvertibleCount)} รายการ`} icon={Boxes} tone="amber" />
+        <StatCard label="น้ำหนักที่โรงงานยืนยันแล้ว" value={formatKg(metrics.confirmedWeightKg)} detail="อิงจากน้ำหนักจริงที่โรงงานรับเข้าแล้ว" icon={BarChart3} tone="sky" />
+        <StatCard label="แต้มที่ใช้ได้จริง" value={formatNumber(metrics.pointsNetAvailable)} detail="แต้มคงเหลือหลังหักที่จองไว้และที่ใช้ไปแล้ว" icon={Coins} tone="violet" />
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
+        <SectionCard
+          title="Executive Summary"
+          description="มุมมองกว้างที่ผู้บริหารมักใช้ก่อน เช่น ปริมาณงานทั้งหมด น้ำหนักที่รับเข้า และการเคลื่อนไหวของแต้ม"
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-[1.5rem] border border-line bg-surface-muted p-4">
+              <p className="text-sm font-semibold text-stone-900">ปริมาณธุรกรรม</p>
+              <div className="mt-3 space-y-2 text-sm text-stone-600">
+                <p>รายการส่งวัสดุทั้งหมด {formatNumber(metrics.submissionsTotal)} รายการ</p>
+                <p>คำขอแลกรางวัลทั้งหมด {formatNumber(metrics.rewardRequestsTotal)} รายการ</p>
+                <p>แต้มที่เครดิตแล้ว {formatNumber(metrics.pointsCredited)} แต้ม</p>
+              </div>
+            </div>
+            <div className="rounded-[1.5rem] border border-line bg-surface-muted p-4">
+              <p className="text-sm font-semibold text-stone-900">สภาพคล่องของแต้ม</p>
+              <div className="mt-3 space-y-2 text-sm text-stone-600">
+                <p>แต้มจองรออนุมัติ {formatNumber(metrics.pointsReserved)} แต้ม</p>
+                <p>แต้มที่ใช้แลกแล้ว {formatNumber(metrics.pointsSpent)} แต้ม</p>
+                <p>แต้มคงเหลือใช้งานจริง {formatNumber(metrics.pointsNetAvailable)} แต้ม</p>
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Operational Bottlenecks"
+          description="ตัวเลขส่วนนี้ช่วยชี้ว่า pipeline ติดอยู่ตรงไหน ไม่ว่าจะเป็นฝั่งขนส่งหรือคลังสินค้า"
+        >
+          <div className="space-y-3">
+            <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-900">รอรับวัสดุ</p>
+              <p className="mt-2 text-3xl font-semibold text-amber-950">{formatNumber(metrics.submissionsPendingPickup)}</p>
+              <p className="mt-2 text-sm text-amber-900/80">รายการที่ยังไม่ผ่านกระบวนการรับและส่งเข้าโรงงาน</p>
+            </div>
+            <div className="rounded-[1.5rem] border border-sky-200 bg-sky-50 p-4">
+              <p className="text-sm font-semibold text-sky-900">งานขนส่งที่กำลังดำเนินการ</p>
+              <p className="mt-2 text-3xl font-semibold text-sky-950">{formatNumber(metrics.pickupJobsActive)}</p>
+              <p className="mt-2 text-sm text-sky-900/80">สะท้อนโหลดงานที่ยังไม่ถึงโรงงานและยังไม่ปิดวงรอบ</p>
+            </div>
+            <div className="rounded-[1.5rem] border border-rose-200 bg-rose-50 p-4">
+              <p className="text-sm font-semibold text-rose-900">คำขอรอคลังพิจารณา</p>
+              <p className="mt-2 text-3xl font-semibold text-rose-950">{formatNumber(metrics.rewardRequestsPendingWarehouse)}</p>
+              <p className="mt-2 text-sm text-rose-900/80">จุดนี้สะท้อนภาระงาน approval ที่อาจหน่วงการส่งมอบรางวัล</p>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+
+      <SectionCard
+        title="Material Mix"
+        description="ใช้กราฟสำหรับภาพรวมเชิงสัดส่วน แล้วคงรายละเอียดเชิงตัวเลขไว้ในตารางสำหรับการตรวจสอบ"
+      >
+        {materialChartData.length === 0 ? (
+          <EmptyState
+            title="ยังไม่มีข้อมูลประเภทวัสดุในภาพรวม"
+            description="เมื่อเริ่มมีการส่งวัสดุ ระบบจะแสดงทั้งสัดส่วนตามประเภทและน้ำหนักประมาณการที่แปลงได้"
+            icon={Boxes}
+          />
+        ) : (
+          <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
+            <div className="h-[320px] rounded-[1.5rem] border border-line bg-surface-muted p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={materialChartData} margin={{ top: 8, right: 8, left: -12, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#d8d0c4" />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                  <YAxis tickLine={false} axisLine={false} fontSize={12} />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(29,29,27,0.06)' }}
+                    contentStyle={{ borderRadius: 16, borderColor: '#d8d0c4' }}
+                    formatter={(value: number) => [`${formatNumber(value)} กก.`, 'น้ำหนักประมาณการ']}
+                  />
+                  <Bar dataKey="weight" radius={[14, 14, 4, 4]}>
+                    {materialChartData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="space-y-3">
+              {(overview?.submissions_material_breakdown ?? []).map((item) => (
+                <article key={item.material_type} className="rounded-[1.4rem] border border-line bg-surface-muted p-4">
+                  <p className="font-semibold text-stone-900">{formatMaterialLabel(item.material_name_th, item.material_type)}</p>
+                  <div className="mt-3 grid gap-2 text-sm text-stone-600 sm:grid-cols-2">
+                    <p>จำนวนรายการ {formatNumber(item.submissions_count)}</p>
+                    <p>แปลงหน่วยได้ {formatNumber(item.convertible_submissions_count)}</p>
+                    <p>แปลงหน่วยไม่ได้ {formatNumber(item.non_convertible_submissions_count)}</p>
+                    <p>น้ำหนักประมาณการ {formatNumber(item.estimated_weight_kg_total)} กก.</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-6 rounded-[1.5rem] border border-line bg-surface-muted p-4 text-sm leading-6 text-stone-600">
+          รายการที่แปลงหน่วยไม่ได้ในภาพรวม {formatNumber(metrics.submissionsNonConvertibleCount)} รายการ
+          ซึ่งยังเป็นจุดที่ผู้บริหารอาจต้องพิจารณาปรับ master data หรือกติกาการรับวัสดุ
+          <Link to="/executive-settings" className="mt-3 inline-flex items-center gap-2 font-semibold text-stone-900 underline underline-offset-2">
+            ไปจัดการสูตรและ master data
+            <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-      </section>
-
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
-          <p className="text-xs uppercase tracking-widest text-emerald-700">เกษตรกรที่เคยทำรายการ</p>
-          <p className="text-3xl font-semibold mt-2 text-emerald-900">{formatNumber(metrics.uniqueFarmersTotal)}</p>
-          <p className="text-xs text-emerald-700/80 mt-1">นับเฉพาะบัญชีที่มีธุรกรรมอย่างน้อย 1 รายการ</p>
-        </div>
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
-          <p className="text-xs uppercase tracking-widest text-amber-700">น้ำหนักประมาณการ (เฉพาะรายการที่แปลงหน่วยได้)</p>
-          <p className="text-3xl font-semibold mt-2 text-amber-900">{formatKg(metrics.submittedWeightConvertibleKg)}</p>
-          <p className="text-xs text-amber-700/80 mt-1">
-            แปลงได้ {formatNumber(metrics.submissionsConvertibleCount)} รายการ • แปลงไม่ได้ {formatNumber(metrics.submissionsNonConvertibleCount)} รายการ
-          </p>
-        </div>
-        <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-5">
-          <p className="text-xs uppercase tracking-widest text-sky-700">น้ำหนักที่โรงงานยืนยันแล้ว</p>
-          <p className="text-3xl font-semibold mt-2 text-sky-900">{formatKg(metrics.confirmedWeightKg)}</p>
-          <p className="text-xs text-sky-700/80 mt-1">อิงจากรายการรับเข้าที่ปิดงานแล้ว</p>
-        </div>
-        <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-5">
-          <p className="text-xs uppercase tracking-widest text-violet-700">แต้มคงเหลือใช้งานได้</p>
-          <p className="text-3xl font-semibold mt-2 text-violet-900">{formatNumber(metrics.pointsNetAvailable)}</p>
-          <p className="text-xs text-violet-700/80 mt-1">แต้มที่ยังนำไปแลกได้จริงตอนนี้</p>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
-          <p className="text-xs uppercase tracking-widest text-stone-500">รายการส่งวัสดุ</p>
-          <p className="text-3xl font-semibold mt-2 text-stone-900">{formatNumber(metrics.submissionsTotal)}</p>
-          <p className="text-sm text-stone-600 mt-2">รอจัดคิวรับ: {formatNumber(metrics.submissionsPendingPickup)} รายการ</p>
-        </div>
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
-          <p className="text-xs uppercase tracking-widest text-stone-500">งานขนส่งที่กำลังดำเนินการ</p>
-          <p className="text-3xl font-semibold mt-2 text-stone-900">{formatNumber(metrics.pickupJobsActive)}</p>
-          <p className="text-sm text-stone-600 mt-2">
-            นัดรับแล้ว {formatNumber(metrics.pickupJobsStatusSummary.pickup_scheduled)} •
-            รับวัสดุแล้ว {formatNumber(metrics.pickupJobsStatusSummary.picked_up)} •
-            ส่งถึงโรงงานแล้ว {formatNumber(metrics.pickupJobsStatusSummary.delivered_to_factory)}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
-          <p className="text-xs uppercase tracking-widest text-stone-500">คำขอแลกรางวัลทั้งหมด</p>
-          <p className="text-3xl font-semibold mt-2 text-stone-900">{formatNumber(metrics.rewardRequestsTotal)}</p>
-          <p className="text-sm text-stone-600 mt-2">แต้มที่ใช้แลกสำเร็จ: {formatNumber(metrics.pointsSpent)}</p>
-        </div>
-      </section>
-
-      <section className="bg-white border border-outline-variant/20 rounded-2xl p-5 space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold">สรุปการแลกของรางวัล</h2>
-          <p className="text-sm text-on-surface-variant mt-1">แสดงจำนวนคำขอและการเคลื่อนไหวของแต้มแบบแยกบทบาทให้เข้าใจง่าย</p>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-            <p className="text-amber-700">รอพิจารณา</p>
-            <p className="text-xl font-semibold text-amber-900">{formatNumber(overview?.reward_requests_status_summary.requested ?? 0)}</p>
-          </div>
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-            <p className="text-emerald-700">อนุมัติแล้ว</p>
-            <p className="text-xl font-semibold text-emerald-900">{formatNumber(overview?.reward_requests_status_summary.warehouse_approved ?? 0)}</p>
-          </div>
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
-            <p className="text-rose-700">ไม่อนุมัติ</p>
-            <p className="text-xl font-semibold text-rose-900">{formatNumber(overview?.reward_requests_status_summary.warehouse_rejected ?? 0)}</p>
-          </div>
-          <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
-            <p className="text-stone-700">ยกเลิกแล้ว</p>
-            <p className="text-xl font-semibold text-stone-900">{formatNumber(overview?.reward_requests_status_summary.cancelled ?? 0)}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-          <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-3">
-            <p className="text-sky-700">แต้มที่ได้รับทั้งหมด</p>
-            <p className="text-2xl font-semibold text-sky-900 mt-1">{formatNumber(metrics.pointsCredited)}</p>
-          </div>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
-            <p className="text-amber-700">แต้มที่กันไว้รออนุมัติ</p>
-            <p className="text-2xl font-semibold text-amber-900 mt-1">{formatNumber(metrics.pointsReserved)}</p>
-          </div>
-          <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-3">
-            <p className="text-violet-700">แต้มที่ยื่นขอแลกทั้งหมด</p>
-            <p className="text-2xl font-semibold text-violet-900 mt-1">{formatNumber(overview?.reward_requested_points_total ?? 0)}</p>
-            <p className="text-xs text-violet-700/80 mt-1">ส่วนที่อนุมัติแล้ว {formatNumber(overview?.reward_approved_points_total ?? 0)} แต้ม</p>
-          </div>
-        </div>
-
-        <p className="text-xs text-on-surface-variant">
-          หมายเหตุ: ตัวเลขแต่ละบล็อกเป็นคนละมุมมอง เช่น จำนวนคำขอ แยกจากจำนวนแต้ม เพื่อไม่ให้ตีความซ้ำกัน
-        </p>
-      </section>
-
-      <section className="bg-white border border-outline-variant/20 rounded-2xl p-5">
-        <h2 className="text-lg font-semibold mb-3">สัดส่วนตามประเภทวัสดุ</h2>
-        <p className="text-sm text-on-surface-variant mb-3">
-          จำนวนรายการและน้ำหนักประมาณการเฉพาะรายการที่แปลงหน่วยเป็นกิโลกรัมได้
-        </p>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="text-left border-b border-stone-200 text-stone-600">
-                <th className="py-2 pr-3">Material</th>
-                <th className="py-2 px-3">จำนวนรายการ</th>
-                <th className="py-2 px-3">แปลงหน่วยได้</th>
-                <th className="py-2 px-3">แปลงหน่วยไม่ได้</th>
-                <th className="py-2 pl-3 text-right">น้ำหนักประมาณการที่แปลงได้ (กก.)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(overview?.submissions_material_breakdown ?? []).map((item) => (
-                <tr key={item.material_type} className="border-b border-stone-100">
-                  <td className="py-2 pr-3 font-medium text-stone-900">{formatMaterialLabel(item.material_name_th, item.material_type)}</td>
-                  <td className="py-2 px-3 text-stone-700">{formatNumber(item.submissions_count)}</td>
-                  <td className="py-2 px-3 text-stone-700">{formatNumber(item.convertible_submissions_count)}</td>
-                  <td className="py-2 px-3 text-stone-700">{formatNumber(item.non_convertible_submissions_count)}</td>
-                  <td className="py-2 pl-3 text-right text-stone-900 font-semibold">
-                    {item.estimated_weight_kg_total.toLocaleString('th-TH', {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 3,
-                    })}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-xs text-on-surface-variant mt-3">
-          รายการที่แปลงหน่วยไม่ได้ในภาพรวม: {formatNumber(metrics.submissionsNonConvertibleCount)} รายการ
-          (ปริมาณรวมหน่วยเดิม {overview?.submissions_non_convertible_quantity_total.toLocaleString('th-TH', { maximumFractionDigits: 3 }) ?? '0'})
-        </p>
-      </section>
+      </SectionCard>
     </div>
   );
 }

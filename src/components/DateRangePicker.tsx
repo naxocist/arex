@@ -152,7 +152,7 @@ export default function DateRangePicker({
         left: `${popupPosition.left}px`,
         zIndex: 1200,
       }}
-      className="rounded-xl border border-outline-variant/20 bg-white p-3 shadow-xl"
+      className="w-[min(340px,calc(100vw-16px))] rounded-3xl border border-line bg-white p-3 shadow-2xl"
     >
       <DayPicker
         mode="range"
@@ -173,7 +173,7 @@ export default function DateRangePicker({
         <button
           type="button"
           onClick={() => onChange({ from: null, to: null })}
-          className="px-2.5 py-1.5 rounded-md text-xs font-medium bg-surface-container-high text-on-surface"
+          className="rounded-full bg-surface-muted px-3 py-1.5 text-xs font-medium text-stone-700"
         >
           ล้างค่า
         </button>
@@ -181,7 +181,7 @@ export default function DateRangePicker({
           type="button"
           onClick={() => setIsOpen(false)}
           disabled={!canConfirm}
-          className="px-2.5 py-1.5 rounded-md text-xs font-semibold bg-primary text-white disabled:opacity-60"
+          className="rounded-full bg-stone-950 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
         >
           ยืนยันช่วงวัน
         </button>
@@ -190,12 +190,12 @@ export default function DateRangePicker({
   );
 
   return (
-    <div ref={wrapperRef} className="relative min-w-[16rem]">
+    <div ref={wrapperRef} className="relative min-w-[14rem]">
       <button
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full flex items-center justify-between gap-2 bg-surface-container-high rounded-md px-2.5 py-1.5 outline-none text-xs text-left disabled:opacity-60"
+        className="flex w-full items-center justify-between gap-2 rounded-2xl border border-line bg-surface-muted px-3 py-2.5 text-left text-sm outline-none transition hover:border-stone-300 disabled:opacity-60"
       >
         <span className="truncate">{label}</span>
         <CalendarDays className="w-3.5 h-3.5 shrink-0" />

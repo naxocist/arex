@@ -1,7 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import {
+  ArrowRight,
+  PackagePlus,
+  Route,
+  Sprout,
+  Truck,
+} from 'lucide-react';
+import AlertBanner from '@/src/components/AlertBanner';
+import EmptyState from '@/src/components/EmptyState';
+import PageHeader from '@/src/components/PageHeader';
 import PickupLocationMapPicker from '@/src/components/PickupLocationMapPicker';
+import SectionCard from '@/src/components/SectionCard';
+import StatCard from '@/src/components/StatCard';
 import StatusBadge from '@/src/components/StatusBadge';
 import {
   ApiError,
@@ -64,6 +75,19 @@ function fallbackThaiUnit(unitCode: string): string {
 
 function buildOpenStreetMapLink(lat: number, lng: number): string {
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
+}
+
+function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
+  if (!message) {
+    return 'info';
+  }
+  if (message.includes('ไม่สำเร็จ') || message.includes('กรุณา') || message.includes('ยังไม่')) {
+    return 'error';
+  }
+  if (message.includes('สำเร็จ')) {
+    return 'success';
+  }
+  return 'info';
 }
 
 export default function FarmerHome() {
@@ -232,80 +256,66 @@ export default function FarmerHome() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold text-on-surface">หน้าจัดการงานวัสดุเกษตร</h1>
-          <p className="text-sm text-on-surface-variant mt-1">แจ้งส่งวัสดุและติดตามสถานะจนเสร็จกระบวนการ</p>
-          {message && <p className="text-sm text-on-surface-variant mt-2 bg-surface-container-high px-3 py-2 rounded-lg w-fit">{message}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/farmer-rewards"
-            className="px-4 py-2 rounded-full bg-surface-container-high text-on-surface text-sm font-medium"
-          >
-            ไปหน้าแลกของรางวัล
-          </Link>
-          <button
-            type="button"
-            onClick={() => void loadDashboard(true)}
-            disabled={isLoading}
-            className="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold disabled:opacity-60 flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" /> รีเฟรช
-          </button>
-        </div>
+      <PageHeader
+        eyebrow="Farmer Workspace"
+        title="แจ้งวัสดุใหม่และติดตามงานรับซื้อในที่เดียว"
+        description="หน้าหลักนี้สรุปสถานะงานแบบสั้นพอให้เห็นภาพรวม แล้วพาคุณลงมือส่งรายการวัสดุใหม่ได้ทันที"
+        className="px-5 py-4 md:px-6 md:py-4"
+        actions={[
+          {
+            label: 'ไปหน้าแลกของรางวัล',
+            to: '/farmer-rewards',
+            variant: 'secondary',
+          },
+          {
+            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
+            onClick: () => void loadDashboard(true),
+          },
+        ]}
+      />
+
+      {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="รายการทั้งหมด" value={stats.all.toLocaleString('th-TH')} detail="ทุกคำขอที่เคยส่งในบัญชีนี้" icon={Sprout} tone="emerald" />
+        <StatCard label="รอรับวัสดุ" value={stats.waitingPickup.toLocaleString('th-TH')} detail="กำลังรอจัดคิวหรือรอรถเข้ารับ" icon={Truck} tone="amber" />
+        <StatCard label="อยู่ระหว่างขนส่ง" value={stats.inTransit.toLocaleString('th-TH')} detail="งานที่รถรับแล้วหรือกำลังส่งถึงโรงงาน" icon={Route} tone="sky" />
+        <StatCard label="ปิดงานแล้ว" value={stats.completed.toLocaleString('th-TH')} detail="รายการที่ได้รับ PMUC Coin เรียบร้อย" icon={ArrowRight} tone="violet" />
       </section>
 
-      <section className="bg-white border border-outline-variant/20 rounded-xl p-4">
-        <h2 className="text-base font-semibold">ลำดับงานในกระบวนการ</h2>
-        <p className="text-sm text-on-surface-variant mt-1">Step 1 แจ้งชนิด/ปริมาณวัสดุ จากนั้นติดตามสถานะการนัดรับ รับของ และส่งถึงโรงงาน</p>
-      </section>
-
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">รายการทั้งหมด</p>
-          <p className="text-3xl font-semibold mt-2">{stats.all.toLocaleString('th-TH')}</p>
-        </div>
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">รอรับวัสดุ</p>
-          <p className="text-3xl font-semibold mt-2">{stats.waitingPickup.toLocaleString('th-TH')}</p>
-        </div>
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">อยู่ระหว่างขนส่ง</p>
-          <p className="text-3xl font-semibold mt-2">{stats.inTransit.toLocaleString('th-TH')}</p>
-        </div>
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">เสร็จสมบูรณ์</p>
-          <p className="text-3xl font-semibold mt-2">{stats.completed.toLocaleString('th-TH')}</p>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 xl:grid-cols-[1.35fr,1fr] gap-6">
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-5">
-          <h2 className="text-lg font-semibold">แจ้งส่งวัสดุใหม่</h2>
-          <p className="text-sm text-on-surface-variant mt-1 mb-4">กรอกข้อมูลสั้นๆ ทางซ้าย และปักหมุดจุดนัดรับบนแผนที่ทางขวา</p>
-
-          <form className="space-y-4" onSubmit={handleSubmitMaterial}>
-            <div className="flex flex-col xl:flex-row gap-4 items-stretch">
-              <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50/70 p-3 w-full xl:w-[360px] xl:min-w-[360px] xl:max-w-[360px]">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-stone-700">ชนิดวัสดุ</label>
+      <div className="grid gap-6 xl:grid-cols-[1.08fr,0.92fr]">
+        <SectionCard
+          title="ส่งรายการวัสดุใหม่"
+          description="กรอกข้อมูลหลักให้ครบ แล้วปักหมุดตำแหน่งนัดรับบนแผนที่ ระบบจะช่วยดึงข้อความที่อยู่ตามตำแหน่งให้โดยอัตโนมัติ"
+          className="border border-emerald-200 shadow-lg shadow-primary/10"
+        >
+          <form className="space-y-5" onSubmit={handleSubmitMaterial}>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-4 rounded-2xl bg-gradient-to-br from-primary via-primary-container to-emerald-700 p-5 text-white shadow-lg">
+                <div>
+                  <p className="text-sm font-semibold tracking-wide">ข้อมูลหลักของรายการ</p>
+                  <p className="mt-1 text-sm text-white/80">เลือกวัสดุและระบุปริมาณก่อน จากนั้นค่อยปักหมุดจุดนัดรับทางด้านขวา</p>
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-white/90">ชนิดวัสดุ</span>
                   <select
                     value={materialType}
                     onChange={(event) => setMaterialType(event.target.value)}
-                    className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-full"
+                    className="w-full rounded-xl border border-white/25 bg-white px-4 py-3 text-on-surface outline-none"
                     required
                   >
-                    {materialTypes.length === 0 && <option value="">เลือกชนิดวัสดุ</option>}
+                    {materialTypes.length === 0 ? <option value="">เลือกชนิดวัสดุ</option> : null}
                     {materialTypes.map((material) => (
-                      <option key={material.code} value={material.code}>{material.name_th}</option>
+                      <option key={material.code} value={material.code}>
+                        {material.name_th}
+                      </option>
                     ))}
                   </select>
-                </div>
+                </label>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-stone-700">ปริมาณและหน่วย</label>
-                  <div className="flex gap-2">
+                <div className="grid gap-4 sm:grid-cols-[1fr,12rem]">
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-white/90">ปริมาณ</span>
                     <input
                       type="number"
                       min="0"
@@ -313,38 +323,45 @@ export default function FarmerHome() {
                       value={quantityValue}
                       onChange={(event) => setQuantityValue(event.target.value)}
                       placeholder="เช่น 120"
-                      className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-full min-w-0"
+                      className="w-full rounded-xl border border-white/25 bg-white px-4 py-3 text-on-surface outline-none"
                     />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-white/90">หน่วย</span>
                     <select
                       value={quantityUnit}
                       onChange={(event) => setQuantityUnit(event.target.value)}
-                      className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-[42%] min-w-[120px]"
+                      className="w-full rounded-xl border border-white/25 bg-white px-4 py-3 text-on-surface outline-none"
                       required
                     >
-                      {measurementUnits.length === 0 && <option value="">เลือกหน่วย</option>}
+                      {measurementUnits.length === 0 ? <option value="">เลือกหน่วย</option> : null}
                       {measurementUnits.map((unit) => (
-                        <option key={unit.code} value={unit.code}>{unit.name_th}</option>
+                        <option key={unit.code} value={unit.code}>
+                          {unit.name_th}
+                        </option>
                       ))}
                     </select>
-                  </div>
+                  </label>
+                </div>
+
+                <div className="rounded-xl bg-white/12 px-4 py-3 text-sm leading-6 text-white/90 ring-1 ring-white/12">
+                  เคล็ดลัด: ถ้าปักหมุดแล้ว ระบบจะอัปเดตที่อยู่ให้เอง และถ้ากดใช้ตำแหน่งปัจจุบัน จะล็อกหน้าจอชั่วคราวจนดึงที่อยู่เสร็จ
                 </div>
               </div>
 
-              <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3 flex-1 min-w-0">
-                <p className="text-sm font-semibold text-on-surface">เลือกจุดนัดรับบนแผนที่ OpenStreetMap</p>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-stone-700">สถานที่นัดรับ (ข้อความ)</label>
+              <div className="space-y-4 rounded-2xl border border-emerald-100 bg-white p-4">
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-stone-700">สถานที่นัดรับ</span>
                   <input
                     type="text"
                     value={pickupLocation}
                     onChange={(event) => setPickupLocation(event.target.value)}
-                    placeholder="เช่น หน้าวัด/จุดสังเกต"
-                    className="bg-white border border-stone-200 rounded-lg px-3 py-2.5 outline-none w-full"
+                    placeholder="เช่น หน้าวัด / จุดสังเกต"
+                    className="w-full rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 outline-none"
                     required
                   />
-                  <p className="text-xs text-on-surface-variant">เมื่อกดแผนที่ ข้อความที่อยู่จะเปลี่ยนตามตำแหน่งที่เลือกให้อัตโนมัติ</p>
-                </div>
-                <p className="text-xs text-on-surface-variant">แตะ/คลิกเพื่อปักหมุด หรือกดปุ่มใช้ตำแหน่งปัจจุบัน</p>
+                </label>
+
                 <PickupLocationMapPicker
                   lat={pickupLat}
                   lng={pickupLng}
@@ -355,96 +372,151 @@ export default function FarmerHome() {
                   onAddressResolved={(address) => {
                     setPickupLocation(address);
                   }}
+                  mapHeightClassName="h-[260px] w-full overflow-hidden rounded-[1.5rem] sm:h-[320px] xl:h-[400px]"
                 />
-                <p className="text-xs text-on-surface-variant">
-                  พิกัดที่เลือก: {pickupLat !== null && pickupLng !== null ? `${pickupLat.toFixed(6)}, ${pickupLng.toFixed(6)}` : 'ยังไม่ได้เลือก'}
-                </p>
+
+                <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-stone-600">
+                  พิกัดที่เลือก:{' '}
+                  {pickupLat !== null && pickupLng !== null ? `${pickupLat.toFixed(6)}, ${pickupLng.toFixed(6)}` : 'ยังไม่ได้เลือก'}
+                </div>
               </div>
             </div>
 
             <button
               type="submit"
               disabled={isSubmittingMaterial || measurementUnits.length === 0 || materialTypes.length === 0}
-              className="w-full px-4 py-2.5 rounded-lg bg-primary text-white font-semibold disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition hover:bg-primary-container disabled:opacity-60"
             >
-              {isSubmittingMaterial ? 'กำลังส่ง...' : 'ส่งรายการวัสดุ'}
+              <PackagePlus className="h-4 w-4" />
+              <span>{isSubmittingMaterial ? 'กำลังส่งรายการ...' : 'ส่งรายการวัสดุ'}</span>
             </button>
           </form>
-        </div>
+        </SectionCard>
 
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-5">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-            <h2 className="text-lg font-semibold">รายการวัสดุ</h2>
-            <div className="flex items-center gap-2">
-              <label htmlFor="submissionStatusFilter" className="text-sm text-on-surface-variant">กรองสถานะ</label>
-              <select
-                id="submissionStatusFilter"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as (typeof SUBMISSION_STATUS_OPTIONS)[number]['value'])}
-                className="bg-surface-container-high rounded-lg px-3 py-2 outline-none text-sm"
-              >
-                {SUBMISSION_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+        <SectionCard
+          title="ประวัติรายการวัสดุ"
+          description="กรองสถานะเพื่อดูเฉพาะงานที่สนใจ หรือไล่ดูย้อนหลังทั้งหมดได้จากตารางเดียว"
+          actions={
+            <div className="flex flex-wrap gap-2">
+              {SUBMISSION_STATUS_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setStatusFilter(option.value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    statusFilter === option.value
+                      ? 'bg-stone-950 text-white'
+                      : 'border border-line bg-surface-muted text-stone-600'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
-          </div>
-
-          <p className="text-xs text-on-surface-variant mb-3">
+          }
+        >
+          <p className="mb-4 text-sm text-stone-600">
             แสดง {filteredSubmissions.length.toLocaleString('th-TH')} จาก {submissions.length.toLocaleString('th-TH')} รายการ
           </p>
 
-          <div className="max-h-[28rem] overflow-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-on-surface-variant">
-                  <th className="sticky top-0 z-10 bg-white py-2">เวลา</th>
-                  <th className="sticky top-0 z-10 bg-white py-2">วัสดุ</th>
-                  <th className="sticky top-0 z-10 bg-white py-2">ปริมาณ</th>
-                  <th className="sticky top-0 z-10 bg-white py-2">สถานที่นัดรับ</th>
-                  <th className="sticky top-0 z-10 bg-white py-2">สถานะ</th>
-                  <th className="sticky top-0 z-10 bg-white py-2">ช่วงนัดรับ</th>
-                </tr>
-              </thead>
-              <tbody>
+          {filteredSubmissions.length === 0 ? (
+            <EmptyState
+              title="ไม่พบรายการตามตัวกรองนี้"
+              description="ลองสลับสถานะด้านบน หรือสร้างรายการวัสดุใหม่เพื่อเริ่มต้นใช้งาน"
+            />
+          ) : (
+            <>
+              <div className="space-y-3 md:hidden">
                 {filteredSubmissions.map((item) => (
-                  <tr key={item.id} className="border-t border-outline-variant/10">
-                    <td className="py-2">{new Date(item.created_at).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
-                    <td className="py-2">{materialNameByCode[item.material_type] ?? item.material_type}</td>
-                    <td className="py-2">{Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}</td>
-                    <td className="py-2 text-on-surface-variant">
-                      <p>{item.pickup_location_text || '-'}</p>
-                      {typeof item.pickup_lat === 'number' && typeof item.pickup_lng === 'number' && (
+                  <article key={item.id} className="rounded-xl bg-surface-container-low p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-stone-900">
+                          {materialNameByCode[item.material_type] ?? item.material_type}
+                        </p>
+                        <p className="mt-1 text-xs text-stone-500">{formatDateTime(item.created_at)}</p>
+                      </div>
+                      <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} size="sm" />
+                    </div>
+                    <div className="mt-4 space-y-2 text-sm text-stone-600">
+                      <p>
+                        ปริมาณ: {Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
+                      </p>
+                      <p>สถานที่: {item.pickup_location_text || '-'}</p>
+                      <p>
+                        ช่วงนัดรับ:{' '}
+                        {item.pickup_window_start_at
+                          ? `${formatDateTime(item.pickup_window_start_at)} - ${formatDateTime(item.pickup_window_end_at ?? null)}`
+                          : 'ยังไม่กำหนด'}
+                      </p>
+                      {typeof item.pickup_lat === 'number' && typeof item.pickup_lng === 'number' ? (
                         <a
                           href={buildOpenStreetMapLink(item.pickup_lat, item.pickup_lng)}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-xs text-primary hover:underline"
+                          className="inline-flex items-center gap-2 text-sm font-medium text-stone-900 underline underline-offset-2"
                         >
                           ดูบนแผนที่
                         </a>
-                      )}
-                    </td>
-                    <td className="py-2">
-                      <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} />
-                    </td>
-                    <td className="py-2 text-on-surface-variant">
-                      {item.pickup_window_start_at
-                        ? `${formatDateTime(item.pickup_window_start_at)} - ${formatDateTime(item.pickup_window_end_at ?? null)}`
-                        : '-'}
-                    </td>
-                  </tr>
+                      ) : null}
+                    </div>
+                  </article>
                 ))}
-                {filteredSubmissions.length === 0 && (
-                  <tr>
-                    <td className="py-3 text-on-surface-variant" colSpan={6}>ไม่พบรายการตามสถานะที่เลือก</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-line text-left text-stone-500">
+                      <th className="py-3 pr-3">เวลา</th>
+                      <th className="py-3 px-3">วัสดุ</th>
+                      <th className="py-3 px-3">ปริมาณ</th>
+                      <th className="py-3 px-3">สถานที่นัดรับ</th>
+                      <th className="py-3 px-3">สถานะ</th>
+                      <th className="py-3 pl-3">ช่วงนัดรับ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSubmissions.map((item) => (
+                      <tr key={item.id} className="border-b border-line/70 align-top">
+                        <td className="py-3 pr-3 whitespace-nowrap">{formatDateTime(item.created_at)}</td>
+                        <td className="px-3 py-3 font-medium text-stone-900">
+                          {materialNameByCode[item.material_type] ?? item.material_type}
+                        </td>
+                        <td className="px-3 py-3 text-stone-700">
+                          {Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
+                        </td>
+                        <td className="px-3 py-3 text-stone-600">
+                          <p>{item.pickup_location_text || '-'}</p>
+                          {typeof item.pickup_lat === 'number' && typeof item.pickup_lng === 'number' ? (
+                            <a
+                              href={buildOpenStreetMapLink(item.pickup_lat, item.pickup_lng)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-1 inline-flex text-xs font-medium text-stone-900 underline underline-offset-2"
+                            >
+                              ดูบนแผนที่
+                            </a>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-3">
+                          <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} />
+                        </td>
+                        <td className="pl-3 py-3 text-stone-600">
+                          {item.pickup_window_start_at
+                            ? `${formatDateTime(item.pickup_window_start_at)} - ${formatDateTime(item.pickup_window_end_at ?? null)}`
+                            : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </SectionCard>
+      </div>
+
     </div>
   );
 }

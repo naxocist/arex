@@ -6,6 +6,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './contexts/UserContext';
+import AppLoadingOverlay from './components/AppLoadingOverlay';
 import Layout from './components/Layout';
 import FarmerHome from './views/FarmerHome';
 import FarmerRewards from './views/FarmerRewards';
@@ -98,6 +99,7 @@ export default function App() {
     <UserProvider>
       <BrowserRouter>
         <AppRoutes />
+        <AppLoadingOverlay />
       </BrowserRouter>
     </UserProvider>
   );

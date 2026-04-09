@@ -1,3 +1,5 @@
+import { beginGlobalLoading, endGlobalLoading } from '@/src/lib/loadingState';
+
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || 'http://localhost:8000/api/v1';
 
@@ -22,6 +24,38 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
   }
+}
+
+function hasLowLevelTransportMessage(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+  return (
+    normalizedMessage.includes('winerror') ||
+    normalizedMessage.includes('non-blocking socket') ||
+    normalizedMessage.includes('socket operation') ||
+    normalizedMessage.includes('failed to fetch')
+  );
+}
+
+function getGenericConnectivityMessage(): string {
+  return 'ระบบเชื่อมต่อข้อมูลไม่สำเร็จชั่วคราว กรุณาลองใหม่อีกครั้ง';
+}
+
+function normalizeApiErrorMessage(status: number, message: string): string {
+  const trimmedMessage = message.trim();
+
+  if (!trimmedMessage) {
+    return getGenericConnectivityMessage();
+  }
+
+  if (hasLowLevelTransportMessage(trimmedMessage)) {
+    return getGenericConnectivityMessage();
+  }
+
+  if (status >= 500 && trimmedMessage === 'Unexpected API error') {
+    return getGenericConnectivityMessage();
+  }
+
+  return trimmedMessage;
 }
 
 function getStoredToken(): string | null {
@@ -73,6 +107,7 @@ export interface RequestBehaviorOptions {
   forceRefresh?: boolean;
   cacheTtlMs?: number;
   retryOnAuthError?: boolean;
+  showGlobalLoading?: boolean;
 }
 
 export function setAuthSession(params: {
@@ -177,11 +212,11 @@ async function parseResponse<T>(response: Response): Promise<T> {
   const body = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const message =
+    const rawMessage =
       typeof body === 'string'
         ? body
         : body?.detail || body?.message || 'Unexpected API error';
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, normalizeApiErrorMessage(response.status, rawMessage));
   }
 
   return body as T;
@@ -197,12 +232,14 @@ export async function apiRequest<T>(
     forceRefresh = false,
     cacheTtlMs = DEFAULT_GET_CACHE_TTL_MS,
     retryOnAuthError = true,
+    showGlobalLoading,
     ...requestOptions
   } = options;
   const token = getStoredToken();
   const method = (requestOptions.method || 'GET').toUpperCase();
   const isGetRequest = method === 'GET';
   const cacheKey = isGetRequest ? buildCacheKey(path, token) : null;
+  const shouldShowGlobalLoading = showGlobalLoading ?? isGetRequest;
 
   if (isGetRequest && cacheKey && !forceRefresh) {
     const cached = getCachedResponse<T>(cacheKey);
@@ -225,38 +262,54 @@ export async function apiRequest<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...requestOptions,
-    method,
-    headers,
-  });
+  if (shouldShowGlobalLoading) {
+    beginGlobalLoading();
+  }
 
-  let parsed: T;
   try {
-    parsed = await parseResponse<T>(response);
-  } catch (error) {
-    if (error instanceof ApiError && retryOnAuthError && shouldRetryWithRefresh(error)) {
-      const refreshed = await tryRefreshAccessToken();
-      if (refreshed) {
-        return apiRequest<T>(path, {
-          ...options,
-          retryOnAuthError: false,
-          forceRefresh: isGetRequest ? true : forceRefresh,
-        });
-      }
-      clearAuthSession();
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        ...requestOptions,
+        method,
+        headers,
+      });
+    } catch {
+      throw new ApiError(0, getGenericConnectivityMessage());
     }
 
-    throw error;
-  }
+    let parsed: T;
+    try {
+      parsed = await parseResponse<T>(response);
+    } catch (error) {
+      if (error instanceof ApiError && retryOnAuthError && shouldRetryWithRefresh(error)) {
+        const refreshed = await tryRefreshAccessToken();
+        if (refreshed) {
+          return apiRequest<T>(path, {
+            ...options,
+            retryOnAuthError: false,
+            forceRefresh: isGetRequest ? true : forceRefresh,
+            showGlobalLoading: false,
+          });
+        }
+        clearAuthSession();
+      }
 
-  if (isGetRequest && cacheKey) {
-    setCachedResponse(cacheKey, parsed, cacheTtlMs);
-  } else {
-    clearApiResponseCache();
-  }
+      throw error;
+    }
 
-  return parsed;
+    if (isGetRequest && cacheKey) {
+      setCachedResponse(cacheKey, parsed, cacheTtlMs);
+    } else {
+      clearApiResponseCache();
+    }
+
+    return parsed;
+  } finally {
+    if (shouldShowGlobalLoading) {
+      endGlobalLoading();
+    }
+  }
 }
 
 export interface CreateSubmissionPayload {
@@ -272,7 +325,6 @@ export interface CreateSubmissionPayload {
 export interface FarmerMaterialTypeItem {
   code: string;
   name_th: string;
-  sort_order: number;
   active: boolean;
 }
 
@@ -280,14 +332,12 @@ export interface FarmerMeasurementUnitItem {
   code: string;
   name_th: string;
   to_kg_factor: number | null;
-  sort_order: number;
   active: boolean;
 }
 
 export interface ExecutiveMaterialTypeItem {
   code: string;
   name_th: string;
-  sort_order: number;
   active: boolean;
 }
 
@@ -295,14 +345,12 @@ export interface ExecutiveMeasurementUnitItem {
   code: string;
   name_th: string;
   to_kg_factor: number | null;
-  sort_order: number;
   active: boolean;
 }
 
 export interface ExecutiveMaterialPointRuleItem {
   material_type: string;
   material_name_th: string;
-  material_sort_order: number;
   material_active: boolean;
   points_per_kg: number | null;
 }
@@ -310,7 +358,6 @@ export interface ExecutiveMaterialPointRuleItem {
 export interface UpsertMaterialTypePayload {
   code: string;
   name_th: string;
-  sort_order: number;
   active: boolean;
 }
 
@@ -318,7 +365,6 @@ export interface UpsertMeasurementUnitPayload {
   code: string;
   name_th: string;
   to_kg_factor: number | null;
-  sort_order: number;
   active: boolean;
 }
 
@@ -657,24 +703,28 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(payload),
       retryOnAuthError: false,
+      showGlobalLoading: true,
     }),
   registerFarmer: (payload: RegisterFarmerPayload) =>
     apiRequest<LoginResponse>('/auth/register/farmer', {
       method: 'POST',
       body: JSON.stringify(payload),
       retryOnAuthError: false,
+      showGlobalLoading: true,
     }),
   registerLogistics: (payload: RegisterLogisticsPayload) =>
     apiRequest<LoginResponse>('/auth/register/logistics', {
       method: 'POST',
       body: JSON.stringify(payload),
       retryOnAuthError: false,
+      showGlobalLoading: true,
     }),
   registerFactory: (payload: RegisterFactoryPayload) =>
     apiRequest<LoginResponse>('/auth/register/factory', {
       method: 'POST',
       body: JSON.stringify(payload),
       retryOnAuthError: false,
+      showGlobalLoading: true,
     }),
 };
 
