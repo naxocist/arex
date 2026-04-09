@@ -17,6 +17,8 @@ interface PickupLocationMapPickerProps {
   lng: number | null;
   onChange: (coords: { lat: number; lng: number }) => void;
   onAddressResolved?: (address: string) => void;
+  currentLocationButtonLabel?: string;
+  mapHintText?: string;
 }
 
 const DEFAULT_CENTER = { lat: 15.870032, lng: 100.992541 };
@@ -48,7 +50,14 @@ function MapRecenter(props: { center: LatLngExpression }) {
 }
 
 export default function PickupLocationMapPicker(props: PickupLocationMapPickerProps) {
-  const { lat, lng, onChange, onAddressResolved } = props;
+  const {
+    lat,
+    lng,
+    onChange,
+    onAddressResolved,
+    currentLocationButtonLabel,
+    mapHintText,
+  } = props;
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
   const [geoErrorMessage, setGeoErrorMessage] = useState<string | null>(null);
 
@@ -124,9 +133,9 @@ export default function PickupLocationMapPicker(props: PickupLocationMapPickerPr
           onClick={handleUseCurrentLocation}
           className="px-4 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm shadow-sm"
         >
-          ใช้ตำแหน่งปัจจุบัน
+          {currentLocationButtonLabel ?? 'ใช้ตำแหน่งปัจจุบัน'}
         </button>
-        <span>คลิกบนแผนที่เพื่อปักหมุดจุดนัดรับ</span>
+        <span>{mapHintText ?? 'คลิกบนแผนที่เพื่อปักหมุดจุดนัดรับ'}</span>
       </div>
 
       {geoErrorMessage ? <p className="text-xs text-rose-700">{geoErrorMessage}</p> : null}
@@ -147,9 +156,12 @@ export default function PickupLocationMapPicker(props: PickupLocationMapPickerPr
           <Marker
             position={{ lat, lng }}
             draggable
-            onDragEnd={async (event) => {
-              const position = event.target.getLatLng();
-              await handleSelect(position.lat, position.lng);
+            eventHandlers={{
+              dragend: (event) => {
+                const marker = event.target as L.Marker;
+                const position = marker.getLatLng();
+                void handleSelect(position.lat, position.lng);
+              },
             }}
           />
         ) : null}

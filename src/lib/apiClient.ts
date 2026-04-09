@@ -621,6 +621,25 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface RegisterBasePayload {
+  email: string;
+  password: string;
+  display_name: string;
+  phone: string;
+  province: string;
+}
+
+export interface RegisterFarmerPayload extends RegisterBasePayload {}
+
+export interface RegisterLogisticsPayload extends RegisterBasePayload {}
+
+export interface RegisterFactoryPayload extends RegisterBasePayload {
+  name_th: string;
+  location_text?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+}
+
 export interface LoginResponse {
   access_token: string;
   refresh_token: string | null;
@@ -635,6 +654,24 @@ export interface LoginResponse {
 export const authApi = {
   login: (payload: LoginPayload) =>
     apiRequest<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      retryOnAuthError: false,
+    }),
+  registerFarmer: (payload: RegisterFarmerPayload) =>
+    apiRequest<LoginResponse>('/auth/register/farmer', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      retryOnAuthError: false,
+    }),
+  registerLogistics: (payload: RegisterLogisticsPayload) =>
+    apiRequest<LoginResponse>('/auth/register/logistics', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      retryOnAuthError: false,
+    }),
+  registerFactory: (payload: RegisterFactoryPayload) =>
+    apiRequest<LoginResponse>('/auth/register/factory', {
       method: 'POST',
       body: JSON.stringify(payload),
       retryOnAuthError: false,
