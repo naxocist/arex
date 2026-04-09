@@ -51,7 +51,6 @@ class RejectRewardRequest(BaseModel):
 class UpsertMaterialTypeRequest(BaseModel):
     code: str = Field(min_length=1, max_length=50)
     name_th: str = Field(min_length=1, max_length=255)
-    sort_order: int = Field(default=100, ge=0, le=9999)
     active: bool = True
 
 
@@ -59,7 +58,6 @@ class UpsertMeasurementUnitRequest(BaseModel):
     code: str = Field(min_length=1, max_length=50)
     name_th: str = Field(min_length=1, max_length=255)
     to_kg_factor: float | None = Field(default=None, gt=0)
-    sort_order: int = Field(default=100, ge=0, le=9999)
     active: bool = True
 
 

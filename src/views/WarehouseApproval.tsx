@@ -1,5 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, PackageSearch, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import AlertBanner from '@/src/components/AlertBanner';
+import EmptyState from '@/src/components/EmptyState';
+import PageHeader from '@/src/components/PageHeader';
+import SectionCard from '@/src/components/SectionCard';
+import StatCard from '@/src/components/StatCard';
 import StatusBadge from '@/src/components/StatusBadge';
 import { ApiError, warehouseApi, type WarehousePendingRequestItem } from '@/src/lib/apiClient';
 
@@ -17,6 +22,19 @@ function formatRewardRequestStatus(status: string): string {
     warehouse_rejected: 'คลังปฏิเสธ',
   };
   return map[status] ?? status;
+}
+
+function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
+  if (!message) {
+    return 'info';
+  }
+  if (message.includes('ไม่สำเร็จ') || message.includes('ยังไม่')) {
+    return 'error';
+  }
+  if (message.includes('สำเร็จ')) {
+    return 'success';
+  }
+  return 'info';
 }
 
 export default function WarehouseApproval() {
@@ -100,153 +118,110 @@ export default function WarehouseApproval() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold text-on-surface">หน้าทำงานฝ่ายคลังสินค้า</h1>
-          <p className="text-sm text-on-surface-variant mt-1">ตรวจสอบคำขอแลกรางวัล อนุมัติหรือปฏิเสธตามกติกา</p>
-          {message && (
-            <p className="text-sm text-on-surface-variant mt-2 bg-surface-container-high px-3 py-2 rounded-lg w-fit">
-              {message}
-            </p>
-          )}
-        </div>
+      <PageHeader
+        eyebrow="Warehouse Inbox"
+        title="กล่องงานคลังที่จัดคำขอเป็นชุดตัดสินใจได้ง่ายขึ้น"
+        description="บทบาทนี้ไม่ต้องเห็น workflow ทั้งระบบ แต่ต้องเห็นคำขอที่รออนุมัติพร้อมบริบทครบพอสำหรับตัดสินใจ จึงถูกออกแบบเป็น approval inbox ที่กดทำงานได้ทันที"
+        actions={[
+          {
+            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
+            onClick: () => void loadPendingRequests(true),
+          },
+        ]}
+      />
 
-        <button
-          type="button"
-          onClick={() => void loadPendingRequests(true)}
-          disabled={isLoading}
-          className="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          รีเฟรชข้อมูล
-        </button>
-      </div>
+      {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
 
-      <section className="bg-white border border-outline-variant/20 rounded-xl p-4">
-        <h2 className="text-base font-semibold">ลำดับงานในกระบวนการ</h2>
-        <p className="text-sm text-on-surface-variant mt-1">Step 7 คลังสินค้าอนุมัติหรือปฏิเสธคำขอแลกรางวัล ก่อนเข้าสู่การส่งมอบรางวัล (Step 8)</p>
+      <section className="grid gap-4 md:grid-cols-3">
+        <StatCard label="คำขอรอตรวจสอบ" value={summary.totalRequests.toLocaleString('th-TH')} detail="รายการในสถานะ requested ที่รอการตัดสินใจ" icon={PackageSearch} tone="amber" />
+        <StatCard label="PMUC Coin รวมในคิว" value={summary.totalPoints.toLocaleString('th-TH')} detail="ภาระแต้มที่กำลังรอการอนุมัติจากคลัง" icon={ShieldCheck} tone="violet" />
+        <StatCard label="สถานะระบบคลัง" value="พร้อมตรวจสอบ" detail="การอนุมัติและปฏิเสธจะส่งต่อสถานะให้ workflow ทันที" icon={CheckCircle2} tone="emerald" />
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">คำขอรอตรวจสอบ</p>
-          <p className="text-3xl font-semibold mt-2">{summary.totalRequests.toLocaleString('th-TH')}</p>
-        </div>
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">PMUC Coin รวมในคิว</p>
-          <p className="text-3xl font-semibold mt-2">{summary.totalPoints.toLocaleString('th-TH')}</p>
-        </div>
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">สถานะระบบคลัง</p>
-          <p className="text-lg font-medium mt-3 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5" />
-            <StatusBadge status="ready" label="พร้อมตรวจสอบ" className="text-sm" />
-          </p>
-        </div>
-      </div>
-
-      <section className="bg-white rounded-xl border border-outline-variant/20 overflow-hidden">
-        <div className="px-6 py-4 border-b border-surface-container-high">
-          <h2 className="text-lg font-semibold">รายการรออนุมัติ</h2>
-        </div>
-
-        <div className="max-h-[28rem] overflow-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-surface-container-low/50">
-                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">เวลา</th>
-                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">ของที่ขอแลก</th>
-                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">สถานะ</th>
-                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">จำนวน</th>
-                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">PMUC Coin</th>
-                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant">เหตุผลปฏิเสธ</th>
-                <th className="px-6 py-3 text-xs uppercase tracking-widest text-on-surface-variant text-center">การตัดสินใจ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-container-high">
-              {isLoading && (
-                <tr>
-                  <td className="px-6 py-6 text-sm text-on-surface-variant" colSpan={7}>กำลังโหลดข้อมูล...</td>
-                </tr>
-              )}
-
-              {!isLoading && requests.length === 0 && (
-                <tr>
-                  <td className="px-6 py-6 text-sm text-on-surface-variant" colSpan={7}>
-                    <div className="flex items-center gap-2">
-                      <PackageSearch className="w-4 h-4" />
-                      <span>ยังไม่มีคำขอที่อยู่ในสถานะ requested</span>
+      <SectionCard
+        title="คำขอที่รอการตัดสินใจ"
+        description="จัดแต่ละคำขอเป็นการ์ดเดียวพร้อมข้อมูลรางวัล จำนวนแต้ม และพื้นที่ระบุเหตุผลปฏิเสธ เพื่อให้ตรวจง่ายกว่าตารางแบบเดิม"
+      >
+        {requests.length === 0 ? (
+          <EmptyState
+            title="ยังไม่มีคำขอที่อยู่ในสถานะ requested"
+            description="เมื่อมีคำขอรออนุมัติจากเกษตรกร ระบบจะนำเข้ากล่องงานนี้ให้โดยอัตโนมัติ"
+            icon={PackageSearch}
+          />
+        ) : (
+          <div className="space-y-4">
+            {requests.map((item) => (
+              <article key={item.id} className="rounded-[1.6rem] border border-line bg-surface-muted p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-base font-semibold text-stone-900">{item.reward_name_th ?? 'ไม่พบชื่อรางวัล'}</p>
+                      <StatusBadge status={item.status} label={formatRewardRequestStatus(item.status)} size="sm" />
                     </div>
-                  </td>
-                </tr>
-              )}
-
-              {requests.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-6 py-4 text-sm">
-                    {new Date(item.requested_at).toLocaleString('th-TH', {
-                      day: '2-digit',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <p className="font-medium">{item.reward_name_th ?? 'ไม่พบชื่อรางวัล'}</p>
-                    <p className="text-xs text-on-surface-variant mt-0.5">
+                    <p className="mt-2 text-sm leading-6 text-stone-600">
                       {item.reward_description_th ?? 'ไม่มีรายละเอียดเพิ่มเติม'}
                     </p>
-                    <p className="text-xs text-on-surface-variant mt-0.5">
-                      แต้มต่อชิ้น {Number(item.reward_points_cost ?? 0).toLocaleString('th-TH')}
+                    <p className="mt-2 text-sm text-stone-500">
+                      ยื่นคำขอเมื่อ{' '}
+                      {new Date(item.requested_at).toLocaleString('th-TH', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </p>
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <StatusBadge status={item.status} label={formatRewardRequestStatus(item.status)} />
-                  </td>
-                  <td className="px-6 py-4 text-sm">{Number(item.quantity).toLocaleString('th-TH')}</td>
-                  <td className="px-6 py-4 text-sm">{Number(item.requested_points).toLocaleString('th-TH')}</td>
-                  <td className="px-6 py-4 text-sm">
-                    <input
-                      type="text"
-                      value={reasons[item.id] || ''}
-                      onChange={(event) =>
-                        setReasons((prev) => ({
-                          ...prev,
-                          [item.id]: event.target.value,
-                        }))
-                      }
-                      placeholder="(ตัวเลือก) ระบุเหตุผลปฏิเสธ"
-                      className="w-full bg-surface-container-high border-none rounded-lg p-2.5 text-on-surface outline-none"
-                    />
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleApprove(item.id)}
-                        disabled={processingRequestId === item.id}
-                        className="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        อนุมัติ
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleReject(item.id)}
-                        disabled={processingRequestId === item.id}
-                        className="px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 hover:bg-red-200 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1"
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        ปฏิเสธ
-                      </button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[22rem]">
+                    <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
+                      <p className="font-semibold text-stone-900">จำนวน / แต้ม</p>
+                      <p className="mt-1">จำนวน {Number(item.quantity).toLocaleString('th-TH')} ชิ้น</p>
+                      <p className="mt-1">ใช้ {Number(item.requested_points).toLocaleString('th-TH')} PMUC Coin</p>
+                      <p className="mt-1 text-stone-500">
+                        แต้มต่อชิ้น {Number(item.reward_points_cost ?? 0).toLocaleString('th-TH')}
+                      </p>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                    <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
+                      <p className="font-semibold text-stone-900">เหตุผลปฏิเสธ (ถ้ามี)</p>
+                      <textarea
+                        value={reasons[item.id] || ''}
+                        onChange={(event) =>
+                          setReasons((prev) => ({
+                            ...prev,
+                            [item.id]: event.target.value,
+                          }))
+                        }
+                        placeholder="เช่น ของคงคลังไม่พอ หรือข้อมูลคำขอไม่ครบ"
+                        className="mt-2 min-h-24 w-full rounded-2xl border border-line bg-surface-muted px-4 py-3 outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleApprove(item.id)}
+                    disabled={processingRequestId === item.id}
+                    className="inline-flex items-center gap-2 rounded-full bg-stone-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-60"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>{processingRequestId === item.id ? 'กำลังบันทึก...' : 'อนุมัติคำขอ'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleReject(item.id)}
+                    disabled={processingRequestId === item.id}
+                    className="inline-flex items-center gap-2 rounded-full border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 transition hover:bg-red-100 disabled:opacity-60"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    <span>{processingRequestId === item.id ? 'กำลังบันทึก...' : 'ปฏิเสธคำขอ'}</span>
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </SectionCard>
     </div>
   );
 }

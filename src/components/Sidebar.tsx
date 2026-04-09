@@ -1,63 +1,87 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { BarChart3, Factory, Gift, Home, LogOut, PackageCheck, SlidersHorizontal, Truck } from 'lucide-react';
+import { LogOut, Sparkles } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import { roleMeta, roleNavItems } from '@/src/lib/roleConfig';
 import { useUser } from '../contexts/UserContext';
 
-const navItems = [
-  { icon: Home, label: 'งานวัสดุ', path: '/', roles: ['farmer'] },
-  { icon: Gift, label: 'แลกของรางวัล', path: '/farmer-rewards', roles: ['farmer'] },
-  { icon: Truck, label: 'ขนส่ง', path: '/logistics', roles: ['logistics'] },
-  { icon: Factory, label: 'โรงงาน', path: '/factory', roles: ['factory'] },
-  { icon: SlidersHorizontal, label: 'ตั้งค่าโรงงาน', path: '/factory/settings', roles: ['factory'] },
-  { icon: PackageCheck, label: 'คลังสินค้า', path: '/warehouse', roles: ['warehouse'] },
-  { icon: BarChart3, label: 'ผู้บริหาร', path: '/dashboard', roles: ['executive'] },
-  { icon: SlidersHorizontal, label: 'ตั้งค่าระบบ', path: '/executive-settings', roles: ['executive'] },
-];
+interface SidebarProps {
+  mobile?: boolean;
+  onNavigate?: () => void;
+}
 
-export default function Sidebar() {
+export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const navigate = useNavigate();
   const { role, logout } = useUser();
 
-  const filteredNavItems = navItems.filter((item) => item.roles.includes(role || ''));
+  const filteredNavItems = roleNavItems.filter((item) => (role ? item.roles.includes(role) : false));
+  const currentRoleMeta = role ? roleMeta[role] : null;
 
   const handleLogout = () => {
     logout();
+    onNavigate?.();
     navigate('/login');
   };
 
   return (
-    <aside className="hidden md:flex flex-col fixed left-0 top-0 h-screen w-64 p-4 gap-3 bg-stone-50 border-r border-stone-200 z-40">
-      <div className="px-2 py-3 border-b border-stone-200">
-        <h1 className="text-lg font-semibold text-emerald-900">AREX Workflow</h1>
-        <p className="text-xs text-stone-500 mt-1">งานหลักตามบทบาท</p>
+    <aside
+      className={cn(
+        'flex h-full flex-col gap-4 bg-white p-4',
+        mobile ? 'w-full max-w-[20rem]' : 'border-r border-outline-variant/20',
+      )}
+    >
+      <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-stone-950">AREX Workflow</h1>
+            <p className="text-xs text-stone-500">งานหลักตามบทบาท</p>
+          </div>
+        </div>
+        {currentRoleMeta ? (
+          <div className={cn('mt-4 rounded-xl border px-3 py-3', currentRoleMeta.accentClassName)}>
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.24em]">Current Role</p>
+            <p className="mt-1 text-sm font-semibold">{currentRoleMeta.label}</p>
+            <p className="mt-1 text-xs leading-5 opacity-80">{currentRoleMeta.description}</p>
+          </div>
+        ) : null}
       </div>
 
-      <nav className="flex-1 flex flex-col gap-1 pt-2">
+      <nav className="flex flex-1 flex-col gap-1">
         {filteredNavItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
+            onClick={onNavigate}
             end={item.path === '/factory'}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
-                isActive ? 'bg-emerald-100 text-emerald-900 font-medium' : 'text-stone-700 hover:bg-stone-200/60',
+                'group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm transition-colors',
+                isActive
+                  ? 'bg-emerald-100 text-emerald-900'
+                  : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900',
               )
             }
           >
-            <item.icon className="w-4 h-4" />
-            <span>{item.label}</span>
+            <div className="rounded-lg bg-white/60 p-2">
+              <item.icon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold">{item.label}</p>
+              <p className="text-xs opacity-70">{item.shortLabel}</p>
+            </div>
           </NavLink>
         ))}
       </nav>
 
-      <div className="pt-3 border-t border-stone-200 flex flex-col gap-2">
+      <div className="border-t border-line pt-3">
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-700 hover:bg-red-50"
+          className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="h-4 w-4" />
           <span>ออกจากระบบ / เปลี่ยนผู้ใช้</span>
         </button>
       </div>

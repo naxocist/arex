@@ -71,8 +71,9 @@ class WorkflowService:
         try:
             query = (
                 self.client.table("material_types")
-                .select("code, name_th, sort_order, active")
-                .order("sort_order", desc=False)
+                .select("code, name_th, active")
+                .order("active", desc=True)
+                .order("name_th", desc=False)
                 .order("code", desc=False)
             )
             if active_only:
@@ -87,8 +88,9 @@ class WorkflowService:
         try:
             query = (
                 self.client.table("measurement_units")
-                .select("code, name_th, to_kg_factor, sort_order, active")
-                .order("sort_order", desc=False)
+                .select("code, name_th, to_kg_factor, active")
+                .order("active", desc=True)
+                .order("name_th", desc=False)
                 .order("code", desc=False)
             )
             if active_only:
@@ -114,7 +116,6 @@ class WorkflowService:
                     {
                         "code": code,
                         "name_th": name_th,
-                        "sort_order": payload.sort_order,
                         "active": payload.active,
                     }
                 )
@@ -165,7 +166,6 @@ class WorkflowService:
                     {
                         "code": target_code,
                         "name_th": name_th,
-                        "sort_order": payload.sort_order,
                         "active": payload.active,
                     }
                 )
@@ -175,7 +175,7 @@ class WorkflowService:
 
             updated_response = (
                 self.client.table("material_types")
-                .select("code, name_th, sort_order, active")
+                .select("code, name_th, active")
                 .eq("code", target_code)
                 .limit(1)
                 .execute()
@@ -202,7 +202,6 @@ class WorkflowService:
                         "code": code,
                         "name_th": name_th,
                         "to_kg_factor": payload.to_kg_factor,
-                        "sort_order": payload.sort_order,
                         "active": payload.active,
                     }
                 )
@@ -254,7 +253,6 @@ class WorkflowService:
                         "code": target_code,
                         "name_th": name_th,
                         "to_kg_factor": payload.to_kg_factor,
-                        "sort_order": payload.sort_order,
                         "active": payload.active,
                     }
                 )
@@ -264,7 +262,7 @@ class WorkflowService:
 
             updated_response = (
                 self.client.table("measurement_units")
-                .select("code, name_th, to_kg_factor, sort_order, active")
+                .select("code, name_th, to_kg_factor, active")
                 .eq("code", target_code)
                 .limit(1)
                 .execute()
@@ -296,7 +294,6 @@ class WorkflowService:
                     {
                         "material_type": material_code,
                         "material_name_th": material.get("name_th"),
-                        "material_sort_order": material.get("sort_order"),
                         "material_active": material.get("active"),
                         "points_per_kg": material_rule.get("points_per_kg"),
                     }

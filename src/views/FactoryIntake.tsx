@@ -1,5 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Factory, RefreshCw, Scale, ShieldCheck, Warehouse } from 'lucide-react';
+import AlertBanner from '@/src/components/AlertBanner';
+import EmptyState from '@/src/components/EmptyState';
+import PageHeader from '@/src/components/PageHeader';
+import SectionCard from '@/src/components/SectionCard';
+import StatCard from '@/src/components/StatCard';
 import StatusBadge from '@/src/components/StatusBadge';
 import {
   ApiError,
@@ -49,6 +54,19 @@ function formatPickupStatus(status: string): string {
     pickup_scheduled: 'จัดคิวรับแล้ว',
   };
   return map[status] ?? status;
+}
+
+function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
+  if (!message) {
+    return 'info';
+  }
+  if (message.includes('ไม่สำเร็จ') || message.includes('กรุณา') || message.includes('ยังไม่')) {
+    return 'error';
+  }
+  if (message.includes('สำเร็จ')) {
+    return 'success';
+  }
+  return 'info';
 }
 
 export default function FactoryIntake() {
@@ -130,186 +148,162 @@ export default function FactoryIntake() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-stone-200 bg-gradient-to-r from-stone-50 to-sky-50/60 p-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold text-stone-900">หน้าทำงานฝ่ายโรงงาน</h1>
-          <p className="text-sm text-stone-600 mt-1">ตรวจรับงานที่ส่งถึงโรงงาน ยืนยันน้ำหนักจริง และติดตามของที่ยืนยันแล้ว</p>
-          {message && <p className="text-sm text-stone-700 mt-2 bg-white border border-stone-200 px-3 py-2 rounded-lg w-fit">{message}</p>}
-        </div>
-        <button
-          type="button"
-          onClick={() => void loadQueue(true)}
-          disabled={isLoading}
-          className="px-4 py-2 rounded-full bg-stone-900 text-white text-sm font-semibold disabled:opacity-60 flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" /> รีเฟรชข้อมูล
-        </button>
+      <PageHeader
+        eyebrow="Factory Intake"
+        title="คิวตรวจรับเข้าโรงงานที่เน้นการยืนยันน้ำหนักจริงก่อนเสมอ"
+        description="ฝ่ายโรงงานไม่จำเป็นต้องไล่ดูงานทั้งหมดพร้อมกัน หน้านี้จึงดันคิวที่ต้องยืนยันขึ้นมาก่อน และแยกประวัติที่ยืนยันแล้วไว้ด้านล่างอย่างชัดเจน"
+        actions={[
+          {
+            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
+            onClick: () => void loadQueue(true),
+          },
+        ]}
+      />
+
+      {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="ของที่มาถึงโรงงานแล้ว" value={(summary?.arrived_count ?? queue.length).toLocaleString('th-TH')} detail="รายการที่รอยืนยันรับเข้าอยู่ตอนนี้" icon={Warehouse} tone="default" />
+        <StatCard label="น้ำหนักประมาณการที่แปลงได้" value={`${(summary?.arrived_estimated_weight_kg_total ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })} กก.`} detail={`แปลงได้ ${(summary?.arrived_convertible_count ?? 0).toLocaleString('th-TH')} รายการ`} icon={Scale} tone="sky" />
+        <StatCard label="ยืนยันน้ำหนักแล้ว" value={(summary?.confirmed_count ?? confirmed.length).toLocaleString('th-TH')} detail="รายการที่บันทึกเข้าระบบเรียบร้อย" icon={ShieldCheck} tone="emerald" />
+        <StatCard label="น้ำหนักรวมที่ยืนยันแล้ว" value={`${(summary?.confirmed_weight_kg_total ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })} กก.`} detail="น้ำหนักจริงที่โรงงานใช้คำนวณแต้ม" icon={Factory} tone="violet" />
       </section>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
-          <p className="text-xs uppercase tracking-widest text-stone-500">ของที่มาถึงโรงงานแล้ว</p>
-          <p className="text-3xl font-semibold mt-2 text-stone-900">{summary?.arrived_count.toLocaleString('th-TH') ?? queue.length.toLocaleString('th-TH')}</p>
-          <p className="text-sm text-stone-600 mt-2">รอยืนยันรับเข้าอยู่ในคิว</p>
-        </div>
-        <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-5">
-          <p className="text-xs uppercase tracking-widest text-sky-700">น้ำหนักประมาณการที่แปลงหน่วยได้</p>
-          <p className="text-3xl font-semibold mt-2 text-sky-900">
-            {(summary?.arrived_estimated_weight_kg_total ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 3 })} กก.
-          </p>
-          <p className="text-sm text-sky-700/80 mt-2">
-            แปลงได้ {(summary?.arrived_convertible_count ?? 0).toLocaleString('th-TH')} รายการ •
-            แปลงไม่ได้ {(summary?.arrived_non_convertible_count ?? 0).toLocaleString('th-TH')} รายการ
-          </p>
-        </div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
-          <p className="text-xs uppercase tracking-widest text-emerald-700">ยืนยันน้ำหนักแล้ว</p>
-          <p className="text-3xl font-semibold mt-2 text-emerald-900">{summary?.confirmed_count.toLocaleString('th-TH') ?? confirmed.length.toLocaleString('th-TH')}</p>
-          <p className="text-sm text-emerald-700/80 mt-2">รายการที่ถูกบันทึกเข้าระบบแล้ว</p>
-        </div>
-        <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-5">
-          <p className="text-xs uppercase tracking-widest text-violet-700">น้ำหนักรวมที่ยืนยันแล้ว (ชั่งจริง)</p>
-          <p className="text-3xl font-semibold mt-2 text-violet-900">
-            {(summary?.confirmed_weight_kg_total ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 3 })} กก.
-          </p>
-          <p className="text-sm text-violet-700/80 mt-2">รวมจากน้ำหนักที่โรงงานชั่งและยืนยันจริงทุกรายการ</p>
-        </div>
-      </section>
+      <SectionCard
+        title="คิวงานที่ต้องยืนยันตอนนี้"
+        description="ระบบเติมน้ำหนักประมาณการให้อัตโนมัติเมื่อหน่วยแปลงเป็นกิโลกรัมได้ เพื่อให้แก้เฉพาะค่าที่ชั่งจริงและยืนยันได้เร็วขึ้น"
+      >
+        {queue.length === 0 ? (
+          <EmptyState
+            title="ยังไม่มีงานที่รอยืนยัน"
+            description="เมื่อรถส่งวัสดุมาถึงโรงงาน รายการจะขึ้นที่นี่เพื่อให้ฝ่ายโรงงานบันทึกน้ำหนักจริง"
+            icon={Factory}
+          />
+        ) : (
+          <div className="space-y-4">
+            {queue.map((item) => {
+              const estimatedKg = quantityToKg(Number(item.quantity_value), item.quantity_to_kg_factor);
 
-      <section className="bg-white border border-stone-200 rounded-2xl p-4">
-        <p className="text-xs text-stone-600">
-          หมายเหตุ: น้ำหนักประมาณการจะแสดงเฉพาะรายการที่หน่วยสามารถแปลงเป็นกิโลกรัมได้
-          (รายการที่แปลงไม่ได้: {(summary?.arrived_non_convertible_count ?? 0).toLocaleString('th-TH')} รายการ,
-          ปริมาณรวมหน่วยเดิม {(summary?.arrived_non_convertible_quantity_total ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 3 })})
-        </p>
-      </section>
+              return (
+                <article key={item.pickup_job_id} className="rounded-[1.6rem] border border-line bg-surface-muted p-4">
+                  <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-base font-semibold text-stone-900">
+                          {item.material_name_th ?? formatMaterial(item.material_type)}
+                        </p>
+                        <StatusBadge status={item.status} label={formatPickupStatus(item.status)} size="sm" />
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
+                          <p className="font-semibold text-stone-900">น้ำหนักที่แจ้งมา</p>
+                          <p className="mt-1">
+                            {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
+                          </p>
+                          <p className="mt-1 text-stone-500">
+                            {estimatedKg !== null
+                              ? `ประมาณ ${estimatedKg.toLocaleString('th-TH', { maximumFractionDigits: 2 })} กก.`
+                              : 'หน่วยนี้ยังไม่สามารถแปลงเป็นกิโลกรัมอัตโนมัติ'}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
+                          <p className="font-semibold text-stone-900">จุดรับต้นทาง</p>
+                          <p className="mt-1">{item.pickup_location_text}</p>
+                          <p className="mt-1 text-stone-500">
+                            มาถึงเมื่อ{' '}
+                            {new Date(item.delivered_factory_at ?? item.planned_pickup_at).toLocaleString('th-TH', {
+                              day: '2-digit',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
-      <section className="bg-white border border-stone-200 rounded-2xl p-5">
-        <h2 className="text-lg font-semibold">ลำดับงานในกระบวนการ</h2>
-        <p className="text-sm text-stone-600 mt-1">Step 4 โรงงานบันทึกน้ำหนักจริงและยืนยันรับเข้า จากนั้นระบบเครดิต PMUC Coin ให้เกษตรกร (Step 5)</p>
-      </section>
+                    <div className="space-y-3">
+                      <div className="rounded-2xl border border-line bg-white px-4 py-3">
+                        <label className="block space-y-2">
+                          <span className="text-sm font-medium text-stone-700">น้ำหนักจริงที่ชั่งได้ (กิโลกรัม)</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={weightByJobId[item.pickup_job_id] ?? ''}
+                            onChange={(event) =>
+                              setWeightByJobId((prev) => ({
+                                ...prev,
+                                [item.pickup_job_id]: event.target.value,
+                              }))
+                            }
+                            className="w-full rounded-2xl border border-line bg-surface-muted px-4 py-3 outline-none"
+                          />
+                        </label>
+                      </div>
 
-      <section className="bg-white border border-stone-200 rounded-2xl p-5 space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold">คิวงานที่ส่งถึงโรงงานแล้ว</h2>
-          <p className="text-sm text-stone-600 mt-1">บันทึกน้ำหนักจริงทีละรายการ แล้วระบบจะสร้าง PMUC Coin ให้ Farmer อัตโนมัติ</p>
-        </div>
-        <div className="max-h-[24rem] overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-on-surface-variant">
-                <th className="py-2">เวลา</th>
-                <th className="py-2">Pickup Job</th>
-                <th className="py-2">วัสดุ</th>
-                <th className="py-2">สถานะงาน</th>
-                <th className="py-2">น้ำหนักแจ้ง</th>
-                <th className="py-2">น้ำหนักจริง (กิโลกรัม)</th>
-                <th className="py-2">ยืนยัน</th>
-              </tr>
-            </thead>
-            <tbody>
-              {queue.map((item) => (
-                <tr key={item.pickup_job_id} className="border-t border-outline-variant/10">
-                  <td className="py-2">
-                    {new Date(item.delivered_factory_at ?? item.planned_pickup_at).toLocaleString('th-TH', {
-                      day: '2-digit',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </td>
-                  <td className="py-2">{item.pickup_job_id.slice(0, 8)}</td>
-                  <td className="py-2">{formatMaterial(item.material_type)}</td>
-                  <td className="py-2">
-                    <StatusBadge status={item.status} label={formatPickupStatus(item.status)} />
-                  </td>
-                  <td className="py-2">{Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</td>
-                  <td className="py-2">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={weightByJobId[item.pickup_job_id] ?? ''}
-                      onChange={(event) =>
-                        setWeightByJobId((prev) => ({
-                          ...prev,
-                          [item.pickup_job_id]: event.target.value,
-                        }))
-                      }
-                      className="w-32 bg-surface-container-high rounded-lg px-2 py-1.5 outline-none"
-                    />
-                  </td>
-                  <td className="py-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleConfirm(item)}
-                      disabled={confirmingJobId === item.pickup_job_id}
-                      className="px-3 py-1.5 rounded-full text-xs font-semibold bg-surface-container-high hover:bg-primary hover:text-white disabled:opacity-60"
-                    >
-                      {confirmingJobId === item.pickup_job_id ? 'กำลังยืนยัน...' : 'ยืนยันรับเข้า'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {queue.length === 0 && (
-                <tr>
-                  <td className="py-3 text-stone-500" colSpan={7}>ยังไม่มีงานที่รอยืนยัน</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                      <button
+                        type="button"
+                        onClick={() => void handleConfirm(item)}
+                        disabled={confirmingJobId === item.pickup_job_id}
+                        className="inline-flex items-center gap-2 rounded-full bg-stone-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-60"
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                        <span>{confirmingJobId === item.pickup_job_id ? 'กำลังยืนยัน...' : 'ยืนยันรับเข้าโรงงาน'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </SectionCard>
 
-      <section className="bg-white border border-stone-200 rounded-2xl p-5 space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold">รายการที่ยืนยันน้ำหนักแล้ว</h2>
-          <p className="text-sm text-stone-600 mt-1">แสดงประวัติที่ยืนยันสำเร็จ พร้อมน้ำหนักจริงที่ใช้คำนวณแต้ม</p>
-        </div>
-        <div className="max-h-[24rem] overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-stone-500 border-b border-stone-200">
-                <th className="sticky top-0 bg-white py-2 pr-3">เวลา</th>
-                <th className="sticky top-0 bg-white py-2 px-3">วัสดุ</th>
-                <th className="sticky top-0 bg-white py-2 px-3">น้ำหนักจริง</th>
-                <th className="sticky top-0 bg-white py-2 px-3">สถานะ</th>
-                <th className="sticky top-0 bg-white py-2 pl-3">หมายเหตุ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {confirmed.map((item) => (
-                <tr key={item.intake_id} className="border-b border-stone-100">
-                  <td className="py-2 pr-3 whitespace-nowrap">
-                    {new Date(item.confirmed_at).toLocaleString('th-TH', {
-                      day: '2-digit',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </td>
-                  <td className="py-2 px-3">
-                    <div className="font-medium text-stone-900">{item.material_name_th ?? formatMaterial(item.material_type)}</div>
-                    <div className="text-xs text-stone-500">{item.material_type}</div>
-                  </td>
-                  <td className="py-2 px-3 text-stone-800">
-                    {item.measured_weight_kg.toLocaleString('th-TH', { maximumFractionDigits: 2 })} กก.
-                  </td>
-                  <td className="py-2 px-3">
-                    <StatusBadge status={item.status} label="ยืนยันแล้ว" />
-                  </td>
-                  <td className="py-2 pl-3 text-stone-600">{item.discrepancy_note ?? '-'}</td>
-                </tr>
-              ))}
-              {confirmed.length === 0 && (
-                <tr>
-                  <td className="py-3 text-stone-500" colSpan={5}>ยังไม่มีรายการที่ยืนยันน้ำหนักแล้ว</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <SectionCard
+        title="ประวัติที่ยืนยันแล้ว"
+        description="ส่วนนี้เก็บรายการที่ปิดงานสำเร็จแล้ว พร้อมน้ำหนักจริงที่ใช้ในการคำนวณแต้มให้เกษตรกร"
+      >
+        {confirmed.length === 0 ? (
+          <EmptyState
+            title="ยังไม่มีรายการที่ยืนยันน้ำหนักแล้ว"
+            description="เมื่อยืนยันรับเข้าแต่ละงาน ประวัติจะย้ายมาอยู่ส่วนนี้โดยอัตโนมัติ"
+            icon={ShieldCheck}
+          />
+        ) : (
+          <div className="space-y-3">
+            {confirmed.map((item) => (
+              <article key={item.intake_id} className="rounded-[1.4rem] border border-line bg-surface-muted p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-base font-semibold text-stone-900">
+                        {item.material_name_th ?? formatMaterial(item.material_type)}
+                      </p>
+                      <StatusBadge status={item.status} label="ยืนยันแล้ว" size="sm" />
+                    </div>
+                    <p className="mt-2 text-sm text-stone-600">
+                      น้ำหนักจริง {item.measured_weight_kg.toLocaleString('th-TH', { maximumFractionDigits: 2 })} กก.
+                    </p>
+                    <p className="mt-1 text-sm text-stone-500">
+                      ยืนยันเมื่อ{' '}
+                      {new Date(item.confirmed_at).toLocaleString('th-TH', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-600">
+                    หมายเหตุ: {item.discrepancy_note ?? '-'}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </SectionCard>
     </div>
   );
 }

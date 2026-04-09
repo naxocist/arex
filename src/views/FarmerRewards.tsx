@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Clock3, RefreshCw, Truck, XCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import {
+  CheckCircle2,
+  Clock3,
+  Gift,
+  Ticket,
+  Truck,
+  XCircle,
+} from 'lucide-react';
+import AlertBanner from '@/src/components/AlertBanner';
+import EmptyState from '@/src/components/EmptyState';
+import PageHeader from '@/src/components/PageHeader';
+import SectionCard from '@/src/components/SectionCard';
+import StatCard from '@/src/components/StatCard';
 import StatusBadge from '@/src/components/StatusBadge';
 import {
   ApiError,
@@ -45,6 +56,19 @@ function formatDateTime(dateTime: string | null | undefined): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
+  if (!message) {
+    return 'info';
+  }
+  if (message.includes('ไม่สำเร็จ') || message.includes('แต้มไม่พอ') || message.includes('ยังไม่')) {
+    return 'error';
+  }
+  if (message.includes('สำเร็จ')) {
+    return 'success';
+  }
+  return 'info';
 }
 
 const REWARD_REQUEST_STATUS_OPTIONS = [
@@ -133,6 +157,7 @@ export default function FarmerRewards() {
 
     const rewardPoints = Number(reward.points_cost) || 0;
     if (availablePoints < rewardPoints) {
+      setMessage(`แต้มไม่พอสำหรับ ${reward.name_th}`);
       return;
     }
 
@@ -196,171 +221,209 @@ export default function FarmerRewards() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold text-on-surface">หน้าการแลกของรางวัล</h1>
-          <p className="text-sm text-on-surface-variant mt-1">จัดการการแลกแต้ม, ติดตามสถานะการอนุมัติ และติดตามการนำส่ง</p>
-          {message && <p className="text-sm text-on-surface-variant mt-2 bg-surface-container-high px-3 py-2 rounded-lg w-fit">{message}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/"
-            className="px-4 py-2 rounded-full bg-surface-container-high text-on-surface text-sm font-medium"
-          >
-            กลับไปงานวัสดุ
-          </Link>
-          <button
-            type="button"
-            onClick={() => void loadRewards(true)}
-            disabled={isLoading}
-            className="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold disabled:opacity-60 flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" /> รีเฟรช
-          </button>
-        </div>
+      <PageHeader
+        eyebrow="Rewards"
+        title="ใช้ PMUC Coin กับรางวัลที่พร้อมแลก และติดตามการจัดส่งได้ในหน้าเดียว"
+        description="พื้นที่นี้ถูกออกแบบให้เกษตรกรเห็นแต้มคงเหลือก่อน แล้วค่อยตัดสินใจเลือกรางวัลที่เหมาะสม พร้อมติดตามคำขอและสถานะการจัดส่งได้ทันที"
+        actions={[
+          {
+            label: 'กลับไปงานวัสดุ',
+            to: '/',
+            variant: 'secondary',
+          },
+          {
+            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
+            onClick: () => void loadRewards(true),
+          },
+        ]}
+      />
+
+      {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="PMUC Coin คงเหลือ" value={availablePoints.toLocaleString('th-TH')} detail="แต้มที่พร้อมใช้แลกของรางวัลได้ทันที" icon={Ticket} tone="violet" />
+        <StatCard label="คำขอทั้งหมด" value={stats.allRequests.toLocaleString('th-TH')} detail="รวมทุกสถานะที่เคยยื่นคำขอ" icon={Gift} tone="default" />
+        <StatCard label="รอตรวจสอบ" value={stats.waitingReview.toLocaleString('th-TH')} detail="คำขอที่กำลังรอฝ่ายคลังตัดสินใจ" icon={Clock3} tone="amber" />
+        <StatCard label="ส่งมอบสำเร็จ" value={stats.delivered.toLocaleString('th-TH')} detail="รางวัลที่ส่งถึงมือเกษตรกรแล้ว" icon={Truck} tone="emerald" />
       </section>
 
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">PMUC Coin คงเหลือ</p>
-          <p className="text-3xl font-semibold mt-2">{availablePoints.toLocaleString('th-TH')}</p>
-        </div>
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">คำขอทั้งหมด</p>
-          <p className="text-3xl font-semibold mt-2">{stats.allRequests.toLocaleString('th-TH')}</p>
-        </div>
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">รอตรวจสอบ</p>
-          <p className="text-3xl font-semibold mt-2">{stats.waitingReview.toLocaleString('th-TH')}</p>
-        </div>
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-4">
-          <p className="text-xs uppercase tracking-widest text-on-surface-variant">ส่งมอบสำเร็จ</p>
-          <p className="text-3xl font-semibold mt-2">{stats.delivered.toLocaleString('th-TH')}</p>
-        </div>
-      </section>
+      <div className="grid gap-6 xl:grid-cols-[0.96fr,1.04fr]">
+        <SectionCard
+          title="เลือกของรางวัล"
+          description="แคตตาล็อกนี้เน้นให้เห็นแต้มที่ต้องใช้และสต็อกคงเหลืออย่างชัดเจนก่อนกดขอแลก"
+        >
+          {rewardsCatalog.length === 0 ? (
+            <EmptyState
+              title="ยังไม่มีรางวัลในระบบ"
+              description="เมื่อมีรายการรางวัลเปิดใช้งาน ระบบจะแสดงตัวเลือกที่นี่พร้อมแต้มที่ต้องใช้"
+              icon={Gift}
+            />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {rewardsCatalog.map((reward) => {
+                const rewardPoints = Number(reward.points_cost) || 0;
+                const stockQty = Number(reward.stock_qty) || 0;
+                const isInsufficientPoints = availablePoints < rewardPoints;
+                const isUnavailable = !reward.active || stockQty <= 0;
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-5">
-          <h2 className="text-lg font-semibold mb-3">แคตตาล็อกรางวัล</h2>
-          <div className="space-y-3 max-h-[28rem] overflow-y-auto pr-1">
-            {rewardsCatalog.map((reward) => {
-              const rewardPoints = Number(reward.points_cost) || 0;
-              const isInsufficientPoints = availablePoints < rewardPoints;
-
-              return (
-                <div key={reward.id} className="border border-outline-variant/15 rounded-lg p-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{reward.name_th}</p>
-                    <p className="text-xs text-on-surface-variant">{rewardPoints.toLocaleString('th-TH')} PMUC Coin</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleCreateRewardRequest(reward)}
-                    disabled={requestingRewardId === reward.id || isInsufficientPoints}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold bg-surface-container-high hover:bg-primary hover:text-white disabled:opacity-60 disabled:hover:bg-surface-container-high disabled:hover:text-on-surface"
-                  >
-                    {requestingRewardId === reward.id
-                      ? 'กำลังส่ง...'
-                      : isInsufficientPoints
-                        ? 'แต้มไม่พอ'
-                        : 'ขอแลก'}
-                  </button>
-                </div>
-              );
-            })}
-            {rewardsCatalog.length === 0 && <p className="text-sm text-on-surface-variant">ยังไม่มีรางวัลในระบบ</p>}
-          </div>
-        </div>
-
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-5">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-            <h2 className="text-lg font-semibold">สถานะคำขอแลกรางวัล</h2>
-            <div className="flex items-center gap-2">
-              <label htmlFor="rewardStatusFilter" className="text-sm text-on-surface-variant">กรองสถานะ</label>
-              <select
-                id="rewardStatusFilter"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as (typeof REWARD_REQUEST_STATUS_OPTIONS)[number]['value'])}
-                className="bg-surface-container-high rounded-lg px-3 py-2 outline-none text-sm"
-              >
-                {REWARD_REQUEST_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <p className="text-xs text-on-surface-variant mb-3">
-            แสดง {filteredRewardRequests.length.toLocaleString('th-TH')} จาก {rewardRequests.length.toLocaleString('th-TH')} รายการ
-          </p>
-
-          <div className="space-y-3 max-h-[28rem] overflow-y-auto pr-1">
-            {filteredRewardRequests.map((request) => {
-              const deliveryJob = request.reward_delivery_jobs?.[0] ?? null;
-              const rewardName = rewardNameById[request.reward_id] ?? 'รางวัลที่เลือก';
-              return (
-                <div key={request.id} className="border border-outline-variant/15 rounded-lg p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-medium">{rewardName}</p>
-                      <p className="text-xs text-on-surface-variant">
-                        ใช้ {Number(request.requested_points).toLocaleString('th-TH')} PMUC Coin • จำนวน {Number(request.quantity).toLocaleString('th-TH')}
-                      </p>
-                    </div>
-                    <p className="text-xs text-on-surface-variant">
-                      {new Date(request.requested_at).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <div className="text-sm flex items-center gap-2">
-                      {request.status === 'warehouse_rejected' || request.status === 'cancelled' ? (
-                        <XCircle className="w-4 h-4 text-red-600" />
-                      ) : request.status === 'warehouse_approved' ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      ) : (
-                        <Clock3 className="w-4 h-4 text-amber-600" />
-                      )}
-                      <StatusBadge status={request.status} label={formatRewardRequestStatus(request.status)} />
-                    </div>
-
-                    {request.status === 'requested' && (
-                      <button
-                        type="button"
-                        onClick={() => void handleCancelRewardRequest(request.id)}
-                        disabled={cancellingRewardRequestId === request.id}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold border border-red-300 bg-red-50 text-red-800 hover:bg-red-100 disabled:opacity-60"
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        {cancellingRewardRequestId === request.id ? 'กำลังยกเลิกคำขอ...' : 'ยกเลิกคำขอนี้'}
-                      </button>
-                    )}
-                  </div>
-
-                  {deliveryJob && (
-                    <div className="mt-1 space-y-1">
-                      <div className="text-sm flex items-center gap-2">
-                        <Truck className="w-4 h-4" />
-                        <StatusBadge status={deliveryJob.status} label={formatDeliveryStatus(deliveryJob.status)} />
+                return (
+                  <article key={reward.id} className="rounded-xl bg-surface-container-low p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-base font-semibold text-stone-900">{reward.name_th}</p>
+                        <p className="mt-2 text-sm leading-6 text-stone-600">
+                          {reward.description_th || 'ไม่มีรายละเอียดเพิ่มเติม'}
+                        </p>
                       </div>
-                      <p className="text-xs text-on-surface-variant">
-                        ช่วงนำส่ง: {formatDateTime(deliveryJob.planned_delivery_at)} - {formatDateTime(deliveryJob.delivery_window_end_at ?? null)}
-                      </p>
+                      <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-stone-700">
+                        {rewardPoints.toLocaleString('th-TH')} แต้ม
+                      </div>
                     </div>
-                  )}
 
-                  {request.status === 'warehouse_rejected' && request.rejection_reason && (
-                    <p className="mt-2 text-xs text-red-700">เหตุผลที่ปฏิเสธ: {request.rejection_reason}</p>
-                  )}
-                </div>
-              );
-            })}
-            {filteredRewardRequests.length === 0 && (
-              <p className="text-sm text-on-surface-variant">ไม่พบคำขอตามสถานะที่เลือก</p>
-            )}
-          </div>
-        </div>
-      </section>
+                    <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+                      <div className="rounded-xl bg-white px-3 py-2 text-stone-700">
+                        สต็อกคงเหลือ {stockQty.toLocaleString('th-TH')}
+                      </div>
+                      <StatusBadge
+                        status={isUnavailable ? 'cancelled' : isInsufficientPoints ? 'requested' : 'warehouse_approved'}
+                        label={isUnavailable ? 'ของหมด / ปิดใช้งาน' : isInsufficientPoints ? 'แต้มไม่พอ' : 'พร้อมขอแลก'}
+                        size="sm"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleCreateRewardRequest(reward)}
+                      disabled={requestingRewardId === reward.id || isInsufficientPoints || isUnavailable}
+                      className="mt-4 inline-flex items-center gap-2 rounded-full bg-stone-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Gift className="h-4 w-4" />
+                      <span>
+                        {requestingRewardId === reward.id
+                          ? 'กำลังส่งคำขอ...'
+                          : isUnavailable
+                            ? 'ยังแลกไม่ได้'
+                            : isInsufficientPoints
+                              ? 'แต้มไม่พอ'
+                              : 'ขอแลกรางวัลนี้'}
+                      </span>
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="ติดตามคำขอแลกรางวัล"
+          description="ดูคำขอที่รอคลังพิจารณา ตรวจสถานะการจัดส่ง และยกเลิกคำขอที่ยังไม่ผ่านการอนุมัติได้จากตรงนี้"
+          actions={
+            <div className="flex flex-wrap gap-2">
+              {REWARD_REQUEST_STATUS_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setStatusFilter(option.value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    statusFilter === option.value
+                      ? 'bg-stone-950 text-white'
+                      : 'border border-line bg-surface-muted text-stone-600'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          }
+        >
+          {filteredRewardRequests.length === 0 ? (
+            <EmptyState
+              title="ยังไม่มีคำขอตามตัวกรองนี้"
+              description="เมื่อคุณกดขอแลกรางวัล ประวัติและสถานะการจัดส่งจะเริ่มแสดงที่นี่ทันที"
+              icon={Truck}
+            />
+          ) : (
+            <div className="space-y-4">
+              {filteredRewardRequests.map((request) => {
+                const deliveryJob = request.reward_delivery_jobs?.[0] ?? null;
+                const rewardName = rewardNameById[request.reward_id] ?? 'รางวัลที่เลือก';
+                const canCancel = request.status === 'requested';
+
+                return (
+                  <article key={request.id} className="rounded-xl bg-surface-container-low p-4">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-semibold text-stone-900">{rewardName}</p>
+                          <StatusBadge status={request.status} label={formatRewardRequestStatus(request.status)} size="sm" />
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-stone-600">
+                          ใช้ {Number(request.requested_points).toLocaleString('th-TH')} PMUC Coin • จำนวน{' '}
+                          {Number(request.quantity).toLocaleString('th-TH')} ชิ้น
+                        </p>
+                        <p className="mt-1 text-sm text-stone-500">ยื่นคำขอเมื่อ {formatDateTime(request.requested_at)}</p>
+                      </div>
+
+                      {canCancel ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleCancelRewardRequest(request.id)}
+                          disabled={cancellingRewardRequestId === request.id}
+                          className="inline-flex items-center gap-2 rounded-full border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 transition hover:bg-red-100 disabled:opacity-60"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          <span>{cancellingRewardRequestId === request.id ? 'กำลังยกเลิก...' : 'ยกเลิกคำขอ'}</span>
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-xl bg-white px-4 py-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+                          {request.status === 'warehouse_rejected' || request.status === 'cancelled' ? (
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          ) : request.status === 'warehouse_approved' ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          ) : (
+                            <Clock3 className="h-4 w-4 text-amber-600" />
+                          )}
+                          <span>สถานะคำขอ</span>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-stone-600">{formatRewardRequestStatus(request.status)}</p>
+                        {request.status === 'warehouse_rejected' && request.rejection_reason ? (
+                          <p className="mt-2 text-sm leading-6 text-red-700">เหตุผลที่ปฏิเสธ: {request.rejection_reason}</p>
+                        ) : null}
+                      </div>
+
+                      <div className="rounded-xl bg-white px-4 py-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+                          <Truck className="h-4 w-4" />
+                          <span>สถานะการจัดส่ง</span>
+                        </div>
+                        {deliveryJob ? (
+                          <>
+                            <div className="mt-2">
+                              <StatusBadge status={deliveryJob.status} label={formatDeliveryStatus(deliveryJob.status)} size="sm" />
+                            </div>
+                            <p className="mt-2 text-sm leading-6 text-stone-600">
+                              ช่วงนำส่ง {formatDateTime(deliveryJob.planned_delivery_at)} -{' '}
+                              {formatDateTime(deliveryJob.delivery_window_end_at ?? null)}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="mt-2 text-sm leading-6 text-stone-600">ยังไม่มีการจัดรอบส่งสำหรับคำขอนี้</p>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </SectionCard>
+      </div>
+
     </div>
   );
 }

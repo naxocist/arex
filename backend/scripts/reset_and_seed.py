@@ -288,19 +288,19 @@ def _create_demo_auth_and_profiles(client: Client) -> dict[str, str]:
 def _seed_master_data(client: Client, resolved_ids_by_email: dict[str, str]) -> None:
     client.table("material_types").upsert(
         [
-            {"code": "rice_straw", "name_th": "ฟางข้าว", "sort_order": 10, "active": True},
-            {"code": "cassava_root", "name_th": "รากมันสำปะหลัง", "sort_order": 20, "active": True},
-            {"code": "sugarcane_bagasse", "name_th": "ชานอ้อย", "sort_order": 30, "active": True},
-            {"code": "corn_stover", "name_th": "ซังและลำต้นข้าวโพด", "sort_order": 40, "active": True},
+            {"code": "rice_straw", "name_th": "ฟางข้าว", "active": True},
+            {"code": "cassava_root", "name_th": "รากมันสำปะหลัง", "active": True},
+            {"code": "sugarcane_bagasse", "name_th": "ชานอ้อย", "active": True},
+            {"code": "corn_stover", "name_th": "ซังและลำต้นข้าวโพด", "active": True},
         ],
         on_conflict="code",
     ).execute()
 
     client.table("measurement_units").upsert(
         [
-            {"code": "kg", "name_th": "กิโลกรัม", "to_kg_factor": 1.0, "sort_order": 10, "active": True},
-            {"code": "ton", "name_th": "ตัน", "to_kg_factor": 1000.0, "sort_order": 20, "active": True},
-            {"code": "m3", "name_th": "ลูกบาศก์เมตร", "to_kg_factor": None, "sort_order": 30, "active": True},
+            {"code": "kg", "name_th": "กิโลกรัม", "to_kg_factor": 1.0, "active": True},
+            {"code": "ton", "name_th": "ตัน", "to_kg_factor": 1000.0, "active": True},
+            {"code": "m3", "name_th": "ลูกบาศก์เมตร", "to_kg_factor": None, "active": True},
         ],
         on_conflict="code",
     ).execute()

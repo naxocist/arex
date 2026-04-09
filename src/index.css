@@ -20,8 +20,42 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  * {
+    border-color: var(--color-outline-variant);
+  }
+
   body {
-    @apply bg-surface text-on-surface font-sans;
+    @apply bg-surface text-on-surface font-sans antialiased;
+  }
+
+  body.app-loading {
+    overflow: hidden;
+    cursor: progress;
+  }
+
+  body,
+  #root {
+    min-height: 100vh;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    @apply transition;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus,
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid rgba(15, 82, 56, 0.2);
+    outline-offset: 2px;
   }
 }
 
@@ -36,4 +70,28 @@
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+@layer components {
+  .surface-card {
+    @apply rounded-2xl border border-outline-variant/20 bg-white shadow-sm;
+  }
+
+  .surface-muted {
+    @apply bg-surface-container-low border border-outline-variant/20;
+  }
+}
+
+@layer utilities {
+  .bg-surface-panel {
+    background-color: rgba(255, 255, 255, 0.95);
+  }
+
+  .bg-surface-muted {
+    background-color: rgba(242, 244, 243, 0.9);
+  }
+
+  .border-line {
+    border-color: rgba(191, 201, 193, 0.35);
+  }
 }

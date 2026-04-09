@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import L, { type LatLngExpression } from 'leaflet';
+import { LoaderCircle } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   MapContainer,
   Marker,
@@ -19,6 +21,7 @@ interface PickupLocationMapPickerProps {
   onAddressResolved?: (address: string) => void;
   currentLocationButtonLabel?: string;
   mapHintText?: string;
+  mapHeightClassName?: string;
 }
 
 const DEFAULT_CENTER = { lat: 15.870032, lng: 100.992541 };
@@ -57,8 +60,10 @@ export default function PickupLocationMapPicker(props: PickupLocationMapPickerPr
     onAddressResolved,
     currentLocationButtonLabel,
     mapHintText,
+    mapHeightClassName,
   } = props;
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
   const [geoErrorMessage, setGeoErrorMessage] = useState<string | null>(null);
 
   const center = useMemo(() => {
@@ -113,25 +118,38 @@ export default function PickupLocationMapPicker(props: PickupLocationMapPickerPr
     }
 
     setGeoErrorMessage(null);
+    setIsUsingCurrentLocation(true);
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        await handleSelect(position.coords.latitude, position.coords.longitude);
+        try {
+          await handleSelect(position.coords.latitude, position.coords.longitude);
+        } finally {
+          setIsUsingCurrentLocation(false);
+        }
       },
       () => {
+        setIsUsingCurrentLocation(false);
         setGeoErrorMessage('ไม่สามารถอ่านตำแหน่งปัจจุบันได้ กรุณาอนุญาตการเข้าถึงตำแหน่ง');
       },
       { enableHighAccuracy: true, timeout: 10000 },
     );
   };
 
+  const isBusy = isUsingCurrentLocation || isResolvingAddress;
+  const busyMessage = isUsingCurrentLocation
+    ? 'กำลังดึงข้อมูลที่อยู่จากตำแหน่งปัจจุบัน...'
+    : 'กำลังดึงข้อมูลที่อยู่...';
+
   return (
+    <>
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-stone-600">
         <button
           type="button"
           onClick={handleUseCurrentLocation}
-          className="px-4 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm shadow-sm"
+          disabled={isBusy}
+          className="rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800"
         >
           {currentLocationButtonLabel ?? 'ใช้ตำแหน่งปัจจุบัน'}
         </button>
@@ -141,7 +159,7 @@ export default function PickupLocationMapPicker(props: PickupLocationMapPickerPr
       {geoErrorMessage ? <p className="text-xs text-rose-700">{geoErrorMessage}</p> : null}
 
       <MapContainer
-        style={{ width: '100%', height: '420px' }}
+        className={mapHeightClassName ?? 'h-[280px] w-full overflow-hidden rounded-[1.5rem] sm:h-[340px] lg:h-[420px]'}
         center={center}
         zoom={typeof lat === 'number' && typeof lng === 'number' ? 15 : 6}
         scrollWheelZoom
@@ -171,5 +189,31 @@ export default function PickupLocationMapPicker(props: PickupLocationMapPickerPr
         {isResolvingAddress ? <span>กำลังดึงที่อยู่...</span> : null}
       </div>
     </div>
+    <AnimatePresence>
+      {isBusy ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="fixed inset-0 z-[2200] flex items-center justify-center bg-white/70 backdrop-blur-md"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className="mx-4 flex max-w-sm items-center gap-4 rounded-2xl border border-emerald-200 bg-white px-5 py-4 shadow-xl"
+          >
+            <LoaderCircle className="h-6 w-6 animate-spin text-emerald-700" />
+            <div>
+              <p className="text-sm font-semibold text-on-surface">กำลังดึงข้อมูลที่อยู่</p>
+              <p className="mt-1 text-sm text-on-surface-variant">{busyMessage}</p>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+    </>
   );
 }
