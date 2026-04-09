@@ -6,6 +6,7 @@ import {
   ApiError,
   logisticsApi,
   type LogisticsApprovedRewardRequestItem,
+  type LogisticsFactoryOptionItem,
   type LogisticsPickupJobItem,
   type LogisticsPickupQueueItem,
   type LogisticsRewardDeliveryJobItem,
@@ -98,6 +99,7 @@ export default function LogisticsTracking() {
   const [pickupJobs, setPickupJobs] = useState<LogisticsPickupJobItem[]>([]);
   const [approvedRewardRequests, setApprovedRewardRequests] = useState<LogisticsApprovedRewardRequestItem[]>([]);
   const [rewardDeliveryJobs, setRewardDeliveryJobs] = useState<LogisticsRewardDeliveryJobItem[]>([]);
+  const [factoryOptions, setFactoryOptions] = useState<LogisticsFactoryOptionItem[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -107,6 +109,7 @@ export default function LogisticsTracking() {
   const [schedulingRewardRequestId, setSchedulingRewardRequestId] = useState<string | null>(null);
   const [updatingDeliveryJobId, setUpdatingDeliveryJobId] = useState<string | null>(null);
   const [pickupRangeBySubmissionId, setPickupRangeBySubmissionId] = useState<Record<string, DateRangeValue>>({});
+  const [destinationFactoryBySubmissionId, setDestinationFactoryBySubmissionId] = useState<Record<string, string>>({});
   const [deliveryRangeByRequestId, setDeliveryRangeByRequestId] = useState<Record<string, DateRangeValue>>({});
 
   const submittedQueue = useMemo(
@@ -129,6 +132,14 @@ export default function LogisticsTracking() {
     [approvedRewardRequests, rewardRequestIdsInDelivery],
   );
 
+  const factoryOptionById = useMemo(() => {
+    const map: Record<string, LogisticsFactoryOptionItem> = {};
+    for (const factory of factoryOptions) {
+      map[factory.id] = factory;
+    }
+    return map;
+  }, [factoryOptions]);
+
   const loadAll = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
       setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
@@ -137,17 +148,36 @@ export default function LogisticsTracking() {
 
     setIsLoading(true);
     try {
-      const [queueResponse, pickupJobsResponse, approvedResponse, deliveryJobsResponse] = await Promise.all([
+      const [queueResponse, pickupJobsResponse, approvedResponse, deliveryJobsResponse, factoriesResponse] = await Promise.all([
         logisticsApi.getPickupQueue({ forceRefresh }),
         logisticsApi.getPickupJobs({ forceRefresh }),
         logisticsApi.getApprovedRewardRequests({ forceRefresh }),
         logisticsApi.getRewardDeliveryJobs({ forceRefresh }),
+        logisticsApi.listFactories({ forceRefresh }),
       ]);
 
       setPickupQueue(queueResponse.queue);
       setPickupJobs(pickupJobsResponse.jobs);
       setApprovedRewardRequests(approvedResponse.queue);
       setRewardDeliveryJobs(deliveryJobsResponse.jobs);
+      setFactoryOptions(factoriesResponse.factories);
+      setDestinationFactoryBySubmissionId((prev) => {
+        const next = { ...prev };
+        const defaultFactoryId = factoriesResponse.factories[0]?.id;
+        for (const item of queueResponse.queue) {
+          if (item.status !== 'submitted') {
+            continue;
+          }
+          const selectedFactoryId = next[item.id];
+          const stillExists = selectedFactoryId
+            ? factoriesResponse.factories.some((factory) => factory.id === selectedFactoryId)
+            : false;
+          if (!stillExists && defaultFactoryId) {
+            next[item.id] = defaultFactoryId;
+          }
+        }
+        return next;
+      });
       setMessage(null);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -179,12 +209,19 @@ export default function LogisticsTracking() {
       return;
     }
 
+    const destinationFactoryId = destinationFactoryBySubmissionId[submissionId];
+    if (!destinationFactoryId) {
+      setMessage('กรุณาเลือกโรงงานปลายทางก่อนจัดคิวรับวัสดุ');
+      return;
+    }
+
     setSchedulingSubmissionId(submissionId);
     setMessage(null);
     try {
       await logisticsApi.schedulePickup(submissionId, {
         pickup_window_start_at: dateOnlyToStartIso(startDate),
         pickup_window_end_at: dateOnlyToEndIso(endDate),
+        destination_factory_id: destinationFactoryId,
         notes: 'จัดคิวโดยฝ่ายขนส่ง',
       });
       setMessage('จัดคิวรับวัสดุสำเร็จแล้ว');
@@ -356,73 +393,105 @@ export default function LogisticsTracking() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-on-surface-variant">
-                <th className="py-2">เวลา</th>
-                <th className="py-2">วัสดุ</th>
-                <th className="py-2">ปริมาณ</th>
-                <th className="py-2">สถานที่นัดรับ</th>
-                <th className="py-2">สถานะ</th>
-                <th className="py-2">ช่วงนัดรับ</th>
-                <th className="py-2">การจัดคิว</th>
+                <th className="py-2 px-2 whitespace-nowrap">เวลา</th>
+                <th className="py-2 px-2 whitespace-nowrap">วัสดุ</th>
+                <th className="py-2 px-2 whitespace-nowrap">ปริมาณ</th>
+                <th className="py-2 px-2 whitespace-nowrap">สถานที่นัดรับ</th>
+                <th className="py-2 px-2 whitespace-nowrap">สถานะ</th>
+                <th className="py-2 px-2 whitespace-nowrap">โรงงานปลายทาง</th>
+                <th className="py-2 px-2 whitespace-nowrap">ช่วงนัดรับ</th>
+                <th className="py-2 px-2 whitespace-nowrap">การจัดคิว</th>
               </tr>
             </thead>
             <tbody>
-              {submittedQueue.map((item) => (
-                <tr key={item.id} className="border-t border-outline-variant/10">
-                  <td className="py-2">{new Date(item.created_at).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
-                  <td className="py-2">{formatMaterial(item.material_type)}</td>
-                  <td className="py-2">{Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</td>
-                  <td className="py-2">
-                    <div className="space-y-1">
-                      <p>{item.pickup_location_text}</p>
-                      {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
-                        <a
-                          href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-primary underline underline-offset-2"
-                        >
-                          ดูรายละเอียดบนแผนที่
-                        </a>
-                      ) : (
-                        <p className="text-xs text-on-surface-variant">ไม่มีพิกัดแผนที่</p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-2">
-                    <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} />
-                  </td>
-                  <td className="py-2">
-                    <DateRangePicker
-                      value={pickupRangeBySubmissionId[item.id] || { from: null, to: null }}
-                      onChange={(nextRange) =>
-                        setPickupRangeBySubmissionId((prev) => ({
-                          ...prev,
-                          [item.id]: nextRange,
-                        }))
-                      }
-                      minDate={new Date()}
-                      placeholder="เลือกช่วงวันนัดรับ"
-                    />
-                  </td>
-                  <td className="py-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleSchedulePickup(item.id)}
-                      disabled={
-                        schedulingSubmissionId === item.id ||
-                        !pickupRangeBySubmissionId[item.id]?.from ||
-                        !pickupRangeBySubmissionId[item.id]?.to
-                      }
-                      className="px-3 py-1.5 rounded-full text-xs font-semibold bg-surface-container-high hover:bg-primary hover:text-white disabled:opacity-60"
-                    >
-                      {schedulingSubmissionId === item.id ? 'กำลังจัดคิว...' : 'จัดคิวรับงาน'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {submittedQueue.map((item) => {
+                const selectedFactoryId = destinationFactoryBySubmissionId[item.id] || '';
+                const selectedFactory = selectedFactoryId ? factoryOptionById[selectedFactoryId] : null;
+
+                return (
+                  <tr key={item.id} className="border-t border-outline-variant/10 align-top">
+                    <td className="py-3 px-2 whitespace-nowrap">{new Date(item.created_at).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="py-3 px-2 whitespace-nowrap">{formatMaterial(item.material_type)}</td>
+                    <td className="py-3 px-2 whitespace-nowrap">{Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</td>
+                    <td className="py-3 px-2">
+                      <div className="space-y-1 max-w-[15rem]">
+                        <p className="break-words">{item.pickup_location_text}</p>
+                        {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
+                          <a
+                            href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary underline underline-offset-2"
+                          >
+                            ดูรายละเอียดบนแผนที่
+                          </a>
+                        ) : (
+                          <p className="text-xs text-on-surface-variant">ไม่มีพิกัดแผนที่</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 whitespace-nowrap">
+                      <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} />
+                    </td>
+                    <td className="py-3 px-2 min-w-[13rem]">
+                      <select
+                        value={selectedFactoryId}
+                        onChange={(event) =>
+                          setDestinationFactoryBySubmissionId((prev) => ({
+                            ...prev,
+                            [item.id]: event.target.value,
+                          }))
+                        }
+                        className="w-full max-w-[14rem] rounded-lg border border-stone-300 px-2 py-1.5 bg-white"
+                      >
+                        <option value="">เลือกโรงงานปลายทาง</option>
+                        {factoryOptions.map((factory) => (
+                          <option key={factory.id} value={factory.id}>
+                            {factory.name_th}
+                          </option>
+                        ))}
+                      </select>
+                      <p
+                        className="mt-1 text-xs text-stone-500 max-w-[14rem] truncate"
+                        title={selectedFactory?.location_text || ''}
+                      >
+                        {selectedFactory?.location_text || 'ที่อยู่โรงงานจะแสดงที่นี่'}
+                      </p>
+                    </td>
+                    <td className="py-3 px-2 min-w-[12rem]">
+                      <DateRangePicker
+                        value={pickupRangeBySubmissionId[item.id] || { from: null, to: null }}
+                        onChange={(nextRange) =>
+                          setPickupRangeBySubmissionId((prev) => ({
+                            ...prev,
+                            [item.id]: nextRange,
+                          }))
+                        }
+                        minDate={new Date()}
+                        placeholder="เลือกช่วงวันนัดรับ"
+                      />
+                    </td>
+                    <td className="py-3 px-2 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => void handleSchedulePickup(item.id)}
+                        disabled={
+                          schedulingSubmissionId === item.id ||
+                          !pickupRangeBySubmissionId[item.id]?.from ||
+                          !pickupRangeBySubmissionId[item.id]?.to ||
+                          !destinationFactoryBySubmissionId[item.id]
+                        }
+                        className="px-3 py-1.5 rounded-full text-xs font-semibold bg-surface-container-high hover:bg-primary hover:text-white disabled:opacity-60"
+                      >
+                        {schedulingSubmissionId === item.id ? 'กำลังจัดคิว...' : 'จัดคิวรับงาน'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
               {submittedQueue.length === 0 && (
                 <tr>
-                  <td className="py-3 text-on-surface-variant" colSpan={7}>ไม่มีคิวใหม่ในสถานะ submitted</td>
+                  <td className="py-3 text-on-surface-variant" colSpan={8}>ไม่มีคิวใหม่ในสถานะ submitted</td>
                 </tr>
               )}
             </tbody>
@@ -436,26 +505,44 @@ export default function LogisticsTracking() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-on-surface-variant">
-                <th className="py-2">วัสดุ</th>
-                <th className="py-2">สถานะ</th>
-                <th className="py-2">ช่วงนัดรับ</th>
-                <th className="py-2">สถานที่</th>
-                <th className="py-2">การอัปเดต</th>
+                <th className="py-2 px-2 whitespace-nowrap">วัสดุ</th>
+                <th className="py-2 px-2 whitespace-nowrap">สถานะ</th>
+                <th className="py-2 px-2 whitespace-nowrap">โรงงานปลายทาง</th>
+                <th className="py-2 px-2 whitespace-nowrap">ช่วงนัดรับ</th>
+                <th className="py-2 px-2 whitespace-nowrap">สถานที่</th>
+                <th className="py-2 px-2 whitespace-nowrap">การอัปเดต</th>
               </tr>
             </thead>
             <tbody>
               {pickupJobs.map((item) => (
-                <tr key={item.id} className="border-t border-outline-variant/10">
-                  <td className="py-2">{formatMaterial(item.material_type)} • {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</td>
-                  <td className="py-2">
+                <tr key={item.id} className="border-t border-outline-variant/10 align-top">
+                  <td className="py-3 px-2 whitespace-nowrap">{formatMaterial(item.material_type)} • {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</td>
+                  <td className="py-3 px-2 whitespace-nowrap">
                     <StatusBadge status={item.status} label={formatPickupJobStatus(item.status)} />
                   </td>
-                  <td className="py-2">
+                  <td className="py-3 px-2">
+                    <div className="max-w-[14rem]">
+                      <p className="font-medium text-stone-800 truncate" title={item.destination_factory_name_th || '-'}>
+                        {item.destination_factory_name_th || '-'}
+                      </p>
+                      {item.destination_factory_location_text ? (
+                        <>
+                          <details className="mt-1 text-xs">
+                            <summary className="cursor-pointer text-primary underline underline-offset-2">ดูที่อยู่เต็ม</summary>
+                            <p className="mt-1 break-words text-stone-600">{item.destination_factory_location_text}</p>
+                          </details>
+                        </>
+                      ) : (
+                        <p className="text-xs text-stone-500">-</p>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 whitespace-nowrap">
                     {formatDateTime(item.planned_pickup_at)} - {formatDateTime(item.pickup_window_end_at ?? null)}
                   </td>
-                  <td className="py-2">
-                    <div className="space-y-1">
-                      <p>{item.pickup_location_text}</p>
+                  <td className="py-3 px-2">
+                    <div className="space-y-1 max-w-[15rem]">
+                      <p className="break-words">{item.pickup_location_text}</p>
                       {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
                         <a
                           href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
@@ -470,7 +557,8 @@ export default function LogisticsTracking() {
                       )}
                     </div>
                   </td>
-                  <td className="py-2 flex items-center gap-2">
+                  <td className="py-3 px-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                     {item.status === 'pickup_scheduled' && (
                       <button
                         type="button"
@@ -491,12 +579,13 @@ export default function LogisticsTracking() {
                         {updatingPickupJobId === item.id ? 'กำลังอัปเดต...' : 'ยืนยันส่งถึงโรงงาน'}
                       </button>
                     )}
+                    </div>
                   </td>
                 </tr>
               ))}
               {pickupJobs.length === 0 && (
                 <tr>
-                  <td className="py-3 text-on-surface-variant" colSpan={5}>ยังไม่มี pickup jobs ของผู้ขนส่งคนนี้</td>
+                  <td className="py-3 text-on-surface-variant" colSpan={6}>ยังไม่มี pickup jobs ของผู้ขนส่งคนนี้</td>
                 </tr>
               )}
             </tbody>

@@ -9,6 +9,7 @@ const navItems = [
   { icon: Gift, label: 'แลกของรางวัล', path: '/farmer-rewards', roles: ['farmer'] },
   { icon: Truck, label: 'ขนส่ง', path: '/logistics', roles: ['logistics'] },
   { icon: Factory, label: 'โรงงาน', path: '/factory', roles: ['factory'] },
+  { icon: SlidersHorizontal, label: 'ตั้งค่าโรงงาน', path: '/factory/settings', roles: ['factory'] },
   { icon: PackageCheck, label: 'คลังสินค้า', path: '/warehouse', roles: ['warehouse'] },
   { icon: BarChart3, label: 'ผู้บริหาร', path: '/dashboard', roles: ['executive'] },
   { icon: SlidersHorizontal, label: 'ตั้งค่าระบบ', path: '/executive-settings', roles: ['executive'] },
@@ -37,6 +38,7 @@ export default function Sidebar() {
           <NavLink
             key={item.path}
             to={item.path}
+            end={item.path === '/factory'}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',

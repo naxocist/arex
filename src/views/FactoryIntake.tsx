@@ -26,11 +26,11 @@ function formatMaterial(materialType: string): string {
   return map[materialType] ?? materialType;
 }
 
-function quantityToKg(quantityValue: number, toKgFactor: number | null | undefined): number {
+function quantityToKg(quantityValue: number, toKgFactor: number | null | undefined): number | null {
   if (typeof toKgFactor === 'number' && Number.isFinite(toKgFactor) && toKgFactor > 0) {
     return quantityValue * toKgFactor;
   }
-  return Math.max(quantityValue, 1);
+  return null;
 }
 
 function fallbackThaiUnit(unitCode: string): string {
@@ -60,14 +60,6 @@ export default function FactoryIntake() {
   const [confirmingJobId, setConfirmingJobId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const waitingTon = useMemo(() => {
-    return summary?.arrived_estimated_weight_kg_total ? summary.arrived_estimated_weight_kg_total / 1000 : 0;
-  }, [summary]);
-
-  const confirmedTon = useMemo(() => {
-    return summary?.confirmed_weight_kg_total ? summary.confirmed_weight_kg_total / 1000 : 0;
-  }, [summary]);
-
   const loadQueue = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
       setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
@@ -76,15 +68,19 @@ export default function FactoryIntake() {
 
     setIsLoading(true);
     try {
-      const response = await factoryApi.listPendingIntakes({ forceRefresh });
-      setQueue(response.queue);
-      setConfirmed(response.confirmed);
-      setSummary(response.summary);
+      const queueResponse = await factoryApi.listPendingIntakes({ forceRefresh });
+
+      setQueue(queueResponse.queue);
+      setConfirmed(queueResponse.confirmed);
+      setSummary(queueResponse.summary);
       setWeightByJobId((prev) => {
         const next = { ...prev };
-        for (const item of response.queue) {
+        for (const item of queueResponse.queue) {
           if (!next[item.pickup_job_id]) {
-            next[item.pickup_job_id] = String(quantityToKg(Number(item.quantity_value), item.quantity_to_kg_factor));
+            const estimatedKg = quantityToKg(Number(item.quantity_value), item.quantity_to_kg_factor);
+            if (estimatedKg !== null) {
+              next[item.pickup_job_id] = String(estimatedKg);
+            }
           }
         }
         return next;
@@ -157,9 +153,14 @@ export default function FactoryIntake() {
           <p className="text-sm text-stone-600 mt-2">รอยืนยันรับเข้าอยู่ในคิว</p>
         </div>
         <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-5">
-          <p className="text-xs uppercase tracking-widest text-sky-700">น้ำหนักรวมที่มาถึง (ประมาณการ)</p>
-          <p className="text-3xl font-semibold mt-2 text-sky-900">{waitingTon.toLocaleString('th-TH', { maximumFractionDigits: 3 })} ตัน</p>
-          <p className="text-sm text-sky-700/80 mt-2">คำนวณจากปริมาณแจ้งและหน่วยแปลง</p>
+          <p className="text-xs uppercase tracking-widest text-sky-700">น้ำหนักประมาณการที่แปลงหน่วยได้</p>
+          <p className="text-3xl font-semibold mt-2 text-sky-900">
+            {(summary?.arrived_estimated_weight_kg_total ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 3 })} กก.
+          </p>
+          <p className="text-sm text-sky-700/80 mt-2">
+            แปลงได้ {(summary?.arrived_convertible_count ?? 0).toLocaleString('th-TH')} รายการ •
+            แปลงไม่ได้ {(summary?.arrived_non_convertible_count ?? 0).toLocaleString('th-TH')} รายการ
+          </p>
         </div>
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
           <p className="text-xs uppercase tracking-widest text-emerald-700">ยืนยันน้ำหนักแล้ว</p>
@@ -167,9 +168,20 @@ export default function FactoryIntake() {
           <p className="text-sm text-emerald-700/80 mt-2">รายการที่ถูกบันทึกเข้าระบบแล้ว</p>
         </div>
         <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-5">
-          <p className="text-xs uppercase tracking-widest text-violet-700">น้ำหนักรวมที่ยืนยันแล้ว</p>
-          <p className="text-3xl font-semibold mt-2 text-violet-900">{confirmedTon.toLocaleString('th-TH', { maximumFractionDigits: 3 })} ตัน</p>
+          <p className="text-xs uppercase tracking-widest text-violet-700">น้ำหนักรวมที่ยืนยันแล้ว (ชั่งจริง)</p>
+          <p className="text-3xl font-semibold mt-2 text-violet-900">
+            {(summary?.confirmed_weight_kg_total ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 3 })} กก.
+          </p>
+          <p className="text-sm text-violet-700/80 mt-2">รวมจากน้ำหนักที่โรงงานชั่งและยืนยันจริงทุกรายการ</p>
         </div>
+      </section>
+
+      <section className="bg-white border border-stone-200 rounded-2xl p-4">
+        <p className="text-xs text-stone-600">
+          หมายเหตุ: น้ำหนักประมาณการจะแสดงเฉพาะรายการที่หน่วยสามารถแปลงเป็นกิโลกรัมได้
+          (รายการที่แปลงไม่ได้: {(summary?.arrived_non_convertible_count ?? 0).toLocaleString('th-TH')} รายการ,
+          ปริมาณรวมหน่วยเดิม {(summary?.arrived_non_convertible_quantity_total ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 3 })})
+        </p>
       </section>
 
       <section className="bg-white border border-stone-200 rounded-2xl p-5">
@@ -254,15 +266,15 @@ export default function FactoryIntake() {
           <h2 className="text-lg font-semibold">รายการที่ยืนยันน้ำหนักแล้ว</h2>
           <p className="text-sm text-stone-600 mt-1">แสดงประวัติที่ยืนยันสำเร็จ พร้อมน้ำหนักจริงที่ใช้คำนวณแต้ม</p>
         </div>
-        <div className="overflow-x-auto">
+        <div className="max-h-[24rem] overflow-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-stone-500 border-b border-stone-200">
-                <th className="py-2 pr-3">เวลา</th>
-                <th className="py-2 px-3">วัสดุ</th>
-                <th className="py-2 px-3">น้ำหนักจริง</th>
-                <th className="py-2 px-3">สถานะ</th>
-                <th className="py-2 pl-3">หมายเหตุ</th>
+                <th className="sticky top-0 bg-white py-2 pr-3">เวลา</th>
+                <th className="sticky top-0 bg-white py-2 px-3">วัสดุ</th>
+                <th className="sticky top-0 bg-white py-2 px-3">น้ำหนักจริง</th>
+                <th className="sticky top-0 bg-white py-2 px-3">สถานะ</th>
+                <th className="sticky top-0 bg-white py-2 pl-3">หมายเหตุ</th>
               </tr>
             </thead>
             <tbody>
@@ -281,7 +293,7 @@ export default function FactoryIntake() {
                     <div className="text-xs text-stone-500">{item.material_type}</div>
                   </td>
                   <td className="py-2 px-3 text-stone-800">
-                    {item.measured_weight_kg.toLocaleString('th-TH', { maximumFractionDigits: 2 })} กก. ({item.measured_weight_ton.toLocaleString('th-TH', { maximumFractionDigits: 3 })} ตัน)
+                    {item.measured_weight_kg.toLocaleString('th-TH', { maximumFractionDigits: 2 })} กก.
                   </td>
                   <td className="py-2 px-3">
                     <StatusBadge status={item.status} label="ยืนยันแล้ว" />

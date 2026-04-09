@@ -332,6 +332,14 @@ export interface ExecutiveSubmissionMaterialBreakdownItem {
   submissions_count: number;
   declared_quantity_total: number;
   estimated_weight_kg_total: number;
+  convertible_submissions_count: number;
+  non_convertible_submissions_count: number;
+}
+
+export interface ExecutivePickupJobsStatusSummary {
+  pickup_scheduled: number;
+  picked_up: number;
+  delivered_to_factory: number;
 }
 
 export interface ExecutiveRewardRequestStatusSummary {
@@ -346,9 +354,13 @@ export interface ExecutiveOverview {
   unique_farmers_total: number;
   submissions_pending_pickup: number;
   pickup_jobs_active: number;
+  pickup_jobs_status_summary: ExecutivePickupJobsStatusSummary;
   reward_requests_pending_warehouse: number;
   submitted_weight_estimated_kg_total: number;
   submitted_weight_estimated_ton_total: number;
+  submissions_convertible_count: number;
+  submissions_non_convertible_count: number;
+  submissions_non_convertible_quantity_total: number;
   factory_confirmed_weight_kg_total: number;
   factory_confirmed_weight_ton_total: number;
   points_credited_total: number;
@@ -414,7 +426,15 @@ export interface FarmerRewardRequestItem {
 export interface SchedulePickupPayload {
   pickup_window_start_at: string;
   pickup_window_end_at: string;
+  destination_factory_id: string;
   notes?: string;
+}
+
+export interface LogisticsFactoryOptionItem {
+  id: string;
+  name_th: string;
+  location_text?: string | null;
+  active: boolean;
 }
 
 export interface LogisticsPickupQueueItem {
@@ -434,6 +454,9 @@ export interface LogisticsPickupJobItem {
   id: string;
   submission_id: string;
   logistics_profile_id: string;
+  destination_factory_id?: string | null;
+  destination_factory_name_th?: string | null;
+  destination_factory_location_text?: string | null;
   status: 'pickup_scheduled' | 'picked_up' | 'delivered_to_factory' | string;
   planned_pickup_at: string;
   pickup_window_end_at?: string | null;
@@ -551,8 +574,29 @@ export interface FactoryIntakeSummary {
   arrived_count: number;
   confirmed_count: number;
   arrived_estimated_weight_kg_total: number;
+  arrived_convertible_count: number;
+  arrived_non_convertible_count: number;
+  arrived_non_convertible_quantity_total: number;
   confirmed_weight_kg_total: number;
   confirmed_weight_ton_total: number;
+}
+
+export interface FactoryInfoItem {
+  id: string;
+  factory_profile_id: string;
+  name_th: string;
+  location_text: string | null;
+  lat: number | null;
+  lng: number | null;
+  active: boolean;
+  created_at: string;
+}
+
+export interface UpsertFactoryInfoPayload {
+  name_th: string;
+  location_text?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface RejectRewardRequestPayload {
@@ -632,6 +676,8 @@ export const farmerApi = {
 };
 
 export const logisticsApi = {
+  listFactories: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ factories: LogisticsFactoryOptionItem[]; actor: string }>('/logistics/factories', options),
   getPickupQueue: (options?: RequestBehaviorOptions) =>
     apiRequest<{ queue: LogisticsPickupQueueItem[]; actor: string }>('/logistics/pickup-queue', options),
   getPickupJobs: (options?: RequestBehaviorOptions) =>
@@ -669,6 +715,12 @@ export const logisticsApi = {
 };
 
 export const factoryApi = {
+  getMyFactory: (options?: RequestBehaviorOptions) => apiRequest<FactoryInfoItem>('/factory/me', options),
+  updateMyFactory: (payload: UpsertFactoryInfoPayload) =>
+    apiRequest<FactoryInfoItem>('/factory/me', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
   listPendingIntakes: (options?: RequestBehaviorOptions) =>
     apiRequest<{
       queue: FactoryPendingIntakeItem[];

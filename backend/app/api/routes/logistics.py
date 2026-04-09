@@ -41,6 +41,21 @@ def get_pickup_jobs(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.get("/factories")
+def get_factories(
+    current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
+    workflow_service: WorkflowService = Depends(get_workflow_service),
+) -> dict[str, Any]:
+    try:
+        factories = workflow_service.list_active_factories()
+        return {
+            "factories": factories,
+            "actor": current_user.role.value,
+        }
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 @router.get("/reward-requests/approved")
 def get_approved_reward_requests(
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
