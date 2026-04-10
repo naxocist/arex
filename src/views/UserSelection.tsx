@@ -2,68 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
-  BarChart3,
-  ChevronDown,
-  Factory,
   Leaf,
-  PackageCheck,
-  Truck,
-  User,
 } from 'lucide-react';
 import AlertBanner from '@/src/components/AlertBanner';
 import PickupLocationMapPicker from '@/src/components/PickupLocationMapPicker';
 import { ApiError, authApi, setAuthSession } from '@/src/lib/apiClient';
 import { useUser, UserRole } from '../contexts/UserContext';
-
-const roleCards: {
-  id: UserRole;
-  role: string;
-  name: string;
-  description: string;
-  icon: typeof User;
-  tone: string;
-}[] = [
-  {
-    id: 'farmer',
-    role: 'เกษตรกร',
-    name: 'คุณสมชาย',
-    description: 'แจ้งวัสดุ ติดตามคิวรับ และเปลี่ยนแต้มเป็นของรางวัลได้จากหน้าเดียวกัน',
-    icon: User,
-    tone: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-  },
-  {
-    id: 'logistics',
-    role: 'ฝ่ายขนส่ง',
-    name: 'พนักงานขับรถ',
-    description: 'มองเห็นทั้งคิวรับวัสดุ งานส่งโรงงาน และงานจัดส่งของรางวัลในลำดับเดียว',
-    icon: Truck,
-    tone: 'border-amber-200 bg-amber-50 text-amber-900',
-  },
-  {
-    id: 'factory',
-    role: 'ฝ่ายโรงงาน',
-    name: 'ผู้จัดการโรงงาน',
-    description: 'ยืนยันน้ำหนักจริงที่จุดรับเข้าและปิดงานเพื่อให้ระบบเครดิตแต้มอัตโนมัติ',
-    icon: Factory,
-    tone: 'border-sky-200 bg-sky-50 text-sky-900',
-  },
-  {
-    id: 'warehouse',
-    role: 'ฝ่ายคลังสินค้า',
-    name: 'เจ้าหน้าที่คลัง',
-    description: 'ตรวจคำขอแลกรางวัลและตัดสินใจอนุมัติหรือปฏิเสธได้อย่างรวดเร็ว',
-    icon: PackageCheck,
-    tone: 'border-teal-200 bg-teal-50 text-teal-900',
-  },
-  {
-    id: 'executive',
-    role: 'ผู้บริหาร',
-    name: 'ผู้บริหาร AREX',
-    description: 'ดูสถานะระบบโดยรวม จุดค้างในกระบวนการ และตั้งค่า master data ที่มีผลทั้งระบบ',
-    icon: BarChart3,
-    tone: 'border-violet-200 bg-violet-50 text-violet-900',
-  },
-];
 
 const THAI_PROVINCES = [
   'กรุงเทพมหานคร',
@@ -305,44 +249,6 @@ export default function UserSelection() {
             </h1>
           </div>
         </section>
-
-        {/* <details className="group overflow-hidden rounded-[1.6rem] border border-emerald-100 bg-white shadow-sm">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:content-none md:px-6">
-            <div>
-              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-emerald-700">Roles</p>
-              <p className="mt-1 text-base font-semibold text-stone-950">ดูรายละเอียดบทบาทในระบบ</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                กดเพื่อดู
-              </span>
-              <ChevronDown className="h-5 w-5 text-emerald-700 transition group-open:rotate-180" />
-            </div>
-          </summary>
-
-          <div className="border-t border-emerald-100 px-5 py-4 md:px-6">
-            <div className="grid gap-3 md:grid-cols-2">
-              {roleCards.map((role) => (
-                <article key={role.id} className="rounded-2xl border border-line bg-white px-4 py-3">
-                  <div className="flex items-start gap-3">
-                    <div className={`rounded-2xl border p-2.5 ${role.tone}`}>
-                      <role.icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-semibold text-stone-900">{role.role}</h3>
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[0.68rem] font-semibold text-emerald-700">
-                          {role.name}
-                        </span>
-                      </div>
-                      <p className="mt-1.5 text-sm leading-6 text-stone-600">{role.description}</p>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </details> */}
 
         <div className="flex justify-center">
           <section className="w-full max-w-3xl overflow-hidden rounded-[1.8rem] border border-emerald-100 bg-white shadow-sm">

@@ -28,9 +28,23 @@ run = "supabase db reset --workdir backend"
 description = "Create a new migration (pass -- my_migration_name)"
 run = "supabase migration new --workdir backend"
 
+[tasks."db:dump:auth"]
+description = "Dump local auth data for cloud push"
+run = "supabase db dump --workdir backend --local --data-only --schema auth -f supabase/dumps/local_auth_data.sql"
+hide = true
+
+[tasks."db:dump:public"]
+description = "Dump local public data for cloud push"
+run = "supabase db dump --workdir backend --local --data-only --schema public -f supabase/dumps/local_public_data.sql"
+hide = true
+
+[tasks."db:dump:cloud-push"]
+description = "Dump local auth+public data files for cloud push"
+run = "mise run db:dump:auth && mise run db:dump:public"
+
 [tasks."dev:up"]
 description = "Start Supabase and app containers"
-run = "supabase start --workdir backend && docker compose up -d --build"
+run = "supabase start --workdir backend && docker compose up --watch"
 
 [tasks."dev:down"]
 description = "Stop app containers and Supabase"
