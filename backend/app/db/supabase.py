@@ -10,12 +10,15 @@ def _build_client(api_key: str) -> Client:
     return create_client(settings.supabase_url, api_key)
 
 
-def get_anon_client() -> Client:
+def get_publishable_client() -> Client:
     settings = get_settings()
-    return _build_client(settings.supabase_anon_key)
+    return _build_client(settings.supabase_publishable_key)
 
 
 @lru_cache
 def get_service_client() -> Client:
     settings = get_settings()
-    return _build_client(settings.supabase_service_role_key)
+    secret_key = settings.supabase_secret_key
+    if secret_key.startswith("sb_secret_") and settings.supabase_legacy_service_role_jwt:
+        secret_key = settings.supabase_legacy_service_role_jwt
+    return _build_client(secret_key)

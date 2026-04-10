@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from supabase import Client, create_client
-import supabase
 
+import supabase
+from supabase import Client, create_client
 
 ZERO_UUID = "00000000-0000-0000-0000-000000000000"
 FARMER_1_ID = "f4ef8667-e708-4a4c-bda5-3454c141748e"
@@ -114,21 +114,21 @@ def _decode_jwt_role(token: str) -> str | None:
     return None
 
 
-def _validate_service_key(service_key: str) -> None:
+def _validate_secret_key(secret_key: str) -> None:
     # Supabase legacy keys are JWT; service-role keys have role=service_role.
     # New secret keys (sb_secret_...) are non-JWT and still admin-capable.
-    if service_key.startswith("sb_secret_"):
+    if secret_key.startswith("sb_secret_"):
         return
 
     try:
-        role = _decode_jwt_role(service_key)
+        role = _decode_jwt_role(secret_key)
     except Exception:
         role = None
 
     if role == "anon":
         raise RuntimeError(
-            "SUPABASE_SERVICE_ROLE_KEY is set to an anon key. "
-            "Use your project's service_role (or sb_secret_*) key for admin operations."
+            "SUPABASE_SECRET_KEY is set to a publishable/anon key. "
+            "Use your project's secret key (or legacy service_role JWT) for admin operations."
         )
 
     if role is not None and role != "service_role":
@@ -138,9 +138,9 @@ def _validate_service_key(service_key: str) -> None:
         )
 
 
-def _select_supabase_key_for_client(service_key: str, legacy_service_jwt: str) -> str:
+def _select_supabase_key_for_client(secret_key: str, legacy_service_jwt: str) -> str:
     # supabase-py==2.15.3 validates API keys as JWT and rejects sb_secret_* keys.
-    if service_key.startswith("sb_secret_"):
+    if secret_key.startswith("sb_secret_"):
         if legacy_service_jwt:
             return legacy_service_jwt
 
@@ -148,11 +148,11 @@ def _select_supabase_key_for_client(service_key: str, legacy_service_jwt: str) -
         raise RuntimeError(
             "Current Python client rejects sb_secret_* keys as Invalid API key. "
             f"Installed supabase-py version: {client_version}. "
-            "Set SUPABASE_SERVICE_ROLE_JWT (legacy service_role JWT key) in backend/.env for this script, "
+            "Set SUPABASE_LEGACY_SERVICE_ROLE_JWT (legacy service_role JWT key) in backend/.env for this script, "
             "or upgrade the client stack to a version that supports secret keys."
         )
 
-    return service_key
+    return secret_key
 
 
 def _load_env() -> tuple[str, str]:
@@ -160,15 +160,15 @@ def _load_env() -> tuple[str, str]:
     load_dotenv(backend_dir / ".env")
 
     supabase_url = os.getenv("SUPABASE_URL", "").strip()
-    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
-    legacy_service_jwt = os.getenv("SUPABASE_SERVICE_ROLE_JWT", "").strip()
+    secret_key = os.getenv("SUPABASE_SECRET_KEY", "").strip()
+    legacy_service_jwt = os.getenv("SUPABASE_LEGACY_SERVICE_ROLE_JWT", "").strip()
 
     if not supabase_url:
         raise RuntimeError("SUPABASE_URL is required")
-    if not service_key:
-        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required")
+    if not secret_key:
+        raise RuntimeError("SUPABASE_SECRET_KEY is required")
 
-    selected_key = _select_supabase_key_for_client(service_key, legacy_service_jwt)
+    selected_key = _select_supabase_key_for_client(secret_key, legacy_service_jwt)
     return supabase_url, selected_key
 
 
@@ -300,7 +300,12 @@ def _seed_master_data(client: Client, resolved_ids_by_email: dict[str, str]) -> 
         [
             {"code": "kg", "name_th": "กิโลกรัม", "to_kg_factor": 1.0, "active": True},
             {"code": "ton", "name_th": "ตัน", "to_kg_factor": 1000.0, "active": True},
-            {"code": "m3", "name_th": "ลูกบาศก์เมตร", "to_kg_factor": None, "active": True},
+            {
+                "code": "m3",
+                "name_th": "ลูกบาศก์เมตร",
+                "to_kg_factor": None,
+                "active": True,
+            },
         ],
         on_conflict="code",
     ).execute()
@@ -538,7 +543,7 @@ def reset_and_seed(client: Client) -> None:
         if "user not allowed" in message or "403" in message:
             raise RuntimeError(
                 "Supabase Auth admin API denied auth user creation. "
-                "Check SUPABASE_SERVICE_ROLE_KEY permissions."
+                "Check SUPABASE_SECRET_KEY permissions."
             ) from exc
         raise
 
@@ -561,11 +566,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     if args.confirm != "RESET_AREX_DATA":
-        raise RuntimeError("Confirmation string mismatch. Use --confirm RESET_AREX_DATA")
+        raise RuntimeError(
+            "Confirmation string mismatch. Use --confirm RESET_AREX_DATA"
+        )
 
-    supabase_url, service_key = _load_env()
-    _validate_service_key(service_key)
-    client = create_client(supabase_url, service_key)
+    supabase_url, secret_key = _load_env()
+    _validate_secret_key(secret_key)
+    client = create_client(supabase_url, secret_key)
 
     reset_and_seed(client)
 
