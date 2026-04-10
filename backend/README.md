@@ -1,42 +1,61 @@
 # AREX Backend (FastAPI + Supabase)
 
-This backend is a separate service for workflow rules, role-safe APIs, and integration with Supabase Postgres/Auth.
+Backend service for workflow rules, role-safe APIs, and Supabase Postgres/Auth integration.
 
-## Prerequisites
+## Monorepo Layout
 
-- Python 3.11+
-- A Supabase project (URL, publishable key, secret key)
+- Frontend app: repository root
+- Backend app: `backend/`
+- Supabase assets for backend: `backend/supabase/`
 
-## Setup
+## Environment Variables
 
-1. Sync dependencies with UV.
-2. Copy `.env.example` to `.env` and set values.
-3. Run the API.
+Copy and edit the backend env file:
+
+```bash
+cd backend
+cp .env.example .env
+```
+
+Required values:
+
+- `SUPABASE_URL`: local (`http://host.docker.internal:54321`) when backend runs in Docker, or hosted Supabase URL in production.
+- `SUPABASE_PUBLISHABLE_KEY`: publishable key from your Supabase project.
+- `SUPABASE_SECRET_KEY`: secret/service key from your Supabase project.
+- `SUPABASE_LEGACY_SERVICE_ROLE_JWT`: optional fallback key used by backend auth-admin flows with older client compatibility.
+
+## Local Development (with monorepo tasks)
+
+Run all local dev commands from repository root using `mise`:
+
+- `mise run dev:up` starts Supabase local stack, backend container, and frontend container.
+- `mise run dev:down` stops app containers and Supabase stack.
+- `mise run db:status` prints local Supabase URLs and keys (includes Studio URL).
+- `mise run db:reset-seed` resets data and seeds deterministic demo data (without migration reset).
+
+You can still run backend only:
 
 ```bash
 cd backend
 uv sync
-cp .env.example .env
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Supabase Migration
 
-Apply migrations in order from:
+Migrations live in `backend/supabase/migrations` and are applied by Supabase CLI workflows.
+Create a new migration with:
 
-- `supabase/migrations/0001_init_arex.sql`
-- `supabase/migrations/0002_fix_plpgsql_ambiguous_columns.sql`
-- `supabase/migrations/0003_guard_duplicate_reward_delivery_job.sql`
-- `supabase/migrations/0004_farmer_cancel_reward_request.sql`
-- `supabase/migrations/0005_logistics_date_windows.sql`
-- `supabase/migrations/0006_thai_measurement_units.sql`
-- `supabase/migrations/0007_dynamic_material_types.sql`
-- `supabase/migrations/0008_factory_account_mapping.sql`
-- `supabase/migrations/0009_logistics_pickup_destination_factory.sql`
-- `supabase/migrations/0010_minimal_schema_cleanup.sql`
-- `supabase/migrations/0011_enable_rls_on_public_tables.sql`
+```bash
+mise run db:migrate:new -- your_migration_name
+```
 
-You can run it in Supabase SQL Editor or using Supabase CLI migrations.
+Then apply and verify with:
+
+```bash
+mise run db:reset-seed
+mise run db:status
+```
 
 ## Registration Flow
 
@@ -61,47 +80,17 @@ Behavior:
 
 ## Deterministic Reset + Seed (Auth + App Data)
 
-Use the Python script below to fully reset and reseed test data, including Supabase Auth users:
+Seed data is now SQL-native and executed by Supabase CLI from `backend/supabase/seed.sql`.
 
-- `scripts/reset_and_seed.py`
-
-### Local Supabase
+Use this command from the repo root:
 
 ```bash
-cd backend
-uv run python scripts/reset_and_seed.py --confirm RESET_AREX_DATA
+mise run db:reset-seed
 ```
 
-### Hosted Supabase
+- `db:reset-seed` resets application/auth data and reruns deterministic seed SQL (no migration reset).
 
-Set backend `.env` (or environment variables) with hosted project credentials:
-
-- `SUPABASE_URL`
-- `SUPABASE_SECRET_KEY`
-
-If your service key is the new `sb_secret_*` format, current Python Supabase client behavior in this script may still require a JWT-format service role key for `create_client(...)`.
-In that case, add:
-
-- `SUPABASE_LEGACY_SERVICE_ROLE_JWT` (legacy JWT service_role key)
-
-The reset script will prefer `SUPABASE_LEGACY_SERVICE_ROLE_JWT` when needed.
-
-Then run the same command:
-
-```bash
-cd backend
-uv run python scripts/reset_and_seed.py --confirm RESET_AREX_DATA
-```
-
-The script upserts deterministic demo users (all major roles) and reseeds workflow data for end-to-end testing.
-
-If you see `403 User not allowed`, your `SUPABASE_SECRET_KEY` is usually incorrect (often accidentally set to the publishable/anon key). Use the secret key from Supabase project settings.
-
-If hosted policies block Auth admin operations, fallback manually:
-
-1. Create required users in Supabase Auth dashboard using the same emails shown by the script.
-2. Run profile and app-data seed steps only by adapting `scripts/reset_and_seed.py` (skip auth delete/create blocks).
-3. Keep `profiles.id` equal to the matching `auth.users.id` UUID.
+The seed includes deterministic demo Auth users and matching app data for end-to-end testing.
 
 ## Minimal Manual Setup (One-time)
 
@@ -109,7 +98,7 @@ If hosted policies block Auth admin operations, fallback manually:
 	- `SUPABASE_URL`
 	- `SUPABASE_PUBLISHABLE_KEY`
 	- `SUPABASE_SECRET_KEY`
-	- `SUPABASE_LEGACY_SERVICE_ROLE_JWT` (optional fallback for reset script)
+	- `SUPABASE_LEGACY_SERVICE_ROLE_JWT` (optional fallback for auth-admin key compatibility)
 2. Set frontend `VITE_API_BASE_URL` in root `.env` (or `.env.local`) to your running backend URL.
 
 ## API Prefix
@@ -160,9 +149,23 @@ All routes are mounted under `/api/v1` by default.
 - `POST /api/v1/warehouse/reward-requests/{request_id}/reject`
 - `GET /api/v1/executive/dashboard/overview`
 
-## Next Implementation Steps
+## Production Deployment (Google Cloud Run)
 
-1. Add JWT integration on frontend and connect first screen (`FarmerHome`) to backend endpoints.
-2. Add picked-up and reward delivered transitions as dedicated endpoints.
-3. Add role-safe integration tests for workflow guards and points accounting.
-4. Add RLS policies and verify with non-service-role data access where needed.
+Backend deployment is configured via `backend/cloudbuild.yaml`.
+
+Manual command from repo root:
+
+```bash
+gcloud builds submit backend --config backend/cloudbuild.yaml
+```
+
+Before first deploy, configure Cloud Build substitutions and secrets:
+
+- `_SERVICE`: Cloud Run service name
+- `_REGION`: deployment region
+- `_SUPABASE_URL`: hosted Supabase project URL
+- `_SUPABASE_PUBLISHABLE_KEY`: hosted publishable key
+- `_SUPABASE_SECRET_KEY`: Secret Manager secret name for backend secret key
+- `_SUPABASE_LEGACY_SERVICE_ROLE_JWT`: Secret Manager secret name for fallback JWT key (can be omitted if not needed)
+
+For frontend (Vercel), set `VITE_API_BASE_URL` to the Cloud Run HTTPS URL plus `/api/v1`.

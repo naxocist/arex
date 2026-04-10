@@ -1,57 +1,50 @@
-# Supabase Schema Notes
+# Supabase (Local + Hosted) for AREX Backend
 
-This folder stores SQL migrations used by the AREX FastAPI backend.
+This folder contains Supabase migrations and local development config for the backend in this monorepo.
 
-## Initial Migration
+## Folder Contract
 
-- `migrations/0001_init_arex.sql`
-- `migrations/0002_fix_plpgsql_ambiguous_columns.sql` (hotfix for existing deployments)
-- `migrations/0003_guard_duplicate_reward_delivery_job.sql` (prevent duplicate reward delivery scheduling)
-- `migrations/0004_farmer_cancel_reward_request.sql` (allow farmer to cancel requested reward requests)
-- `migrations/0005_logistics_date_windows.sql` (require pickup/delivery start-end windows and expose to waiting users)
-- `migrations/0006_thai_measurement_units.sql` (Thai unit master table, configurable units, farmer-selectable unit)
-- `migrations/0007_dynamic_material_types.sql` (material type master table and dynamic farmer selection)
-- `migrations/0008_factory_account_mapping.sql` (link one factory profile to one factory record)
-- `migrations/0009_logistics_pickup_destination_factory.sql` (pickup scheduling requires destination factory)
-- `migrations/0010_minimal_schema_cleanup.sql` (drop unused farm schema and keep canonical pickup RPC signature)
-- `migrations/0011_enable_rls_on_public_tables.sql` (enable RLS on all active public tables; default deny for direct client access unless policies are added)
+- `backend/supabase/config.toml`: local Supabase CLI config
+- `backend/supabase/migrations/*.sql`: ordered SQL migrations
+- `backend/supabase/seed.sql`: deterministic SQL seed entrypoint
 
-Includes:
+## One-command Operations (from repo root)
 
-- Core tables for submissions, logistics jobs, factory intakes, reward requests, points ledger, and status events
-- Enum types for status/state machine fields
-- Indexes and updated-at triggers
-- Guarded workflow functions (RPC-ready) used by FastAPI
+- Start local Supabase stack (includes Studio UI):
+  - `mise run db:start`
+- Stop local Supabase stack:
+  - `mise run db:stop`
+- Show local Supabase endpoints/keys:
+  - `mise run db:status`
+- Reset DB and apply all migrations:
+  - `mise run db:reset`
+- Reset data + deterministic app/auth seed (without migration reset):
+  - `mise run db:reset-seed`
+- Create a migration:
+  - `mise run db:migrate:new -- your_migration_name`
 
-## Applying Migration
+## Studio UI
 
-Run the SQL in Supabase SQL Editor, or apply via Supabase CLI migration flow for the target project.
+After `mise run db:start`, open Supabase Studio at `http://127.0.0.1:54323`.
 
-If your environment already ran `0001_init_arex.sql`, apply all later migrations in order.
+This is the primary local UI for:
 
-## Reset and Seed
+- Browsing and editing table data
+- Managing Auth users
+- Running SQL during development
 
-Use `../scripts/reset_and_seed.py` for deterministic reset and seed.
+## Reset + Seed Details
 
-It performs both:
+Deterministic SQL seed file:
 
-- Supabase Auth upsert/seed for demo users
-- App data reset/seed for master and workflow tables
+- `backend/supabase/seed.sql`
 
-Command:
+It performs:
 
-```bash
-cd backend
-uv run python scripts/reset_and_seed.py --confirm RESET_AREX_DATA
-```
+- Demo Auth user creation in `auth.users`/`auth.identities`
+- Application table reset and deterministic reseed
 
-Works for local and hosted Supabase projects as long as `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are set.
+Supabase CLI runs this seed from `backend/supabase/config.toml` via:
 
-If you get `403 User not allowed`, verify `SUPABASE_SECRET_KEY` is a real secret key, not the publishable/anon key.
-
-Compatibility note for this repo:
-
-- Current `supabase-py` client behavior in this script expects JWT-style keys for `create_client(...)` and may reject `sb_secret_*` keys as `Invalid API key`.
-- If this happens, set `SUPABASE_LEGACY_SERVICE_ROLE_JWT` in `backend/.env` and rerun reset script.
-
-If hosted environment permissions block auth admin APIs, create auth users manually in Supabase dashboard first, then run only app-data portions from `../scripts/reset_and_seed.py` while keeping `profiles.id` aligned to each auth user UUID.
+- `supabase db query --workdir backend --file supabase/seed.sql`
+- `supabase db reset --workdir backend`

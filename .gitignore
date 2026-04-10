@@ -13,5 +13,6 @@ __pycache__/
 .mypy_cache/
 .venv/
 venv/
-*.temp/
 .vscode
+backend/supabase/.branches/
+backend/supabase/.temp/

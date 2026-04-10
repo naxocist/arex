@@ -1,5 +1,5 @@
 -- Hotfix for ambiguous PL/pgSQL references in pickup/reward delivery transitions.
--- Apply this on environments already created from 0001_init_arex.sql.
+-- Apply this on environments already created from the initial schema migration.
 
 create or replace function mark_pickup_delivered_to_factory(
   p_pickup_job_id uuid,

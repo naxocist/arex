@@ -1,5 +1,5 @@
 -- Hotfix: enforce logistics date windows (start/end) for pickup and reward delivery jobs.
--- Apply this after 0001-0004.
+-- Apply this after the initial schema and earlier workflow guard migrations.
 
 alter table if exists pickup_jobs
   add column if not exists pickup_window_end_at timestamptz;
