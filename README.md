@@ -1,20 +1,72 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# AREX Monorepo
 
-# Run and deploy your AI Studio app
+This repository is a monorepo:
 
-This contains everything you need to run your app locally.
+- Frontend (React + Vite): repository root
+- Backend (FastAPI): `backend/`
+- Supabase schema/migrations: `backend/supabase/`
 
-View your app in AI Studio: https://ai.studio/apps/c332eef0-4100-41d0-ac93-784aaa4834aa
+## Prerequisites
 
-## Run Locally
+- `mise` installed
+- Docker Desktop (or compatible Docker runtime)
+- Supabase CLI installed (or managed by `mise`)
 
-**Prerequisites:**  Node.js
+## Environment Setup
 
+### Frontend env
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+cp .env.example .env.local
+```
+
+Set `VITE_API_BASE_URL` to your backend URL.
+
+### Backend env
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+For local Supabase with backend running in Docker:
+
+- `SUPABASE_URL=http://host.docker.internal:54321`
+- keys come from `mise run db:status`
+
+## One-command Developer Workflow
+
+All common operations are exposed as `mise` tasks:
+
+- `mise run setup` - install frontend and backend dependencies
+- `mise run dev:up` - start Supabase local stack + backend/frontend containers
+- `mise run dev:down` - stop containers and Supabase stack
+- `mise run db:status` - print local Supabase endpoints and keys
+- `mise run db:reset` - reset and migrate local database
+- `mise run db:migrate:new -- feature_name` - create a migration file
+- `mise run logs:frontend` / `mise run logs:backend` - tail service logs
+- `mise run check` - run frontend type-check and backend compile checks
+
+## Local URLs
+
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8000/api/v1`
+- Supabase API: `http://localhost:54321`
+- Supabase Studio: `http://127.0.0.1:54323`
+
+## Deployment Targets
+
+- Frontend: Vercel
+- Backend: Google Cloud Run
+
+Manual deployment:
+
+- Frontend: use Vercel CLI or Vercel dashboard
+- Backend: `gcloud builds submit backend --config backend/cloudbuild.yaml`
+
+Frontend production env on Vercel:
+
+- `VITE_API_BASE_URL=https://<your-cloud-run-domain>/api/v1`
+
+Backend production env on Cloud Run is set by `backend/cloudbuild.yaml` (`--set-env-vars` + `--set-secrets`).
+
+See `backend/README.md` for backend runtime details and `backend/supabase/README.md` for database/auth workflows.

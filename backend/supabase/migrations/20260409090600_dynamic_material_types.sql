@@ -1,5 +1,5 @@
 -- Hotfix: move material types to configurable master table.
--- Apply this after 0001-0006.
+-- Apply this after initial schema plus measurement unit updates.
 
 create table if not exists material_types (
   code text primary key,

@@ -19,7 +19,7 @@ begin
       and p.proname = 'schedule_pickup_job'
       and oidvectortypes(p.proargtypes) = 'uuid, uuid, timestamp with time zone, timestamp with time zone, uuid, text'
   ) then
-    raise exception 'Expected canonical public.schedule_pickup_job(uuid, uuid, timestamptz, timestamptz, uuid, text) is missing. Apply migration 0009 first.';
+    raise exception 'Expected canonical public.schedule_pickup_job(uuid, uuid, timestamptz, timestamptz, uuid, text) is missing. Apply the previous pickup-destination migration first.';
   end if;
 end
 $$;

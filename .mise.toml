@@ -1,0 +1,49 @@
+[tools]
+node = "20"
+python = "3.11"
+uv = "latest"
+supabase = "latest"
+
+[tasks.setup]
+description = "Install frontend and backend dependencies"
+run = "npm install && cd backend && uv sync"
+
+[tasks."db:start"]
+description = "Start local Supabase stack"
+run = "supabase start --workdir backend"
+
+[tasks."db:stop"]
+description = "Stop local Supabase stack"
+run = "supabase stop --workdir backend"
+
+[tasks."db:status"]
+description = "Show local Supabase endpoints and keys"
+run = "supabase status -o env --workdir backend"
+
+[tasks."db:reset"]
+description = "Reset local database, reapply migrations, and seed data"
+run = "supabase db reset --workdir backend"
+
+[tasks."db:migrate:new"]
+description = "Create a new migration (pass -- my_migration_name)"
+run = "supabase migration new --workdir backend"
+
+[tasks."dev:up"]
+description = "Start Supabase and app containers"
+run = "supabase start --workdir backend && docker compose up -d --build"
+
+[tasks."dev:down"]
+description = "Stop app containers and Supabase"
+run = "docker compose down --remove-orphans && supabase stop --workdir backend"
+
+[tasks."logs:frontend"]
+description = "Tail frontend container logs"
+run = "docker compose logs -f frontend"
+
+[tasks."logs:backend"]
+description = "Tail backend container logs"
+run = "docker compose logs -f backend"
+
+[tasks.check]
+description = "Run frontend and backend checks"
+run = "npm run lint && cd backend && uv run python -m compileall app scripts"
