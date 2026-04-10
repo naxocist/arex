@@ -5,7 +5,7 @@ This backend is a separate service for workflow rules, role-safe APIs, and integ
 ## Prerequisites
 
 - Python 3.11+
-- A Supabase project (URL, anon key, service role key)
+- A Supabase project (URL, publishable key, secret key)
 
 ## Setup
 
@@ -77,14 +77,14 @@ uv run python scripts/reset_and_seed.py --confirm RESET_AREX_DATA
 Set backend `.env` (or environment variables) with hosted project credentials:
 
 - `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_SECRET_KEY`
 
 If your service key is the new `sb_secret_*` format, current Python Supabase client behavior in this script may still require a JWT-format service role key for `create_client(...)`.
 In that case, add:
 
-- `SUPABASE_SERVICE_ROLE_JWT` (legacy JWT service_role key)
+- `SUPABASE_LEGACY_SERVICE_ROLE_JWT` (legacy JWT service_role key)
 
-The reset script will prefer `SUPABASE_SERVICE_ROLE_JWT` when needed.
+The reset script will prefer `SUPABASE_LEGACY_SERVICE_ROLE_JWT` when needed.
 
 Then run the same command:
 
@@ -95,7 +95,7 @@ uv run python scripts/reset_and_seed.py --confirm RESET_AREX_DATA
 
 The script upserts deterministic demo users (all major roles) and reseeds workflow data for end-to-end testing.
 
-If you see `403 User not allowed`, your `SUPABASE_SERVICE_ROLE_KEY` is usually incorrect (often accidentally set to the anon key). Use the service-role key from Supabase project settings.
+If you see `403 User not allowed`, your `SUPABASE_SECRET_KEY` is usually incorrect (often accidentally set to the publishable/anon key). Use the secret key from Supabase project settings.
 
 If hosted policies block Auth admin operations, fallback manually:
 
@@ -107,9 +107,9 @@ If hosted policies block Auth admin operations, fallback manually:
 
 1. Copy backend `.env.example` to `.env` and set:
 	- `SUPABASE_URL`
-	- `SUPABASE_ANON_KEY`
-	- `SUPABASE_SERVICE_ROLE_KEY`
-	- `SUPABASE_SERVICE_ROLE_JWT` (optional fallback for reset script)
+	- `SUPABASE_PUBLISHABLE_KEY`
+	- `SUPABASE_SECRET_KEY`
+	- `SUPABASE_LEGACY_SERVICE_ROLE_JWT` (optional fallback for reset script)
 2. Set frontend `VITE_API_BASE_URL` in root `.env` (or `.env.local`) to your running backend URL.
 
 ## API Prefix

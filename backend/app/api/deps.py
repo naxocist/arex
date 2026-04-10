@@ -3,7 +3,7 @@ from typing import Any, Callable
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.db.supabase import get_anon_client, get_service_client
+from app.db.supabase import get_publishable_client, get_service_client
 from app.models.auth import AuthenticatedUser, Role
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -61,10 +61,10 @@ def _fetch_role_from_profile(user_id: str) -> Role | None:
 
 
 def get_current_user(token: str = Depends(get_bearer_token)) -> AuthenticatedUser:
-    anon_client = get_anon_client()
+    publishable_client = get_publishable_client()
 
     try:
-        user_response = anon_client.auth.get_user(token)
+        user_response = publishable_client.auth.get_user(token)
         user = user_response.user
     except Exception as exc:
         raise HTTPException(

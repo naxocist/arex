@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import _extract_role_from_user, _fetch_role_from_profile, get_current_user
-from app.db.supabase import get_anon_client, get_service_client
+from app.core.config import get_settings
+from app.db.supabase import _build_client, get_publishable_client, get_service_client
 from app.models.auth import AuthenticatedUser, Role
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -50,13 +51,39 @@ def _is_duplicate_user_error(exc: Exception) -> bool:
     message = str(exc).lower()
     duplicate_markers = (
         "already registered",
+        "already been registered",
         "already exists",
         "duplicate",
         "email exists",
         "email address already",
         "user already",
+        "user_already_exists",
     )
     return any(marker in message for marker in duplicate_markers)
+
+
+def _auth_user_exists_by_email(service_client: Any, normalized_email: str) -> bool:
+    page = 1
+    per_page = 1000
+
+    while True:
+        users = service_client.auth.admin.list_users(page=page, per_page=per_page)
+        if not users:
+            return False
+
+        for user in users:
+            if (getattr(user, "email", "") or "").strip().lower() == normalized_email:
+                return True
+
+        if len(users) < per_page:
+            return False
+
+        page += 1
+
+
+def _is_key_compatibility_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "invalid api key" in message or "apikey" in message
 
 
 def _resolve_role_or_raise(user: Any) -> Role:
@@ -109,27 +136,69 @@ def _register_user(
     factory_payload: RegisterFactoryRequest | None = None,
 ) -> dict[str, Any]:
     service_client = get_service_client()
-    anon_client = get_anon_client()
+    publishable_client = get_publishable_client()
 
     normalized_email = _normalize_email(payload.email)
     created_user_id: str | None = None
 
     try:
-        create_response = service_client.auth.admin.create_user(
-            {
-                "email": normalized_email,
-                "password": payload.password,
-                "email_confirm": True,
-                "user_metadata": {"role": role.value},
-                "app_metadata": {"role": role.value},
-            }
-        )
+        if _auth_user_exists_by_email(service_client, normalized_email):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        # If listing users fails, continue to create flow and rely on create_user response.
+        pass
+
+    create_payload = {
+        "email": normalized_email,
+        "password": payload.password,
+        "email_confirm": True,
+        "user_metadata": {"role": role.value},
+        "app_metadata": {"role": role.value},
+    }
+
+    try:
+        create_response = service_client.auth.admin.create_user(create_payload)
     except Exception as exc:
+        if _is_key_compatibility_error(exc):
+            settings = get_settings()
+            if settings.supabase_legacy_service_role_jwt:
+                try:
+                    fallback_client = _build_client(settings.supabase_legacy_service_role_jwt)
+                    create_response = fallback_client.auth.admin.create_user(create_payload)
+                    service_client = fallback_client
+                except Exception as fallback_exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Unable to create auth user: invalid service key configuration",
+                    ) from fallback_exc
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Unable to create auth user: set SUPABASE_LEGACY_SERVICE_ROLE_JWT or use a compatible secret key",
+                ) from exc
+
         if _is_duplicate_user_error(exc):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Email already registered",
             ) from exc
+
+        try:
+            if _auth_user_exists_by_email(service_client, normalized_email):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Email already registered",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unable to create auth user",
@@ -206,7 +275,7 @@ def _register_user(
         ) from exc
 
     try:
-        login_response = anon_client.auth.sign_in_with_password(
+        login_response = publishable_client.auth.sign_in_with_password(
             {
                 "email": normalized_email,
                 "password": payload.password,
@@ -232,10 +301,10 @@ def auth_me(current_user: AuthenticatedUser = Depends(get_current_user)) -> dict
 
 @router.post("/login")
 def login(payload: LoginRequest) -> dict[str, Any]:
-    anon_client = get_anon_client()
+    publishable_client = get_publishable_client()
 
     try:
-        auth_response = anon_client.auth.sign_in_with_password(
+        auth_response = publishable_client.auth.sign_in_with_password(
             {
                 "email": payload.email,
                 "password": payload.password,
@@ -252,10 +321,10 @@ def login(payload: LoginRequest) -> dict[str, Any]:
 
 @router.post("/refresh")
 def refresh_token(payload: RefreshRequest) -> dict[str, Any]:
-    anon_client = get_anon_client()
+    publishable_client = get_publishable_client()
 
     try:
-        auth_response = anon_client.auth.refresh_session(payload.refresh_token)
+        auth_response = publishable_client.auth.refresh_session(payload.refresh_token)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

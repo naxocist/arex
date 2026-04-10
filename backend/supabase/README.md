@@ -45,13 +45,13 @@ cd backend
 uv run python scripts/reset_and_seed.py --confirm RESET_AREX_DATA
 ```
 
-Works for local and hosted Supabase projects as long as `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set.
+Works for local and hosted Supabase projects as long as `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are set.
 
-If you get `403 User not allowed`, verify `SUPABASE_SERVICE_ROLE_KEY` is a real service-role/secret key, not the anon key.
+If you get `403 User not allowed`, verify `SUPABASE_SECRET_KEY` is a real secret key, not the publishable/anon key.
 
 Compatibility note for this repo:
 
 - Current `supabase-py` client behavior in this script expects JWT-style keys for `create_client(...)` and may reject `sb_secret_*` keys as `Invalid API key`.
-- If this happens, set `SUPABASE_SERVICE_ROLE_JWT` in `backend/.env` and rerun reset script.
+- If this happens, set `SUPABASE_LEGACY_SERVICE_ROLE_JWT` in `backend/.env` and rerun reset script.
 
 If hosted environment permissions block auth admin APIs, create auth users manually in Supabase dashboard first, then run only app-data portions from `../scripts/reset_and_seed.py` while keeping `profiles.id` aligned to each auth user UUID.

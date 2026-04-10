@@ -12,8 +12,9 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     supabase_url: str
-    supabase_anon_key: str
-    supabase_service_role_key: str
+    supabase_publishable_key: str
+    supabase_secret_key: str
+    supabase_legacy_service_role_jwt: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
