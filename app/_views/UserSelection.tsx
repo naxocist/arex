@@ -42,7 +42,7 @@ export default function UserSelection() {
   const rolePathMap = useMemo<Record<UserRole, string>>(
     () => ({
       farmer: '/farmer',
-      executive: '/dashboard',
+      executive: '/executive',
       logistics: '/logistics',
       factory: '/factory',
       warehouse: '/warehouse',

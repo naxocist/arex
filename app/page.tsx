@@ -7,7 +7,7 @@ import { UserRole } from '@/app/_contexts/UserContext';
 
 const rolePaths: Record<UserRole, string> = {
   farmer: '/farmer',
-  executive: '/dashboard',
+  executive: '/executive',
   logistics: '/logistics',
   factory: '/factory',
   warehouse: '/warehouse',
