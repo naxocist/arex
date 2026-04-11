@@ -76,7 +76,12 @@ function SidebarContent({
 }) {
   const router = useRouter();
   const { logout } = useUser();
-  const roleInfo = roleMeta[currentRole as keyof typeof roleMeta];
+  const [mounted, setMounted] = React.useState(false);
+  const roleInfo = mounted ? roleMeta[currentRole as keyof typeof roleMeta] : null;
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -149,8 +154,6 @@ export function MobileNav({
     setMounted(true);
   }, []);
 
-  const navItems = mounted && role ? getNavItems(role) : [];
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -172,18 +175,20 @@ export function MobileNav({
           >
             <SidebarContent
               navItems={
-                <>
-                  {navItems.map((item) => (
-                    <NavLink
-                      key={item.path}
-                      item={item}
-                      isActive={pathname === item.path}
-                      onClick={onClose}
-                    />
-                  ))}
-                </>
+                !mounted || !role ? null : (
+                  <>
+                    {getNavItems(role).map((item) => (
+                      <NavLink
+                        key={item.path}
+                        item={item}
+                        isActive={pathname === item.path}
+                        onClick={onClose}
+                      />
+                    ))}
+                  </>
+                )
               }
-              currentRole={role || ''}
+              currentRole={mounted && role ? role : ''}
               onClose={onClose}
             />
           </motion.div>
@@ -202,23 +207,23 @@ export function DesktopSidebar() {
     setMounted(true);
   }, []);
 
-  const navItems = mounted && role ? getNavItems(role) : [];
-
   return (
     <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-stone-200 bg-white lg:flex">
       <SidebarContent
         navItems={
-          <>
-            {navItems.map((item) => (
-              <NavLink
-                key={item.path}
-                item={item}
-                isActive={pathname === item.path}
-              />
-            ))}
-          </>
+          !mounted || !role ? null : (
+            <>
+              {getNavItems(role).map((item) => (
+                <NavLink
+                  key={item.path}
+                  item={item}
+                  isActive={pathname === item.path}
+                />
+              ))}
+            </>
+          )
         }
-        currentRole={role || ''}
+        currentRole={mounted && role ? role : ''}
       />
     </aside>
   );
