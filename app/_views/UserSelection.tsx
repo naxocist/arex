@@ -385,15 +385,6 @@ export default function UserSelection() {
                           mapHintText="คลิกบนแผนที่เพื่อปักหมุดตำแหน่งโรงงาน"
                           mapHeightClassName="h-[220px] w-full overflow-hidden rounded-[1.5rem] sm:h-[260px]"
                         />
-
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm text-stone-700">
-                            Latitude: {typeof registerForm.lat === 'number' ? registerForm.lat.toFixed(6) : '-'}
-                          </div>
-                          <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm text-stone-700">
-                            Longitude: {typeof registerForm.lng === 'number' ? registerForm.lng.toFixed(6) : '-'}
-                          </div>
-                        </div>
                       </div>
                     </div>
                   ) : null}

@@ -179,21 +179,6 @@ export default function FactorySettings() {
               />
             </label>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-line bg-surface-muted px-4 py-3 text-sm text-stone-700">
-                Latitude:{" "}
-                {typeof factoryForm.lat === "number"
-                  ? factoryForm.lat.toFixed(6)
-                  : "-"}
-              </div>
-              <div className="rounded-2xl border border-line bg-surface-muted px-4 py-3 text-sm text-stone-700">
-                Longitude:{" "}
-                {typeof factoryForm.lng === "number"
-                  ? factoryForm.lng.toFixed(6)
-                  : "-"}
-              </div>
-            </div>
-
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
