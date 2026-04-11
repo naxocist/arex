@@ -77,13 +77,13 @@ export const roleMeta: Record<UserRole, RoleMeta> = {
 
 export const roleNavItems: RoleNavItem[] = [
   { icon: Home, label: 'งานวัสดุ', shortLabel: 'ส่งวัสดุ', path: '/farmer', roles: ['farmer'] },
-  { icon: Gift, label: 'แลกของรางวัล', shortLabel: 'รางวัล', path: '/farmer-rewards', roles: ['farmer'] },
+  { icon: Gift, label: 'แลกของรางวัล', shortLabel: 'รางวัล', path: '/farmer/rewards', roles: ['farmer'] },
   { icon: Truck, label: 'ขนส่ง', shortLabel: 'คิวขนส่ง', path: '/logistics', roles: ['logistics'] },
   { icon: Factory, label: 'โรงงาน', shortLabel: 'ตรวจรับเข้า', path: '/factory', roles: ['factory'] },
   { icon: SlidersHorizontal, label: 'ตั้งค่าโรงงาน', shortLabel: 'ตั้งค่า', path: '/factory/settings', roles: ['factory'] },
   { icon: PackageCheck, label: 'คลังสินค้า', shortLabel: 'อนุมัติ', path: '/warehouse', roles: ['warehouse'] },
-  { icon: BarChart3, label: 'ผู้บริหาร', shortLabel: 'ภาพรวม', path: '/dashboard', roles: ['executive'] },
-  { icon: SlidersHorizontal, label: 'ตั้งค่าระบบ', shortLabel: 'Master Data', path: '/executive-settings', roles: ['executive'] },
+  { icon: BarChart3, label: 'ผู้บริหาร', shortLabel: 'ภาพรวม', path: '/executive', roles: ['executive'] },
+  { icon: SlidersHorizontal, label: 'ตั้งค่าระบบ', shortLabel: 'Master Data', path: '/executive/settings', roles: ['executive'] },
 ];
 
 const routeMetaByPath: Record<string, RouteMeta> = {
@@ -91,7 +91,7 @@ const routeMetaByPath: Record<string, RouteMeta> = {
     title: 'งานวัสดุเกษตร',
     description: 'แจ้งส่งวัสดุใหม่ ติดตามคิวรับ และดูความคืบหน้าจนรับแต้มสำเร็จ',
   },
-  '/farmer-rewards': {
+  '/farmer/rewards': {
     title: 'การแลกของรางวัล',
     description: 'ดูแต้มคงเหลือ เลือกรางวัลที่พร้อมแลก และติดตามการจัดส่ง',
   },
@@ -111,11 +111,11 @@ const routeMetaByPath: Record<string, RouteMeta> = {
     title: 'กล่องงานคลังสินค้า',
     description: 'ตรวจสอบคำขอแลกรางวัลและตัดสินใจอนุมัติหรือปฏิเสธอย่างรวดเร็ว',
   },
-  '/dashboard': {
+  '/executive': {
     title: 'ภาพรวมผู้บริหาร',
     description: 'ติดตามปริมาณวัสดุ งานค้าง แต้ม และแนวโน้มของระบบ AREX',
   },
-  '/executive-settings': {
+  '/executive/settings': {
     title: 'ตั้งค่าระบบ',
     description: 'จัดการ material, หน่วย และสูตรแต้มที่มีผลต่อการคำนวณทั้งระบบ',
   },
