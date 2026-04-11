@@ -1,7 +1,7 @@
 'use client';
 
-import ProtectedRoute from '@/app/components/ProtectedRoute';
-import LogisticsTracking from '@/app/views/LogisticsTracking';
+import ProtectedRoute from '@/app/_components/ProtectedRoute';
+import LogisticsTracking from '@/app/_views/LogisticsTracking';
 
 export default function LogisticsPage() {
   return (

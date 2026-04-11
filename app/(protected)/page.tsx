@@ -1,7 +1,7 @@
 'use client';
 
-import ProtectedRoute from '@/app/components/ProtectedRoute';
-import FarmerHome from '@/app/views/FarmerHome';
+import ProtectedRoute from '@/app/_components/ProtectedRoute';
+import FarmerHome from '@/app/_views/FarmerHome';
 
 export default function HomePage() {
   return (

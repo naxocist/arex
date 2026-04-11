@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { cn } from '@/app/lib/utils';
+import { cn } from '@/app/_lib/utils';
 
 interface SectionCardProps {
   title: string;

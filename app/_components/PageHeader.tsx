@@ -4,7 +4,7 @@ import React from 'react';
 import { ArrowRight, type LucideIcon } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
-import { cn } from '@/app/lib/utils';
+import { cn } from '@/app/_lib/utils';
 
 interface PageHeaderAction {
   label: string;

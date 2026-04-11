@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertCircle, CheckCircle2, Info, type LucideIcon } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import { cn } from '@/app/lib/utils';
+import { cn } from '@/app/_lib/utils';
 
 type AlertTone = 'info' | 'success' | 'error';
 

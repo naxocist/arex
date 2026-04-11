@@ -6,11 +6,11 @@ import {
   ArrowRight,
   Leaf,
 } from 'lucide-react';
-import AlertBanner from '@/app/components/AlertBanner';
+import AlertBanner from '@/app/_components/AlertBanner';
 import dynamic from 'next/dynamic';
-const PickupLocationMapPicker = dynamic(() => import('@/app/components/PickupLocationMapPicker'), { ssr: false });
-import { ApiError, authApi, setAuthSession } from '@/app/lib/apiClient';
-import { useUser, UserRole } from '@/app/contexts/UserContext';
+const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
+import { ApiError, authApi, setAuthSession } from '@/app/_lib/apiClient';
+import { useUser, UserRole } from '@/app/_contexts/UserContext';
 
 const THAI_PROVINCES = [
   'กรุงเทพมหานคร',

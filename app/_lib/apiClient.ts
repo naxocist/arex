@@ -1,4 +1,4 @@
-import { beginGlobalLoading, endGlobalLoading } from '@/app/lib/loadingState';
+import { beginGlobalLoading, endGlobalLoading } from '@/app/_lib/loadingState';
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || 'http://localhost:8000/api/v1';

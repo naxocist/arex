@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { clearAuthSession, getStoredRole } from '@/app/lib/apiClient';
+import { clearAuthSession, getStoredRole } from '@/app/_lib/apiClient';
 
 export type UserRole = 'farmer' | 'executive' | 'logistics' | 'factory' | 'warehouse';
 

@@ -1,8 +1,8 @@
 'use client';
 
-import { UserProvider } from '@/app/contexts/UserContext';
-import AppLoadingOverlay from '@/app/components/AppLoadingOverlay';
-import Layout from '@/app/components/Layout';
+import { UserProvider } from '@/app/_contexts/UserContext';
+import AppLoadingOverlay from '@/app/_components/AppLoadingOverlay';
+import Layout from '@/app/_components/Layout';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   return (

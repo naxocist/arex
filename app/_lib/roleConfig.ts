@@ -8,7 +8,7 @@ import {
   Truck,
   type LucideIcon,
 } from 'lucide-react';
-import type { UserRole } from '@/app/contexts/UserContext';
+import type { UserRole } from '@/app/_contexts/UserContext';
 
 export interface RoleMeta {
   id: UserRole;

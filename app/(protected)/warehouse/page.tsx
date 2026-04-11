@@ -1,7 +1,7 @@
 'use client';
 
-import ProtectedRoute from '@/app/components/ProtectedRoute';
-import WarehouseApproval from '@/app/views/WarehouseApproval';
+import ProtectedRoute from '@/app/_components/ProtectedRoute';
+import WarehouseApproval from '@/app/_views/WarehouseApproval';
 
 export default function WarehousePage() {
   return (

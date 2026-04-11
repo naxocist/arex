@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   getIsGlobalLoading,
   subscribeToGlobalLoading,
-} from '@/app/lib/loadingState';
+} from '@/app/_lib/loadingState';
 
 export default function AppLoadingOverlay() {
   const reduceMotion = useReducedMotion();

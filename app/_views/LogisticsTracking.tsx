@@ -9,13 +9,13 @@ import {
   Route,
   Truck,
 } from 'lucide-react';
-import AlertBanner from '@/app/components/AlertBanner';
-import DateRangePicker, { type DateRangeValue } from '@/app/components/DateRangePicker';
-import EmptyState from '@/app/components/EmptyState';
-import PageHeader from '@/app/components/PageHeader';
-import SectionCard from '@/app/components/SectionCard';
-import StatCard from '@/app/components/StatCard';
-import StatusBadge from '@/app/components/StatusBadge';
+import AlertBanner from '@/app/_components/AlertBanner';
+import DateRangePicker, { type DateRangeValue } from '@/app/_components/DateRangePicker';
+import EmptyState from '@/app/_components/EmptyState';
+import PageHeader from '@/app/_components/PageHeader';
+import SectionCard from '@/app/_components/SectionCard';
+import StatCard from '@/app/_components/StatCard';
+import StatusBadge from '@/app/_components/StatusBadge';
 import {
   ApiError,
   logisticsApi,
@@ -24,7 +24,7 @@ import {
   type LogisticsPickupJobItem,
   type LogisticsPickupQueueItem,
   type LogisticsRewardDeliveryJobItem,
-} from '@/app/lib/apiClient';
+} from '@/app/_lib/apiClient';
 
 function hasAccessToken(): boolean {
   if (typeof window === 'undefined') {

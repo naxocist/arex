@@ -2,16 +2,16 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Coins, Plus, RefreshCw, Ruler, Save, Shapes, X } from 'lucide-react';
-import AlertBanner from '@/app/components/AlertBanner';
-import PageHeader from '@/app/components/PageHeader';
-import SectionCard from '@/app/components/SectionCard';
+import AlertBanner from '@/app/_components/AlertBanner';
+import PageHeader from '@/app/_components/PageHeader';
+import SectionCard from '@/app/_components/SectionCard';
 import {
   ApiError,
   executiveApi,
   type ExecutiveMaterialPointRuleItem,
   type ExecutiveMaterialTypeItem,
   type ExecutiveMeasurementUnitItem,
-} from '@/app/lib/apiClient';
+} from '@/app/_lib/apiClient';
 
 interface MaterialDraftRow {
   originalCode: string;

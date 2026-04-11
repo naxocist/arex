@@ -5,8 +5,8 @@ import { Menu, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
-import { getRouteMeta, roleMeta } from '@/app/lib/roleConfig';
-import { useUser } from '@/app/contexts/UserContext';
+import { getRouteMeta, roleMeta } from '@/app/_lib/roleConfig';
+import { useUser } from '@/app/_contexts/UserContext';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

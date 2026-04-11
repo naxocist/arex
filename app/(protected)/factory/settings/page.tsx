@@ -1,7 +1,7 @@
 'use client';
 
-import ProtectedRoute from '@/app/components/ProtectedRoute';
-import FactorySettings from '@/app/views/FactorySettings';
+import ProtectedRoute from '@/app/_components/ProtectedRoute';
+import FactorySettings from '@/app/_views/FactorySettings';
 
 export default function FactorySettingsPage() {
   return (
