@@ -1,7 +1,7 @@
 'use client';
 
-import ProtectedRoute from '@/app/components/ProtectedRoute';
-import FarmerRewards from '@/app/views/FarmerRewards';
+import ProtectedRoute from '@/app/_components/ProtectedRoute';
+import FarmerRewards from '@/app/_views/FarmerRewards';
 
 export default function FarmerRewardsPage() {
   return (

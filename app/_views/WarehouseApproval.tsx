@@ -2,13 +2,13 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, PackageSearch, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
-import AlertBanner from '@/app/components/AlertBanner';
-import EmptyState from '@/app/components/EmptyState';
-import PageHeader from '@/app/components/PageHeader';
-import SectionCard from '@/app/components/SectionCard';
-import StatCard from '@/app/components/StatCard';
-import StatusBadge from '@/app/components/StatusBadge';
-import { ApiError, warehouseApi, type WarehousePendingRequestItem } from '@/app/lib/apiClient';
+import AlertBanner from '@/app/_components/AlertBanner';
+import EmptyState from '@/app/_components/EmptyState';
+import PageHeader from '@/app/_components/PageHeader';
+import SectionCard from '@/app/_components/SectionCard';
+import StatCard from '@/app/_components/StatCard';
+import StatusBadge from '@/app/_components/StatusBadge';
+import { ApiError, warehouseApi, type WarehousePendingRequestItem } from '@/app/_lib/apiClient';
 
 function hasAccessToken(): boolean {
   if (typeof window === 'undefined') {

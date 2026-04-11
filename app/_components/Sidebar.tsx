@@ -4,9 +4,9 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LogOut, Sparkles } from 'lucide-react';
-import { cn } from '@/app/lib/utils';
-import { roleMeta, roleNavItems } from '@/app/lib/roleConfig';
-import { useUser } from '@/app/contexts/UserContext';
+import { cn } from '@/app/_lib/utils';
+import { roleMeta, roleNavItems } from '@/app/_lib/roleConfig';
+import { useUser } from '@/app/_contexts/UserContext';
 
 interface SidebarProps {
   mobile?: boolean;

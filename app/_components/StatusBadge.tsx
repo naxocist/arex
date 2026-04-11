@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '@/app/lib/utils';
+import { cn } from '@/app/_lib/utils';
 
 const BASE_BADGE_CLASS =
   'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide';

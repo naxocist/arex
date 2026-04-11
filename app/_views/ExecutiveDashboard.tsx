@@ -4,12 +4,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, BarChart3, Boxes, Coins, RefreshCw, Users } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import AlertBanner from '@/app/components/AlertBanner';
-import EmptyState from '@/app/components/EmptyState';
-import PageHeader from '@/app/components/PageHeader';
-import SectionCard from '@/app/components/SectionCard';
-import StatCard from '@/app/components/StatCard';
-import { ApiError, executiveApi, type ExecutiveOverview } from '@/app/lib/apiClient';
+import AlertBanner from '@/app/_components/AlertBanner';
+import EmptyState from '@/app/_components/EmptyState';
+import PageHeader from '@/app/_components/PageHeader';
+import SectionCard from '@/app/_components/SectionCard';
+import StatCard from '@/app/_components/StatCard';
+import { ApiError, executiveApi, type ExecutiveOverview } from '@/app/_lib/apiClient';
 
 function formatNumber(value: number): string {
   return value.toLocaleString('th-TH');

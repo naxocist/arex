@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/app/contexts/UserContext';
+import { useUser } from '@/app/_contexts/UserContext';
 
 const rolePaths: Record<string, string> = {
   farmer: '/',

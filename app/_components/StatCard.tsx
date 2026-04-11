@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { type LucideIcon } from 'lucide-react';
-import { cn } from '@/app/lib/utils';
+import { cn } from '@/app/_lib/utils';
 
 interface StatCardProps {
   label: string;

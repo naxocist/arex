@@ -9,14 +9,14 @@ import {
   Sprout,
   Truck,
 } from 'lucide-react';
-import AlertBanner from '@/app/components/AlertBanner';
-import EmptyState from '@/app/components/EmptyState';
-import PageHeader from '@/app/components/PageHeader';
+import AlertBanner from '@/app/_components/AlertBanner';
+import EmptyState from '@/app/_components/EmptyState';
+import PageHeader from '@/app/_components/PageHeader';
 import dynamic from 'next/dynamic';
-const PickupLocationMapPicker = dynamic(() => import('@/app/components/PickupLocationMapPicker'), { ssr: false });
-import SectionCard from '@/app/components/SectionCard';
-import StatCard from '@/app/components/StatCard';
-import StatusBadge from '@/app/components/StatusBadge';
+const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
+import SectionCard from '@/app/_components/SectionCard';
+import StatCard from '@/app/_components/StatCard';
+import StatusBadge from '@/app/_components/StatusBadge';
 import {
   ApiError,
   farmerApi,
@@ -24,7 +24,7 @@ import {
   type FarmerMaterialTypeItem,
   type FarmerMeasurementUnitItem,
   type FarmerSubmissionItem,
-} from '@/app/lib/apiClient';
+} from '@/app/_lib/apiClient';
 
 const SUBMISSION_STATUS_OPTIONS = [
   { value: 'all', label: 'ทั้งหมด' },

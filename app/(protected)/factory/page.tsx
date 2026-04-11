@@ -1,7 +1,7 @@
 'use client';
 
-import ProtectedRoute from '@/app/components/ProtectedRoute';
-import FactoryIntake from '@/app/views/FactoryIntake';
+import ProtectedRoute from '@/app/_components/ProtectedRoute';
+import FactoryIntake from '@/app/_views/FactoryIntake';
 
 export default function FactoryPage() {
   return (

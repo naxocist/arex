@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { MapPinned, RefreshCw, Save } from "lucide-react";
-import AlertBanner from "@/app/components/AlertBanner";
-import PageHeader from "@/app/components/PageHeader";
+import AlertBanner from "@/app/_components/AlertBanner";
+import PageHeader from "@/app/_components/PageHeader";
 import dynamic from 'next/dynamic';
-const PickupLocationMapPicker = dynamic(() => import('@/app/components/PickupLocationMapPicker'), { ssr: false });
-import SectionCard from "@/app/components/SectionCard";
-import { ApiError, factoryApi } from "@/app/lib/apiClient";
+const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
+import SectionCard from "@/app/_components/SectionCard";
+import { ApiError, factoryApi } from "@/app/_lib/apiClient";
 
 function hasAccessToken(): boolean {
   if (typeof window === "undefined") {
