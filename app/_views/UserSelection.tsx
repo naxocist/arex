@@ -11,86 +11,7 @@ import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
 import { ApiError, authApi, setAuthSession } from '@/app/_lib/apiClient';
 import { useUser, UserRole } from '@/app/_contexts/UserContext';
-
-const THAI_PROVINCES = [
-  'กรุงเทพมหานคร',
-  'กระบี่',
-  'กาญจนบุรี',
-  'กาฬสินธุ์',
-  'กำแพงเพชร',
-  'ขอนแก่น',
-  'จันทบุรี',
-  'ฉะเชิงเทรา',
-  'ชลบุรี',
-  'ชัยนาท',
-  'ชัยภูมิ',
-  'ชุมพร',
-  'เชียงราย',
-  'เชียงใหม่',
-  'ตรัง',
-  'ตราด',
-  'ตาก',
-  'นครนายก',
-  'นครปฐม',
-  'นครพนม',
-  'นครราชสีมา',
-  'นครศรีธรรมราช',
-  'นครสวรรค์',
-  'นนทบุรี',
-  'นราธิวาส',
-  'น่าน',
-  'บึงกาฬ',
-  'บุรีรัมย์',
-  'ปทุมธานี',
-  'ประจวบคีรีขันธ์',
-  'ปราจีนบุรี',
-  'ปัตตานี',
-  'พระนครศรีอยุธยา',
-  'พะเยา',
-  'พังงา',
-  'พัทลุง',
-  'พิจิตร',
-  'พิษณุโลก',
-  'เพชรบุรี',
-  'เพชรบูรณ์',
-  'แพร่',
-  'ภูเก็ต',
-  'มหาสารคาม',
-  'มุกดาหาร',
-  'แม่ฮ่องสอน',
-  'ยโสธร',
-  'ยะลา',
-  'ร้อยเอ็ด',
-  'ระนอง',
-  'ระยอง',
-  'ราชบุรี',
-  'ลพบุรี',
-  'ลำปาง',
-  'ลำพูน',
-  'เลย',
-  'ศรีสะเกษ',
-  'สกลนคร',
-  'สงขลา',
-  'สตูล',
-  'สมุทรปราการ',
-  'สมุทรสงคราม',
-  'สมุทรสาคร',
-  'สระแก้ว',
-  'สระบุรี',
-  'สิงห์บุรี',
-  'สุโขทัย',
-  'สุพรรณบุรี',
-  'สุราษฎร์ธานี',
-  'สุรินทร์',
-  'หนองคาย',
-  'หนองบัวลำภู',
-  'อ่างทอง',
-  'อำนาจเจริญ',
-  'อุดรธานี',
-  'อุตรดิตถ์',
-  'อุทัยธานี',
-  'อุบลราชธานี',
-] as const;
+import { THAI_PROVINCES } from '@/app/_lib/utils';
 
 export default function UserSelection() {
   const navigate = useRouter();
@@ -120,7 +41,7 @@ export default function UserSelection() {
 
   const rolePathMap = useMemo<Record<UserRole, string>>(
     () => ({
-      farmer: '/',
+      farmer: '/farmer',
       executive: '/dashboard',
       logistics: '/logistics',
       factory: '/factory',
@@ -235,14 +156,14 @@ export default function UserSelection() {
   return (
     <div className="min-h-screen bg-surface px-4 py-5 md:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-5">
-        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-gradient-to-r from-white via-[#f4fff9] to-[#eefcf4] px-5 py-7 shadow-sm md:px-10 md:py-10">
+        <section className="overflow-hidden rounded-[2rem] border border-blue-100 bg-gradient-to-r from-white via-blue-50/50 to-green-50/30 px-5 py-7 shadow-sm md:px-10 md:py-10">
           <div className="max-w-5xl">
-            <div className="inline-flex items-center gap-4 rounded-full border border-emerald-100 bg-white/95 px-4 py-3 shadow-sm">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white">
+            <div className="inline-flex items-center gap-4 rounded-full border border-blue-100 bg-white/95 px-4 py-3 shadow-sm">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-container text-white">
                 <Leaf className="h-5 w-5 fill-current" />
               </span>
               <div>
-                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-emerald-700">AREX Platform</p>
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-green-700">AREX Platform</p>
                 <p className="text-xl font-semibold text-stone-700 md:text-2xl">Agricultural Residue Exchange</p>
               </div>
             </div>
@@ -254,8 +175,8 @@ export default function UserSelection() {
         </section>
 
         <div className="flex justify-center">
-          <section className="w-full max-w-3xl overflow-hidden rounded-[1.8rem] border border-emerald-100 bg-white shadow-sm">
-            <div className="border-b border-emerald-100 bg-gradient-to-r from-white via-emerald-50/65 to-white px-5 py-4 md:px-6">
+          <section className="w-full max-w-3xl overflow-hidden rounded-[1.8rem] border border-blue-100 bg-white shadow-sm">
+            <div className="border-b border-blue-100 bg-gradient-to-r from-white via-blue-50/50 to-green-50/30 px-5 py-4 md:px-6">
               <div>
                 <h2 className="mt-2 text-2xl font-semibold text-stone-950">
                   {mode === 'login' ? 'เข้าสู่ระบบเพื่อเริ่มใช้งาน' : 'สมัครสมาชิกในไม่กี่ขั้นตอน'}
@@ -267,7 +188,7 @@ export default function UserSelection() {
                 </p>
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-3 rounded-[1.3rem] bg-white p-1.5 shadow-sm ring-1 ring-emerald-100">
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-[1.3rem] bg-white p-1.5 shadow-sm ring-1 ring-blue-100">
                 <button
                   type="button"
                   onClick={() => setMode('login')}
@@ -300,7 +221,7 @@ export default function UserSelection() {
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         placeholder="name@example.com"
-                        className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/45 px-4 py-3 outline-none"
+                        className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
                         required
                       />
                     </label>
@@ -311,7 +232,7 @@ export default function UserSelection() {
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         placeholder="กรอกรหัสผ่าน"
-                        className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/45 px-4 py-3 outline-none"
+                        className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
                         required
                       />
                     </label>
@@ -343,7 +264,7 @@ export default function UserSelection() {
                         className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
                           registerRole === option.value
                             ? 'border-primary bg-primary text-white'
-                            : 'border-emerald-100 bg-emerald-50/45 text-stone-700'
+                            : 'border-blue-100 bg-blue-50/45 text-stone-700'
                         }`}
                       >
                         {option.label}
@@ -351,7 +272,7 @@ export default function UserSelection() {
                     ))}
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-emerald-100 bg-white p-4">
+                  <div className="rounded-[1.5rem] border border-blue-100 bg-white p-4">
                     <div className="mb-3">
                       <h3 className="text-base font-semibold text-stone-900">ข้อมูลบัญชีและข้อมูลติดต่อ</h3>
                     </div>
@@ -363,7 +284,7 @@ export default function UserSelection() {
                           type="email"
                           value={registerForm.email}
                           onChange={(event) => setRegisterForm((prev) => ({ ...prev, email: event.target.value }))}
-                          className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/45 px-4 py-3 outline-none"
+                          className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
                           required
                         />
                       </label>
@@ -373,7 +294,7 @@ export default function UserSelection() {
                           type="password"
                           value={registerForm.password}
                           onChange={(event) => setRegisterForm((prev) => ({ ...prev, password: event.target.value }))}
-                          className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/45 px-4 py-3 outline-none"
+                          className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
                           required
                           minLength={6}
                         />
@@ -384,7 +305,7 @@ export default function UserSelection() {
                           type="text"
                           value={registerForm.display_name}
                           onChange={(event) => setRegisterForm((prev) => ({ ...prev, display_name: event.target.value }))}
-                          className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/45 px-4 py-3 outline-none"
+                          className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
                           required
                         />
                       </label>
@@ -394,7 +315,7 @@ export default function UserSelection() {
                           type="text"
                           value={registerForm.phone}
                           onChange={(event) => setRegisterForm((prev) => ({ ...prev, phone: event.target.value }))}
-                          className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/45 px-4 py-3 outline-none"
+                          className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
                           required
                         />
                       </label>
@@ -403,7 +324,7 @@ export default function UserSelection() {
                         <select
                           value={registerForm.province}
                           onChange={(event) => setRegisterForm((prev) => ({ ...prev, province: event.target.value }))}
-                          className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/45 px-4 py-3 outline-none"
+                          className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
                           required
                         >
                           <option value="" disabled>
@@ -420,7 +341,7 @@ export default function UserSelection() {
                   </div>
 
                   {registerRole === 'factory' ? (
-                    <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50/50 p-4">
+                    <div className="rounded-[1.5rem] border border-green-100 bg-green-50/50 p-4">
                       <div className="mb-4">
                         <h3 className="text-base font-semibold text-stone-900">ข้อมูลโรงงาน</h3>
                         <p className="mt-1 text-sm leading-6 text-stone-600">
@@ -435,7 +356,7 @@ export default function UserSelection() {
                             type="text"
                             value={registerForm.name_th}
                             onChange={(event) => setRegisterForm((prev) => ({ ...prev, name_th: event.target.value }))}
-                            className="w-full rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
+                            className="w-full rounded-2xl border border-green-100 bg-white px-4 py-3 outline-none"
                             required
                           />
                         </label>
@@ -446,7 +367,7 @@ export default function UserSelection() {
                             type="text"
                             value={registerForm.location_text}
                             onChange={(event) => setRegisterForm((prev) => ({ ...prev, location_text: event.target.value }))}
-                            className="w-full rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
+                            className="w-full rounded-2xl border border-green-100 bg-white px-4 py-3 outline-none"
                           />
                         </label>
 
@@ -466,10 +387,10 @@ export default function UserSelection() {
                         />
 
                         <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-stone-700">
+                          <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm text-stone-700">
                             Latitude: {typeof registerForm.lat === 'number' ? registerForm.lat.toFixed(6) : '-'}
                           </div>
-                          <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-stone-700">
+                          <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm text-stone-700">
                             Longitude: {typeof registerForm.lng === 'number' ? registerForm.lng.toFixed(6) : '-'}
                           </div>
                         </div>

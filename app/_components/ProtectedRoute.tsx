@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/app/_contexts/UserContext';
 
 const rolePaths: Record<string, string> = {
-  farmer: '/',
+  farmer: '/farmer',
   executive: '/dashboard',
   logistics: '/logistics',
   factory: '/factory',
@@ -21,16 +21,22 @@ export default function ProtectedRoute({
 }) {
   const { role } = useUser();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     if (!role) {
       router.replace('/login');
     } else if (role !== allowedRole) {
       router.replace(rolePaths[role] ?? '/login');
     }
-  }, [role, allowedRole, router]);
+  }, [mounted, role, allowedRole, router]);
 
-  if (!role || role !== allowedRole) {
+  if (!mounted || !role || role !== allowedRole) {
     return null;
   }
 

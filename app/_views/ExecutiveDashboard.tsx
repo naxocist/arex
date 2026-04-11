@@ -81,7 +81,7 @@ export default function ExecutiveDashboard() {
         name: formatMaterialLabel(item.material_name_th, item.material_type),
         weight: Number(item.estimated_weight_kg_total.toFixed(2)),
         count: item.submissions_count,
-        fill: ['#1f6b4f', '#c67a25', '#2563eb', '#7c3aed'][index % 4],
+        fill: ['#064e93', '#059669', '#c67a25', '#7c3aed'][index % 4],
       })),
     [overview],
   );
@@ -107,7 +107,7 @@ export default function ExecutiveDashboard() {
     void loadOverview();
   }, []);
 
-  return (
+return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Executive Overview"
@@ -129,74 +129,88 @@ export default function ExecutiveDashboard() {
       {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="เกษตรกรที่เคยทำรายการ" value={formatNumber(metrics.uniqueFarmersTotal)} detail="นับเฉพาะบัญชีที่มีธุรกรรมอย่างน้อย 1 ครั้ง" icon={Users} tone="emerald" />
-        <StatCard label="น้ำหนักประมาณการที่แปลงได้" value={formatKg(metrics.submittedWeightConvertibleKg)} detail={`แปลงได้ ${formatNumber(metrics.submissionsConvertibleCount)} รายการ`} icon={Boxes} tone="amber" />
-        <StatCard label="น้ำหนักที่โรงงานยืนยันแล้ว" value={formatKg(metrics.confirmedWeightKg)} detail="อิงจากน้ำหนักจริงที่โรงงานรับเข้าแล้ว" icon={BarChart3} tone="sky" />
-        <StatCard label="แต้มที่ใช้ได้จริง" value={formatNumber(metrics.pointsNetAvailable)} detail="แต้มคงเหลือหลังหักที่จองไว้และที่ใช้ไปแล้ว" icon={Coins} tone="violet" />
+        <StatCard label="เกษตรกรที่เคยทำรายการ" value={formatNumber(metrics.uniqueFarmersTotal)} detail="นับเฉพาะบัญชีที่มีธุรกรรมอย่างน้อย 1 ครั้ง" icon={Users} tone="blue" />
+        <StatCard label="น้ำหนักประมาณการที่แปลงได้" value={formatKg(metrics.submittedWeightConvertibleKg)} detail={`แปลงได้ ${formatNumber(metrics.submissionsConvertibleCount)} รายการ`} icon={Boxes} tone="emerald" />
+        <StatCard label="น้ำหนักที่โรงงานยืนยันแล้ว" value={formatKg(metrics.confirmedWeightKg)} detail="อิงจากน้ำหนักจริงที่โรงงานรับเข้าแล้ว" icon={BarChart3} tone="green" />
+        <StatCard label="แต้มที่ใช้ได้จริง" value={formatNumber(metrics.pointsNetAvailable)} detail="แต้มคงเหลือหลังหักที่จองไว้และที่ใช้ไปแล้ว" icon={Coins} tone="blue" />
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
+      <div className="grid gap-6 xl:grid-cols-[1fr,1fr]">
         <SectionCard
-          title="Executive Summary"
-          description="มุมมองกว้างที่ผู้บริหารมักใช้ก่อน เช่น ปริมาณงานทั้งหมด น้ำหนักที่รับเข้า และการเคลื่อนไหวของแต้ม"
+          title="ปริมาณธุรกรรม"
+          description="มุมมองกว้างที่ผู้บริหารมักใช้ก่อน"
         >
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-[1.5rem] border border-line bg-surface-muted p-4">
-              <p className="text-sm font-semibold text-stone-900">ปริมาณธุรกรรม</p>
-              <div className="mt-3 space-y-2 text-sm text-stone-600">
-                <p>รายการส่งวัสดุทั้งหมด {formatNumber(metrics.submissionsTotal)} รายการ</p>
-                <p>คำขอแลกรางวัลทั้งหมด {formatNumber(metrics.rewardRequestsTotal)} รายการ</p>
-                <p>แต้มที่เครดิตแล้ว {formatNumber(metrics.pointsCredited)} แต้ม</p>
-              </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">รายการส่งวัสดุ</p>
+              <p className="mt-2 text-2xl font-semibold text-blue-950">{formatNumber(metrics.submissionsTotal)}</p>
             </div>
-            <div className="rounded-[1.5rem] border border-line bg-surface-muted p-4">
-              <p className="text-sm font-semibold text-stone-900">สภาพคล่องของแต้ม</p>
-              <div className="mt-3 space-y-2 text-sm text-stone-600">
-                <p>แต้มจองรออนุมัติ {formatNumber(metrics.pointsReserved)} แต้ม</p>
-                <p>แต้มที่ใช้แลกแล้ว {formatNumber(metrics.pointsSpent)} แต้ม</p>
-                <p>แต้มคงเหลือใช้งานจริง {formatNumber(metrics.pointsNetAvailable)} แต้ม</p>
-              </div>
+            <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-green-700">คำขอแลกรางวัล</p>
+              <p className="mt-2 text-2xl font-semibold text-green-950">{formatNumber(metrics.rewardRequestsTotal)}</p>
+            </div>
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">แต้มเครดิตแล้ว</p>
+              <p className="mt-2 text-2xl font-semibold text-blue-950">{formatNumber(metrics.pointsCredited)}</p>
             </div>
           </div>
         </SectionCard>
 
         <SectionCard
-          title="Operational Bottlenecks"
-          description="ตัวเลขส่วนนี้ช่วยชี้ว่า pipeline ติดอยู่ตรงไหน ไม่ว่าจะเป็นฝั่งขนส่งหรือคลังสินค้า"
+          title="แต้มและสภาพคล่อง"
+          description="สถานะแต้มในระบบ"
         >
-          <div className="space-y-3">
-            <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-semibold text-amber-900">รอรับวัสดุ</p>
-              <p className="mt-2 text-3xl font-semibold text-amber-950">{formatNumber(metrics.submissionsPendingPickup)}</p>
-              <p className="mt-2 text-sm text-amber-900/80">รายการที่ยังไม่ผ่านกระบวนการรับและส่งเข้าโรงงาน</p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">จองรออนุมัติ</p>
+              <p className="mt-2 text-2xl font-semibold text-blue-950">{formatNumber(metrics.pointsReserved)}</p>
             </div>
-            <div className="rounded-[1.5rem] border border-sky-200 bg-sky-50 p-4">
-              <p className="text-sm font-semibold text-sky-900">งานขนส่งที่กำลังดำเนินการ</p>
-              <p className="mt-2 text-3xl font-semibold text-sky-950">{formatNumber(metrics.pickupJobsActive)}</p>
-              <p className="mt-2 text-sm text-sky-900/80">สะท้อนโหลดงานที่ยังไม่ถึงโรงงานและยังไม่ปิดวงรอบ</p>
+            <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-green-700">ใช้แลกแล้ว</p>
+              <p className="mt-2 text-2xl font-semibold text-green-950">{formatNumber(metrics.pointsSpent)}</p>
             </div>
-            <div className="rounded-[1.5rem] border border-rose-200 bg-rose-50 p-4">
-              <p className="text-sm font-semibold text-rose-900">คำขอรอคลังพิจารณา</p>
-              <p className="mt-2 text-3xl font-semibold text-rose-950">{formatNumber(metrics.rewardRequestsPendingWarehouse)}</p>
-              <p className="mt-2 text-sm text-rose-900/80">จุดนี้สะท้อนภาระงาน approval ที่อาจหน่วงการส่งมอบรางวัล</p>
+            <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-green-700">คงเหลือใช้จริง</p>
+              <p className="mt-2 text-2xl font-semibold text-green-950">{formatNumber(metrics.pointsNetAvailable)}</p>
             </div>
           </div>
         </SectionCard>
-      </div>
 
-      <SectionCard
-        title="Material Mix"
-        description="ใช้กราฟสำหรับภาพรวมเชิงสัดส่วน แล้วคงรายละเอียดเชิงตัวเลขไว้ในตารางสำหรับการตรวจสอบ"
-      >
-        {materialChartData.length === 0 ? (
-          <EmptyState
-            title="ยังไม่มีข้อมูลประเภทวัสดุในภาพรวม"
-            description="เมื่อเริ่มมีการส่งวัสดุ ระบบจะแสดงทั้งสัดส่วนตามประเภทและน้ำหนักประมาณการที่แปลงได้"
-            icon={Boxes}
-          />
-        ) : (
-          <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
-            <div className="h-[320px] rounded-[1.5rem] border border-line bg-surface-muted p-4">
+        <SectionCard
+          title="งานค้างตรงไหน"
+          description="pipeline ติดอยู่ตรงไหน"
+        >
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">รอรับวัสดุ</p>
+              <p className="mt-2 text-2xl font-semibold text-amber-950">{formatNumber(metrics.submissionsPendingPickup)}</p>
+              <p className="mt-1 text-xs text-amber-800/70">ยังไม่ถึงโรงงาน</p>
+            </div>
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">ขนส่งกำลังดำเนิน</p>
+              <p className="mt-2 text-2xl font-semibold text-sky-950">{formatNumber(metrics.pickupJobsActive)}</p>
+              <p className="mt-1 text-xs text-sky-800/70">ยังไม่ปิดวงรอบ</p>
+            </div>
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">รอคลังพิจารณา</p>
+              <p className="mt-2 text-2xl font-semibold text-rose-950">{formatNumber(metrics.rewardRequestsPendingWarehouse)}</p>
+              <p className="mt-1 text-xs text-rose-800/70">รอ approval</p>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="วัสดุและสัดส่วน"
+          description="น้ำหนักและประเภทวัสดุที่เข้าระบบ"
+        >
+          {materialChartData.length === 0 ? (
+            <EmptyState
+              title="ยังไม่มีข้อมูลวัสดุ"
+              description="เมื่อเริ่มมีการส่งวัสดุ ระบบจะแสดงสัดส่วนตามประเภท"
+              icon={Boxes}
+            />
+          ) : (
+            <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={materialChartData} margin={{ top: 8, right: 8, left: -12, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#d8d0c4" />
@@ -205,9 +219,9 @@ export default function ExecutiveDashboard() {
                   <Tooltip
                     cursor={{ fill: 'rgba(29,29,27,0.06)' }}
                     contentStyle={{ borderRadius: 16, borderColor: '#d8d0c4' }}
-                    formatter={(value: number) => [`${formatNumber(value)} กก.`, 'น้ำหนักประมาณการ']}
+                    formatter={(value: number) => [`${formatNumber(value)} กก.`, 'น้ำหนัก']}
                   />
-                  <Bar dataKey="weight" radius={[14, 14, 4, 4]}>
+                  <Bar dataKey="weight" radius={[8, 8, 4, 4]}>
                     {materialChartData.map((entry) => (
                       <Cell key={entry.name} fill={entry.fill} />
                     ))}
@@ -215,32 +229,20 @@ export default function ExecutiveDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+          )}
+        </SectionCard>
+      </div>
 
-            <div className="space-y-3">
-              {(overview?.submissions_material_breakdown ?? []).map((item) => (
-                <article key={item.material_type} className="rounded-[1.4rem] border border-line bg-surface-muted p-4">
-                  <p className="font-semibold text-stone-900">{formatMaterialLabel(item.material_name_th, item.material_type)}</p>
-                  <div className="mt-3 grid gap-2 text-sm text-stone-600 sm:grid-cols-2">
-                    <p>จำนวนรายการ {formatNumber(item.submissions_count)}</p>
-                    <p>แปลงหน่วยได้ {formatNumber(item.convertible_submissions_count)}</p>
-                    <p>แปลงหน่วยไม่ได้ {formatNumber(item.non_convertible_submissions_count)}</p>
-                    <p>น้ำหนักประมาณการ {formatNumber(item.estimated_weight_kg_total)} กก.</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="mt-6 rounded-[1.5rem] border border-line bg-surface-muted p-4 text-sm leading-6 text-stone-600">
-          รายการที่แปลงหน่วยไม่ได้ในภาพรวม {formatNumber(metrics.submissionsNonConvertibleCount)} รายการ
-          ซึ่งยังเป็นจุดที่ผู้บริหารอาจต้องพิจารณาปรับ master data หรือกติกาการรับวัสดุ
-          <Link href="/executive-settings" className="mt-3 inline-flex items-center gap-2 font-semibold text-stone-900 underline underline-offset-2">
-            ไปจัดการสูตรและ master data
+      {metrics.submissionsNonConvertibleCount > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-900">
+          <span className="font-semibold">รายการแปลงหน่วยไม่ได้ {formatNumber(metrics.submissionsNonConvertibleCount)} รายการ</span>
+          {' '} - อาจต้องพิจารณาปรับ master data หรือกติกาการรับวัสดุ
+          <Link href="/executive-settings" className="ml-2 inline-flex items-center gap-1 font-semibold underline underline-offset-2">
+            ไปจัดการ
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-      </SectionCard>
+      )}
     </div>
   );
 }

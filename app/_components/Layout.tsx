@@ -12,9 +12,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { role } = useUser();
   const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
   const reduceMotion = useReducedMotion();
   const routeMeta = getRouteMeta(pathname);
-  const currentRoleMeta = role ? roleMeta[role] : null;
+  const currentRoleMeta = mounted && role ? roleMeta[role] : null;
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   React.useEffect(() => {
     setIsMobileNavOpen(false);
@@ -45,7 +50,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
 
               {currentRoleMeta ? (
-                <div className="rounded-full bg-emerald-100 px-3 py-1 text-[0.72rem] font-semibold text-emerald-900">
+                <div className="rounded-full bg-green-100 px-3 py-1 text-[0.72rem] font-semibold text-green-900" key={currentRoleMeta.shortLabel}>
                   {currentRoleMeta.shortLabel}
                 </div>
               ) : null}
@@ -56,15 +61,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
               <div className="hidden items-center justify-between rounded-xl border border-outline-variant/20 bg-white px-5 py-4 lg:flex">
                 <div className="min-w-0">
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-emerald-700">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-green-700">
                     {currentRoleMeta?.label ?? 'AREX Platform'}
                   </p>
                   <p className="mt-1 truncate text-xl font-semibold text-stone-950">{routeMeta.title}</p>
                   <p className="mt-1 text-sm text-stone-600">{routeMeta.description}</p>
                 </div>
                 {currentRoleMeta ? (
-                  <div className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-900">
-                    {currentRoleMeta.shortLabel}
+                  <div className="rounded-full bg-green-100 px-4 py-2 text-sm font-semibold text-green-900" key={currentRoleMeta?.shortLabel}>
+                    {currentRoleMeta?.shortLabel}
                   </div>
                 ) : null}
               </div>
