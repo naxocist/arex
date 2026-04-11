@@ -97,7 +97,7 @@ export default function FarmerHome() {
   const [materialType, setMaterialType] = useState<CreateSubmissionPayload['material_type']>('');
   const [quantityValue, setQuantityValue] = useState('');
   const [quantityUnit, setQuantityUnit] = useState('');
-  const [pickupLocation, setPickupLocation] = useState('ต.นาเฉลียง อ.หนองไผ่ จ.เพชรบูรณ์');
+  const [pickupLocation, setPickupLocation] = useState<string>('');
   const [pickupLat, setPickupLat] = useState<number | null>(null);
   const [pickupLng, setPickupLng] = useState<number | null>(null);
 

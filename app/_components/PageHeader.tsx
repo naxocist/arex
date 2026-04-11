@@ -46,7 +46,7 @@ export default function PageHeader({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           {eyebrow ? (
-            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-emerald-700">{eyebrow}</p>
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-green-700">{eyebrow}</p>
           ) : null}
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-on-surface md:text-4xl">{title}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant md:text-base">{description}</p>
@@ -60,7 +60,7 @@ export default function PageHeader({
               const commonClassName = cn(
                 'inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition',
                 isPrimary
-                  ? 'bg-primary text-white hover:bg-primary-container'
+                  ? 'bg-primary text-white hover:opacity-90'
                   : 'border border-outline-variant/30 bg-surface-container-low text-on-surface hover:bg-surface-container-high',
               );
 

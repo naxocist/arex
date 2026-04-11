@@ -4,8 +4,8 @@
 @theme {
   --font-sans: "Prompt", ui-sans-serif, system-ui, sans-serif;
   
-  --color-primary: #0f5238;
-  --color-primary-container: #2d6a4f;
+  --color-primary: #045ba8;
+  --color-primary-container: #059669;
   --color-surface: #f8faf9;
   --color-surface-container-low: #f2f4f3;
   --color-surface-container: #eceeed;
@@ -15,8 +15,13 @@
   --color-on-surface-variant: #404943;
   --color-outline-variant: #bfc9c1;
   --color-tertiary: #713638;
-  --color-secondary-container: #bee8dc;
-  --color-on-secondary-container: #436a60;
+  --color-secondary-container: #d0e8f5;
+  --color-on-secondary-container: #045ba8;
+  
+  --color-brand-blue: #045ba8;
+  --color-brand-blue-light: #3b8fe6;
+  --color-brand-green: #059669;
+  --color-brand-green-light: #34d399;
 }
 
 @layer base {
@@ -54,13 +59,17 @@
   textarea:focus,
   button:focus-visible,
   a:focus-visible {
-    outline: 2px solid rgba(15, 82, 56, 0.2);
+    outline: 2px solid rgba(6, 78, 147, 0.2);
     outline-offset: 2px;
   }
 }
 
 .primary-gradient {
-  background: linear-gradient(135deg, #0f5238 0%, #2d6a4f 100%);
+  background: #045ba8;
+}
+
+.primary-gradient-alt {
+  background: #059669;
 }
 
 .glass-header {

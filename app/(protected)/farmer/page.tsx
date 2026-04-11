@@ -3,7 +3,7 @@
 import ProtectedRoute from '@/app/_components/ProtectedRoute';
 import FarmerHome from '@/app/_views/FarmerHome';
 
-export default function HomePage() {
+export default function FarmerPage() {
   return (
     <ProtectedRoute allowedRole="farmer">
       <FarmerHome />

@@ -17,9 +17,14 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { role, logout } = useUser();
+  const [mounted, setMounted] = React.useState(false);
 
-  const filteredNavItems = roleNavItems.filter((item) => (role ? item.roles.includes(role) : false));
-  const currentRoleMeta = role ? roleMeta[role] : null;
+  const filteredNavItems = roleNavItems.filter((item) => (role && mounted ? item.roles.includes(role) : false));
+  const currentRoleMeta = mounted && role ? roleMeta[role] : null;
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -36,7 +41,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
     >
       <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-container text-white">
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
@@ -66,7 +71,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
               className={cn(
                 'group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm transition-colors',
                 isActive
-                  ? 'bg-emerald-100 text-emerald-900'
+                  ? 'bg-green-100 text-green-900'
                   : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900',
               )}
             >

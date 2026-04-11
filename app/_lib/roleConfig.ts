@@ -38,45 +38,45 @@ export const roleMeta: Record<UserRole, RoleMeta> = {
     label: 'เกษตรกร',
     shortLabel: 'Farmer',
     description: 'แจ้งวัสดุ ติดตามสถานะ และแลกรางวัลจาก PMUC Coin',
-    accentClassName: 'text-emerald-900 bg-emerald-100 border-emerald-200',
-    softClassName: 'from-emerald-100 via-white to-lime-50',
+    accentClassName: 'text-green-900 bg-green-100 border-green-200',
+    softClassName: 'from-green-100 via-white to-blue-50',
   },
   logistics: {
     id: 'logistics',
     label: 'ฝ่ายขนส่ง',
     shortLabel: 'Logistics',
     description: 'จัดคิวรับวัสดุ ส่งถึงโรงงาน และส่งมอบรางวัล',
-    accentClassName: 'text-amber-900 bg-amber-100 border-amber-200',
-    softClassName: 'from-amber-100 via-white to-orange-50',
+    accentClassName: 'text-blue-900 bg-blue-100 border-blue-200',
+    softClassName: 'from-blue-100 via-white to-green-50',
   },
   factory: {
     id: 'factory',
     label: 'ฝ่ายโรงงาน',
     shortLabel: 'Factory',
     description: 'ตรวจรับเข้าวัสดุและยืนยันน้ำหนักจริงเพื่อคำนวณแต้ม',
-    accentClassName: 'text-sky-900 bg-sky-100 border-sky-200',
-    softClassName: 'from-sky-100 via-white to-cyan-50',
+    accentClassName: 'text-green-900 bg-green-100 border-green-200',
+    softClassName: 'from-green-100 via-white to-blue-50',
   },
   warehouse: {
     id: 'warehouse',
     label: 'ฝ่ายคลังสินค้า',
     shortLabel: 'Warehouse',
     description: 'ตรวจสอบคำขอแลกรางวัลและอนุมัติหรือปฏิเสธ',
-    accentClassName: 'text-teal-900 bg-teal-100 border-teal-200',
-    softClassName: 'from-teal-100 via-white to-cyan-50',
+    accentClassName: 'text-blue-900 bg-blue-100 border-blue-200',
+    softClassName: 'from-blue-100 via-white to-green-50',
   },
   executive: {
     id: 'executive',
     label: 'ผู้บริหาร',
     shortLabel: 'Executive',
     description: 'ติดตามภาพรวมระบบและบริหารข้อมูลหลักกับสูตรแต้ม',
-    accentClassName: 'text-violet-900 bg-violet-100 border-violet-200',
-    softClassName: 'from-violet-100 via-white to-fuchsia-50',
+    accentClassName: 'text-green-900 bg-green-100 border-green-200',
+    softClassName: 'from-green-100 via-white to-blue-50',
   },
 };
 
 export const roleNavItems: RoleNavItem[] = [
-  { icon: Home, label: 'งานวัสดุ', shortLabel: 'ส่งวัสดุ', path: '/', roles: ['farmer'] },
+  { icon: Home, label: 'งานวัสดุ', shortLabel: 'ส่งวัสดุ', path: '/farmer', roles: ['farmer'] },
   { icon: Gift, label: 'แลกของรางวัล', shortLabel: 'รางวัล', path: '/farmer-rewards', roles: ['farmer'] },
   { icon: Truck, label: 'ขนส่ง', shortLabel: 'คิวขนส่ง', path: '/logistics', roles: ['logistics'] },
   { icon: Factory, label: 'โรงงาน', shortLabel: 'ตรวจรับเข้า', path: '/factory', roles: ['factory'] },
@@ -87,7 +87,7 @@ export const roleNavItems: RoleNavItem[] = [
 ];
 
 const routeMetaByPath: Record<string, RouteMeta> = {
-  '/': {
+  '/farmer': {
     title: 'งานวัสดุเกษตร',
     description: 'แจ้งส่งวัสดุใหม่ ติดตามคิวรับ และดูความคืบหน้าจนรับแต้มสำเร็จ',
   },
