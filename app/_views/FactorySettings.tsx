@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { MapPinned, RefreshCw, Save } from "lucide-react";
 import AlertBanner from "@/app/_components/AlertBanner";
-import PageHeader from "@/app/_components/PageHeader";
 import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
 import SectionCard from "@/app/_components/SectionCard";
@@ -120,18 +119,19 @@ export default function FactorySettings() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Factory Settings"
-        title="อัปเดตข้อมูลโรงงานให้ทีมขนส่งและระบบเห็นตรงกัน"
-        description="หน้าตั้งค่านี้แยกจากคิวตรวจรับ เพื่อให้ฝ่ายโรงงานแก้ชื่อ ที่อยู่ และพิกัดได้โดยไม่รบกวนงานรับเข้าประจำวัน"
-        actions={[
-          {
-            label: isLoading ? "กำลังรีเฟรช..." : "รีเฟรชข้อมูล",
-            onClick: () => void loadFactory(true),
-          },
-        ]}
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-stone-900">ตั้งค่าโรงงาน</h1>
+        <button
+          type="button"
+          onClick={() => void loadFactory(true)}
+          disabled={isLoading}
+          className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          {isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล'}
+        </button>
+      </div>
 
       {message ? (
         <AlertBanner message={message} tone={inferMessageTone(message)} />
@@ -202,7 +202,7 @@ export default function FactorySettings() {
               </button>
               {factoryForm.lat !== null && factoryForm.lng !== null ? (
                 <a
-                  href={`https://www.openstreetmap.org/?mlat=${factoryForm.lat}&mlon=${factoryForm.lng}#map=15/${factoryForm.lat}/${factoryForm.lng}`}
+                  href={`https://www.google.com/maps?q=${factoryForm.lat},${factoryForm.lng}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 transition hover:bg-surface-muted"

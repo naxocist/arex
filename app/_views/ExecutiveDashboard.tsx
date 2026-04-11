@@ -6,7 +6,6 @@ import { ArrowRight, BarChart3, Boxes, Coins, RefreshCw, Users } from 'lucide-re
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import AlertBanner from '@/app/_components/AlertBanner';
 import EmptyState from '@/app/_components/EmptyState';
-import PageHeader from '@/app/_components/PageHeader';
 import SectionCard from '@/app/_components/SectionCard';
 import StatCard from '@/app/_components/StatCard';
 import { ApiError, executiveApi, type ExecutiveOverview } from '@/app/_lib/apiClient';
@@ -108,23 +107,27 @@ export default function ExecutiveDashboard() {
   }, []);
 
 return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Executive Overview"
-        title="ภาพรวมผู้บริหารที่แยก KPI, งานค้าง และโครงสร้างวัสดุออกจากกันชัดเจน"
-        description="ข้อมูลบริหารควรตอบคำถามได้เร็วว่า ตอนนี้ระบบค้างตรงไหน วัสดุเข้าเท่าไร และแต้มกำลังหมุนเวียนอย่างไร หน้านี้จึงจัดเป็น summary, bottlenecks และ material mix"
-        actions={[
-          {
-            label: 'จัดการสูตรแต้มและ master data',
-            to: '/executive-settings',
-            variant: 'secondary',
-          },
-          {
-            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
-            onClick: () => void loadOverview(true),
-          },
-        ]}
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-stone-900">ภาพรวมผู้บริหาร</h1>
+        <div className="flex gap-2">
+          <Link
+            href="/executive-settings"
+            className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+          >
+            จัดการสูตรแต้มและ master data
+          </Link>
+          <button
+            type="button"
+            onClick={() => void loadOverview(true)}
+            disabled={isLoading}
+            className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล'}
+          </button>
+        </div>
+      </div>
 
       {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
 
@@ -237,7 +240,7 @@ return (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-900">
           <span className="font-semibold">รายการแปลงหน่วยไม่ได้ {formatNumber(metrics.submissionsNonConvertibleCount)} รายการ</span>
           {' '} - อาจต้องพิจารณาปรับ master data หรือกติกาการรับวัสดุ
-          <Link href="/executive-settings" className="ml-2 inline-flex items-center gap-1 font-semibold underline underline-offset-2">
+          <Link href="/executive/settings" className="ml-2 inline-flex items-center gap-1 font-semibold underline underline-offset-2">
             ไปจัดการ
             <ArrowRight className="h-4 w-4" />
           </Link>

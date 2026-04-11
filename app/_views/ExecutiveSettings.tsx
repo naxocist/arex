@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Coins, Plus, RefreshCw, Ruler, Save, Shapes, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
-import PageHeader from '@/app/_components/PageHeader';
 import SectionCard from '@/app/_components/SectionCard';
 import {
   ApiError,
@@ -306,19 +305,19 @@ export default function ExecutiveSettings() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="System Configuration"
-        title="ตั้งค่าระบบจากภาพรวมเดียวที่เห็นหลายส่วนพร้อมกัน"
-        description="หน้านี้ถูกรวมให้เห็นประเภทวัสดุ แต้มต่อกิโลกรัม และหน่วยวัดในจอเดียว โดยเลื่อนเฉพาะรายการด้านในเพื่อให้แก้ไขได้เร็วขึ้น"
-        actions={[
-          {
-            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
-            onClick: () => void loadConfiguration(true),
-            icon: RefreshCw,
-          },
-        ]}
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-stone-900">ตั้งค่าระบบ</h1>
+        <button
+          type="button"
+          onClick={() => void loadConfiguration(true)}
+          disabled={isLoading}
+          className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          {isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล'}
+        </button>
+      </div>
 
       {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
 

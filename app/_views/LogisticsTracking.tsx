@@ -6,13 +6,13 @@ import {
   Factory,
   MapPin,
   PackageCheck,
+  RefreshCw,
   Route,
   Truck,
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import DateRangePicker, { type DateRangeValue } from '@/app/_components/DateRangePicker';
 import EmptyState from '@/app/_components/EmptyState';
-import PageHeader from '@/app/_components/PageHeader';
 import SectionCard from '@/app/_components/SectionCard';
 import StatCard from '@/app/_components/StatCard';
 import StatusBadge from '@/app/_components/StatusBadge';
@@ -104,8 +104,8 @@ function hasValidCoordinates(lat: number | null | undefined, lng: number | null 
   return typeof lat === 'number' && Number.isFinite(lat) && typeof lng === 'number' && Number.isFinite(lng);
 }
 
-function buildOpenStreetMapUrl(lat: number, lng: number): string {
-  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
+function buildGoogleMapsUrl(lat: number, lng: number): string {
+  return `https://www.google.com/maps?q=${lat},${lng}`;
 }
 
 function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
@@ -456,18 +456,19 @@ export default function LogisticsTracking() {
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Logistics Control"
-        title="ศูนย์ปฏิบัติการขนส่งที่แยกงานเป็นคิวตัดสินใจชัดเจน"
-        description="ฝ่ายขนส่งต้องเห็นทั้งคิวใหม่ งานระหว่างทาง และงานส่งรางวัลพร้อมกัน แต่ไม่ควรปะปนกันจนอ่านยาก หน้านี้จึงแบ่งเป็นบอร์ดงานตามจังหวะการทำงานจริง"
-        actions={[
-          {
-            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
-            onClick: () => void loadAll(true),
-          },
-        ]}
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-stone-900">ศูนย์ปฏิบัติการขนส่ง</h1>
+        <button
+          type="button"
+          onClick={() => void loadAll(true)}
+          disabled={isLoading}
+          className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          {isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล'}
+        </button>
+      </div>
 
       {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
       {loadIssueMessages.length > 0 ? (
@@ -556,7 +557,7 @@ export default function LogisticsTracking() {
                             <p className="mt-1">{item.pickup_location_text}</p>
                             {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
                               <a
-                                href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
+                                href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-stone-900 underline underline-offset-2"
@@ -690,7 +691,7 @@ export default function LogisticsTracking() {
                         <p className="mt-1">{item.pickup_location_text}</p>
                         {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
                           <a
-                            href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
+                            href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-stone-900 underline underline-offset-2"
@@ -796,7 +797,7 @@ export default function LogisticsTracking() {
                           <p className="mt-1">{item.pickup_location_text || '-'}</p>
                           {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
                             <a
-                              href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
+                              href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-stone-900 underline underline-offset-2"
@@ -901,7 +902,7 @@ export default function LogisticsTracking() {
                         <p className="mt-1">{item.pickup_location_text || '-'}</p>
                         {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
                           <a
-                            href={buildOpenStreetMapUrl(item.pickup_lat as number, item.pickup_lng as number)}
+                            href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-stone-900 underline underline-offset-2"
