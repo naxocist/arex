@@ -177,7 +177,7 @@ export function MobileNav({
                     <NavLink
                       key={item.path}
                       item={item}
-                      isActive={pathname === item.path || pathname.startsWith(item.path + '/')}
+                      isActive={pathname === item.path}
                       onClick={onClose}
                     />
                   ))}
@@ -213,7 +213,7 @@ export function DesktopSidebar() {
               <NavLink
                 key={item.path}
                 item={item}
-                isActive={pathname === item.path || pathname.startsWith(item.path + '/')}
+                isActive={pathname === item.path}
               />
             ))}
           </>
