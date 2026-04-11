@@ -7,7 +7,7 @@ FROM deps AS dev
 WORKDIR /app
 COPY . .
 EXPOSE 3000
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
+CMD ["npm", "run", "dev"]
 
 FROM deps AS build
 WORKDIR /app
@@ -16,7 +16,9 @@ RUN npm run build
 
 FROM node:20-alpine AS prod
 WORKDIR /app
-RUN npm install -g serve
-COPY --from=build /app/dist ./dist
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
 EXPOSE 3000
-CMD ["serve", "-s", "dist", "-l", "3000"]
+ENV PORT=3000
+CMD ["node", "server.js"]

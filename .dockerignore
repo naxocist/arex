@@ -1,5 +1,5 @@
 node_modules
-dist
+.next
 coverage
 .git
 .github
@@ -8,4 +8,4 @@ backend
 *.log
 .env
 .env.local
-backend
+.env*.local

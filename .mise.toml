@@ -60,4 +60,4 @@ run = "docker compose logs -f backend"
 
 [tasks.check]
 description = "Run frontend and backend checks"
-run = "npm run lint && cd backend && uv run python -m compileall app scripts"
+run = "npx tsc --noEmit && npm run build && cd backend && uv run python -m compileall app scripts"
