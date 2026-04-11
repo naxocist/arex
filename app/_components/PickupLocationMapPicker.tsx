@@ -165,6 +165,7 @@ export default function PickupLocationMapPicker(props: PickupLocationMapPickerPr
         center={center}
         zoom={typeof lat === 'number' && typeof lng === 'number' ? 15 : 6}
         scrollWheelZoom
+        style={{ zIndex: 1 }}
       >
         <TileLayer
           attribution='&copy; OpenStreetMap contributors'

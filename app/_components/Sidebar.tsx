@@ -161,14 +161,14 @@ export function MobileNav({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="fixed inset-0 z-40 bg-stone-900/50 backdrop-blur-sm"
+            className="fixed inset-0 z-[9998] bg-stone-900/50 backdrop-blur-sm"
           />
           <motion.div
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="fixed left-0 top-0 bottom-0 z-50 w-72 max-w-[85vw] bg-white shadow-xl"
+            className="fixed left-0 top-0 bottom-0 z-[9999] w-72 max-w-[85vw] bg-white shadow-xl"
           >
             <SidebarContent
               navItems={
