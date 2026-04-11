@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import EmptyState from '@/app/_components/EmptyState';
-import PageHeader from '@/app/_components/PageHeader';
 import SectionCard from '@/app/_components/SectionCard';
 import StatCard from '@/app/_components/StatCard';
 import StatusBadge from '@/app/_components/StatusBadge';
@@ -44,6 +43,7 @@ function formatDeliveryStatus(status: string): string {
     reward_delivery_scheduled: 'จัดรอบส่งแล้ว',
     out_for_delivery: 'กำลังนำส่ง',
     reward_delivered: 'ส่งมอบสำเร็จ',
+    cancelled: 'ยกเลิก',
   };
   return map[status] ?? status;
 }
@@ -58,6 +58,91 @@ function formatDateTime(dateTime: string | null | undefined): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function DeliveryTimeline({ deliveryJob }: { deliveryJob: NonNullable<FarmerRewardRequestItem['reward_delivery_jobs']>[0] }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const steps = [
+    { status: 'reward_delivery_scheduled', label: 'จัดรอบส่ง', time: deliveryJob.planned_delivery_at },
+    { status: 'out_for_delivery', label: 'กำลังนำส่ง', time: deliveryJob.out_for_delivery_at },
+    { status: 'reward_delivered', label: 'ส่งมอบสำเร็จ', time: deliveryJob.delivered_at },
+  ];
+
+  const currentStatusIndex = steps.findIndex(s => s.status === deliveryJob.status);
+  const isDelivered = deliveryJob.status === 'reward_delivered';
+  const statusLabel = isDelivered ? 'ส่งมอบสำเร็จ' : formatDeliveryStatus(deliveryJob.status);
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/50">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-left transition hover:bg-emerald-50"
+      >
+        <div className="flex items-center gap-2">
+          <Truck className="h-4 w-4 text-emerald-600" />
+          <span className="text-sm font-medium text-stone-700">สถานะจัดส่ง</span>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+            isDelivered ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+          }`}>
+            {statusLabel}
+          </span>
+        </div>
+        <span className={`text-xs text-stone-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+      {isExpanded && (
+        <div className="border-t border-emerald-100 px-4 pb-4 pt-3">
+          <div className="flex items-center justify-between">
+            {steps.map((step, index) => {
+              const isCompleted = index <= currentStatusIndex;
+              const isCurrent = index === currentStatusIndex;
+              return (
+                <React.Fragment key={step.status}>
+                  <div className="flex flex-1 flex-col items-center">
+                    <div className={`relative flex h-8 w-8 items-center justify-center rounded-full border-2 ${
+                      isDelivered && index === steps.length - 1
+                        ? 'border-emerald-500 bg-emerald-500 text-white'
+                        : isCompleted
+                          ? 'border-emerald-500 bg-white text-emerald-600'
+                          : 'border-stone-200 bg-white text-stone-300'
+                    }`}>
+                      {isDelivered && index === steps.length - 1 ? (
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <span className="text-xs font-bold">{index + 1}</span>
+                      )}
+                      {isCurrent && !isDelivered && (
+                        <span className="absolute -bottom-1 h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+                      )}
+                    </div>
+                    <span className={`mt-2 text-xs font-medium ${isCompleted ? 'text-stone-700' : 'text-stone-400'}`}>
+                      {step.label}
+                    </span>
+                    {step.time && (
+                      <span className="mt-0.5 text-[0.65rem] text-stone-400">
+                        {formatDateTime(step.time)}
+                      </span>
+                    )}
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div className={`relative top-4 h-0.5 flex-1 ${index < currentStatusIndex ? 'bg-emerald-400' : 'bg-stone-200'}`}>
+                      {index < currentStatusIndex && (
+                        <div className="absolute inset-0 bg-emerald-400" />
+                      )}
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
@@ -222,23 +307,13 @@ export default function FarmerRewards() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Rewards"
-        title="ใช้ PMUC Coin กับรางวัลที่พร้อมแลก และติดตามการจัดส่งได้ในหน้าเดียว"
-        description="พื้นที่นี้ถูกออกแบบให้เกษตรกรเห็นแต้มคงเหลือก่อน แล้วค่อยตัดสินใจเลือกรางวัลที่เหมาะสม พร้อมติดตามคำขอและสถานะการจัดส่งได้ทันที"
-        actions={[
-          {
-            label: 'กลับไปงานวัสดุ',
-            to: '/',
-            variant: 'secondary',
-          },
-          {
-            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
-            onClick: () => void loadRewards(true),
-          },
-        ]}
-      />
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <a href="/farmer" className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-700">กลับ</a>
+        <button onClick={() => void loadRewards(true)} disabled={isLoading} className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-700">
+          {isLoading ? '...' : 'รีเฟรช'}
+        </button>
+      </div>
 
       {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
 
@@ -346,79 +421,47 @@ export default function FarmerRewards() {
               icon={Truck}
             />
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {filteredRewardRequests.map((request) => {
                 const deliveryJob = request.reward_delivery_jobs?.[0] ?? null;
                 const rewardName = rewardNameById[request.reward_id] ?? 'รางวัลที่เลือก';
                 const canCancel = request.status === 'requested';
+                const hasDeliveryJob = deliveryJob && deliveryJob.status !== 'cancelled';
 
                 return (
-                  <article key={request.id} className="rounded-xl bg-surface-container-low p-4">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-base font-semibold text-stone-900">{rewardName}</p>
-                          <StatusBadge status={request.status} label={formatRewardRequestStatus(request.status)} size="sm" />
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-stone-600">
-                          ใช้ {Number(request.requested_points).toLocaleString('th-TH')} PMUC Coin • จำนวน{' '}
-                          {Number(request.quantity).toLocaleString('th-TH')} ชิ้น
+                  <div key={request.id} className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-stone-900">
+                          {rewardName}
+                          <span className="ml-2 text-stone-500">{Number(request.quantity)} ชิ้น • {Number(request.requested_points).toLocaleString('th-TH')} แต้ม</span>
                         </p>
-                        <p className="mt-1 text-sm text-stone-500">ยื่นคำขอเมื่อ {formatDateTime(request.requested_at)}</p>
+                        <p className="truncate text-xs text-stone-500">
+                          {formatRewardRequestStatus(request.status)} • {formatDateTime(request.requested_at)}
+                        </p>
                       </div>
-
-                      {canCancel ? (
+                      {canCancel && (
                         <button
                           type="button"
                           onClick={() => void handleCancelRewardRequest(request.id)}
                           disabled={cancellingRewardRequestId === request.id}
-                          className="inline-flex items-center gap-2 rounded-full border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 transition hover:bg-red-100 disabled:opacity-60"
+                          className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700"
                         >
-                          <XCircle className="h-4 w-4" />
-                          <span>{cancellingRewardRequestId === request.id ? 'กำลังยกเลิก...' : 'ยกเลิกคำขอ'}</span>
+                          ยกเลิก
                         </button>
-                      ) : null}
+                      )}
+                      <StatusBadge status={request.status} label={formatRewardRequestStatus(request.status)} size="sm" />
                     </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <div className="rounded-xl bg-white px-4 py-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
-                          {request.status === 'warehouse_rejected' || request.status === 'cancelled' ? (
-                            <XCircle className="h-4 w-4 text-red-600" />
-                          ) : request.status === 'warehouse_approved' ? (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          ) : (
-                            <Clock3 className="h-4 w-4 text-amber-600" />
-                          )}
-                          <span>สถานะคำขอ</span>
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-stone-600">{formatRewardRequestStatus(request.status)}</p>
-                        {request.status === 'warehouse_rejected' && request.rejection_reason ? (
-                          <p className="mt-2 text-sm leading-6 text-red-700">เหตุผลที่ปฏิเสธ: {request.rejection_reason}</p>
-                        ) : null}
+                    {request.status === 'warehouse_approved' && !hasDeliveryJob && (
+                      <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+                        <Clock3 className="h-4 w-4 text-amber-600" />
+                        <span className="text-xs font-medium text-amber-700">รอฝ่ายขนส่งจัดรอบส่ง</span>
                       </div>
-
-                      <div className="rounded-xl bg-white px-4 py-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
-                          <Truck className="h-4 w-4" />
-                          <span>สถานะการจัดส่ง</span>
-                        </div>
-                        {deliveryJob ? (
-                          <>
-                            <div className="mt-2">
-                              <StatusBadge status={deliveryJob.status} label={formatDeliveryStatus(deliveryJob.status)} size="sm" />
-                            </div>
-                            <p className="mt-2 text-sm leading-6 text-stone-600">
-                              ช่วงนำส่ง {formatDateTime(deliveryJob.planned_delivery_at)} -{' '}
-                              {formatDateTime(deliveryJob.delivery_window_end_at ?? null)}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="mt-2 text-sm leading-6 text-stone-600">ยังไม่มีการจัดรอบส่งสำหรับคำขอนี้</p>
-                        )}
-                      </div>
-                    </div>
-                  </article>
+                    )}
+                    {hasDeliveryJob && (
+                      <DeliveryTimeline deliveryJob={deliveryJob} />
+                    )}
+                  </div>
                 );
               })}
             </div>

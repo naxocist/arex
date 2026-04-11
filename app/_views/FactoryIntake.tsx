@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { Factory, RefreshCw, Scale, ShieldCheck, Warehouse } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import EmptyState from '@/app/_components/EmptyState';
-import PageHeader from '@/app/_components/PageHeader';
 import SectionCard from '@/app/_components/SectionCard';
 import StatCard from '@/app/_components/StatCard';
 import StatusBadge from '@/app/_components/StatusBadge';
@@ -149,18 +148,19 @@ export default function FactoryIntake() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Factory Intake"
-        title="คิวตรวจรับเข้าโรงงานที่เน้นการยืนยันน้ำหนักจริงก่อนเสมอ"
-        description="ฝ่ายโรงงานไม่จำเป็นต้องไล่ดูงานทั้งหมดพร้อมกัน หน้านี้จึงดันคิวที่ต้องยืนยันขึ้นมาก่อน และแยกประวัติที่ยืนยันแล้วไว้ด้านล่างอย่างชัดเจน"
-        actions={[
-          {
-            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
-            onClick: () => void loadQueue(true),
-          },
-        ]}
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-stone-900">คิวตรวจรับเข้าโรงงาน</h1>
+        <button
+          type="button"
+          onClick={() => void loadQueue(true)}
+          disabled={isLoading}
+          className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          {isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล'}
+        </button>
+      </div>
 
       {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
 

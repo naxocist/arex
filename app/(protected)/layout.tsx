@@ -86,7 +86,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           <footer className="border-t border-stone-200 bg-stone-50 px-4 py-4 text-xs text-stone-500 md:px-6 lg:px-8">
             <div className="mx-auto flex max-w-7xl flex-col justify-between gap-2 md:flex-row">
               <p>AREX Platform</p>
-              <p>เจ้าของระบบ: บพข. และ LAWDEE CO., LTD</p>
+              <p>เจ้าของระบบ: บพข. และ LAWDEE CO., LTD | ผู้พัฒนา: CEDT</p>
             </div>
           </footer>
         </div>

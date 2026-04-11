@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import EmptyState from '@/app/_components/EmptyState';
-import PageHeader from '@/app/_components/PageHeader';
 import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
 import SectionCard from '@/app/_components/SectionCard';
@@ -76,8 +75,8 @@ function fallbackThaiUnit(unitCode: string): string {
   return map[unitCode] ?? unitCode;
 }
 
-function buildOpenStreetMapLink(lat: number, lng: number): string {
-  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
+function buildGoogleMapsLink(lat: number, lng: number): string {
+  return `https://www.google.com/maps?q=${lat},${lng}`;
 }
 
 function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
@@ -258,24 +257,13 @@ export default function FarmerHome() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Farmer Workspace"
-        title="แจ้งวัสดุใหม่และติดตามงานรับซื้อในที่เดียว"
-        description="หน้าหลักนี้สรุปสถานะงานแบบสั้นพอให้เห็นภาพรวม แล้วพาคุณลงมือส่งรายการวัสดุใหม่ได้ทันที"
-        className="px-5 py-4 md:px-6 md:py-4"
-        actions={[
-          {
-            label: 'ไปหน้าแลกของรางวัล',
-            to: '/farmer-rewards',
-            variant: 'secondary',
-          },
-          {
-            label: isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล',
-            onClick: () => void loadDashboard(true),
-          },
-        ]}
-      />
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <a href="/farmer/rewards" className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-700">ไปหน้าแลกรางวัล</a>
+        <button onClick={() => void loadDashboard(true)} disabled={isLoading} className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-700">
+          {isLoading ? '...' : 'รีเฟรช'}
+        </button>
+      </div>
 
       {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
 
@@ -294,7 +282,7 @@ export default function FarmerHome() {
         >
           <form className="space-y-5" onSubmit={handleSubmitMaterial}>
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-4 rounded-2xl bg-gradient-to-br from-primary via-primary-container to-emerald-700 p-5 text-white shadow-lg">
+              <div className="space-y-4 rounded-2xl bg-primary p-5 text-white shadow-lg">
                 <div>
                   <p className="text-sm font-semibold tracking-wide">ข้อมูลหลักของรายการ</p>
                   <p className="mt-1 text-sm text-white/80">เลือกวัสดุและระบุปริมาณก่อน จากนั้นค่อยปักหมุดจุดนัดรับทางด้านขวา</p>
@@ -428,94 +416,24 @@ export default function FarmerHome() {
               description="ลองสลับสถานะด้านบน หรือสร้างรายการวัสดุใหม่เพื่อเริ่มต้นใช้งาน"
             />
           ) : (
-            <>
-              <div className="space-y-3 md:hidden">
-                {filteredSubmissions.map((item) => (
-                  <article key={item.id} className="rounded-xl bg-surface-container-low p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-stone-900">
-                          {materialNameByCode[item.material_type] ?? item.material_type}
-                        </p>
-                        <p className="mt-1 text-xs text-stone-500">{formatDateTime(item.created_at)}</p>
-                      </div>
-                      <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} size="sm" />
-                    </div>
-                    <div className="mt-4 space-y-2 text-sm text-stone-600">
-                      <p>
-                        ปริมาณ: {Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
-                      </p>
-                      <p>สถานที่: {item.pickup_location_text || '-'}</p>
-                      <p>
-                        ช่วงนัดรับ:{' '}
-                        {item.pickup_window_start_at
-                          ? `${formatDateTime(item.pickup_window_start_at)} - ${formatDateTime(item.pickup_window_end_at ?? null)}`
-                          : 'ยังไม่กำหนด'}
-                      </p>
-                      {typeof item.pickup_lat === 'number' && typeof item.pickup_lng === 'number' ? (
-                        <a
-                          href={buildOpenStreetMapLink(item.pickup_lat, item.pickup_lng)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 text-sm font-medium text-stone-900 underline underline-offset-2"
-                        >
-                          ดูบนแผนที่
-                        </a>
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
-              </div>
-
-              <div className="hidden overflow-x-auto md:block">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-left text-stone-500">
-                      <th className="py-3 pr-3">เวลา</th>
-                      <th className="py-3 px-3">วัสดุ</th>
-                      <th className="py-3 px-3">ปริมาณ</th>
-                      <th className="py-3 px-3">สถานที่นัดรับ</th>
-                      <th className="py-3 px-3">สถานะ</th>
-                      <th className="py-3 pl-3">ช่วงนัดรับ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredSubmissions.map((item) => (
-                      <tr key={item.id} className="border-b border-line/70 align-top">
-                        <td className="py-3 pr-3 whitespace-nowrap">{formatDateTime(item.created_at)}</td>
-                        <td className="px-3 py-3 font-medium text-stone-900">
-                          {materialNameByCode[item.material_type] ?? item.material_type}
-                        </td>
-                        <td className="px-3 py-3 text-stone-700">
-                          {Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
-                        </td>
-                        <td className="px-3 py-3 text-stone-600">
-                          <p>{item.pickup_location_text || '-'}</p>
-                          {typeof item.pickup_lat === 'number' && typeof item.pickup_lng === 'number' ? (
-                            <a
-                              href={buildOpenStreetMapLink(item.pickup_lat, item.pickup_lng)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-1 inline-flex text-xs font-medium text-stone-900 underline underline-offset-2"
-                            >
-                              ดูบนแผนที่
-                            </a>
-                          ) : null}
-                        </td>
-                        <td className="px-3 py-3">
-                          <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} />
-                        </td>
-                        <td className="pl-3 py-3 text-stone-600">
-                          {item.pickup_window_start_at
-                            ? `${formatDateTime(item.pickup_window_start_at)} - ${formatDateTime(item.pickup_window_end_at ?? null)}`
-                            : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+            <div className="space-y-2">
+              {filteredSubmissions.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 rounded-xl bg-stone-50 px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-stone-900">
+                      {materialNameByCode[item.material_type] ?? item.material_type}
+                      <span className="ml-2 text-stone-500">
+                        {Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
+                      </span>
+                    </p>
+                    <p className="truncate text-xs text-stone-500">
+                      {item.pickup_location_text || '-'} • {item.pickup_window_start_at ? formatDateTime(item.pickup_window_start_at) : 'รอนัด'}
+                    </p>
+                  </div>
+                  <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} size="sm" />
+                </div>
+              ))}
+            </div>
           )}
         </SectionCard>
       </div>
