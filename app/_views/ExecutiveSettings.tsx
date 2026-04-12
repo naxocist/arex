@@ -481,7 +481,7 @@ export default function ExecutiveSettings() {
           }
         >
           {isAddingMaterial ? (
-            <div className="mb-4 grid gap-3 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/45 p-4 md:grid-cols-[0.9fr,1.2fr,10rem,8.5rem,auto]">
+            <div className="mb-4 grid grid-cols-1 gap-3 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/45 p-4 md:grid-cols-[0.9fr,1.2fr,10rem,8.5rem,auto]">
               <input
                 value={newMaterial.code}
                 onChange={(event) => setNewMaterial((prev) => ({ ...prev, code: event.target.value }))}
@@ -542,7 +542,7 @@ export default function ExecutiveSettings() {
                     <input
                       value={row.code}
                       onChange={(event) => updateMaterialRow(index, { code: event.target.value })}
-                      className="w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="w-full sm:w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                       placeholder="รหัส"
                     />
                     <input
@@ -554,7 +554,7 @@ export default function ExecutiveSettings() {
                     <input
                       value={row.points_per_kg}
                       onChange={(event) => updateMaterialRow(index, { points_per_kg: event.target.value })}
-                      className="w-24 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="w-full sm:w-24 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                       placeholder="แต้ม/กก."
                     />
                   </div>
@@ -601,7 +601,7 @@ export default function ExecutiveSettings() {
           }
         >
           {isAddingUnit ? (
-            <div className="mb-4 grid gap-3 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/45 p-4 md:grid-cols-[0.8fr,1fr,10rem,8.5rem,auto]">
+            <div className="mb-4 grid grid-cols-1 gap-3 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/45 p-4 md:grid-cols-[0.8fr,1fr,10rem,8.5rem,auto]">
               <input
                 value={newUnit.code}
                 onChange={(event) => setNewUnit((prev) => ({ ...prev, code: event.target.value }))}
@@ -662,7 +662,7 @@ export default function ExecutiveSettings() {
                     <input
                       value={row.code}
                       onChange={(event) => updateUnitRow(index, { code: event.target.value })}
-                      className="w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="w-full sm:w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                       placeholder="รหัส"
                     />
                     <input
@@ -674,7 +674,7 @@ export default function ExecutiveSettings() {
                     <input
                       value={row.to_kg_factor}
                       onChange={(event) => updateUnitRow(index, { to_kg_factor: event.target.value })}
-                      className="w-24 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="w-full sm:w-24 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                       placeholder="ตัวแปลง"
                     />
                   </div>

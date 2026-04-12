@@ -95,7 +95,7 @@ function DeliveryTimeline({ deliveryJob }: { deliveryJob: NonNullable<FarmerRewa
       </button>
       {isExpanded && (
         <div className="border-t border-emerald-100 px-4 pb-4 pt-3">
-          <div className="flex items-center justify-between">
+          <div className="overflow-x-auto"><div className="flex min-w-max items-center justify-between">
             {steps.map((step, index) => {
               const isCompleted = index <= currentStatusIndex;
               const isCurrent = index === currentStatusIndex;
@@ -139,7 +139,7 @@ function DeliveryTimeline({ deliveryJob }: { deliveryJob: NonNullable<FarmerRewa
                 </React.Fragment>
               );
             })}
-          </div>
+          </div></div>
         </div>
       )}
     </div>
