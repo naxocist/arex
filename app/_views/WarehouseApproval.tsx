@@ -94,12 +94,12 @@ function RequestCard({
           </div>
 
           {isPending && (
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <textarea
                 value={reasons[item.id] || ''}
                 onChange={(event) => onReasonChange(item.id, event.target.value)}
                 placeholder="เหตุผล (ถ้าปฏิเสธ)"
-                className="flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-300 focus:bg-white"
+                className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-300 focus:bg-white"
                 rows={1}
               />
               <div className="flex gap-2">

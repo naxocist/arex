@@ -19,6 +19,7 @@ pnpm-debug.log*
 !.env.local.example
 !backend/.env.local.example
 !backend/.env.prod.example
+!backend/.env.staging.example
 
 
 # Python caches and virtual envs

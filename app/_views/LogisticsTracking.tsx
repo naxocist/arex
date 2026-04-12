@@ -522,7 +522,7 @@ export default function LogisticsTracking() {
                     <span className={mutedCls}>{formatDateTime(item.created_at)}</span>
                     <span className={locCls}>
                       <MapPin className="h-3 w-3 shrink-0" />
-                      <span className="truncate max-w-[14rem]">{item.pickup_location_text}</span>
+                      <span className="truncate max-w-[8rem] sm:max-w-[14rem]">{item.pickup_location_text}</span>
                       {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
                         <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-primary hover:underline">แผนที่</a>
                       )}
@@ -592,7 +592,7 @@ export default function LogisticsTracking() {
                   </span>
                   <span className={locCls}>
                     <MapPin className="h-3 w-3 shrink-0" />
-                    <span className="truncate max-w-[12rem]">{item.pickup_location_text}</span>
+                    <span className="truncate max-w-[7rem] sm:max-w-[12rem]">{item.pickup_location_text}</span>
                     {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
                       <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-primary hover:underline">แผนที่</a>
                     )}
@@ -605,7 +605,7 @@ export default function LogisticsTracking() {
                         <span className="text-stone-300">·</span>
                       ) : null}
                       {item.destination_factory_location_text ? (
-                        <span className="truncate max-w-[12rem]">{item.destination_factory_location_text}</span>
+                        <span className="truncate max-w-[7rem] sm:max-w-[12rem]">{item.destination_factory_location_text}</span>
                       ) : null}
                     </span>
                   ) : null}
@@ -654,7 +654,7 @@ export default function LogisticsTracking() {
                     <span className={`${badgeCls} bg-violet-50 text-violet-700`}>{Number(item.requested_points).toLocaleString('th-TH')} แต้ม</span>
                     <span className={locCls}>
                       <MapPin className="h-3 w-3 shrink-0" />
-                      <span className="truncate max-w-[14rem]">{item.pickup_location_text || '-'}</span>
+                      <span className="truncate max-w-[8rem] sm:max-w-[14rem]">{item.pickup_location_text || '-'}</span>
                       {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
                         <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-primary hover:underline">แผนที่</a>
                       )}
@@ -711,7 +711,7 @@ export default function LogisticsTracking() {
                   </span>
                   <span className={locCls}>
                     <MapPin className="h-3 w-3 shrink-0" />
-                    <span className="truncate max-w-[14rem]">{item.pickup_location_text || '-'}</span>
+                    <span className="truncate max-w-[8rem] sm:max-w-[14rem]">{item.pickup_location_text || '-'}</span>
                     {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
                       <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-primary hover:underline">แผนที่</a>
                     )}

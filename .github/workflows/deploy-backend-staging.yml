@@ -1,0 +1,27 @@
+name: Deploy backend to GCP VM (staging)
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - 'backend/**'
+      - 'backend/docker-compose.staging.yml'
+      - '.github/workflows/deploy-backend-staging.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_VM_HOST }}
+          username: ${{ secrets.GCP_VM_USER }}
+          key: ${{ secrets.GCP_VM_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/arex-platform
+            git pull origin staging
+            cd backend
+            docker compose -f docker-compose.staging.yml --env-file .env.staging up --build -d backend-staging
+            docker image prune -f
