@@ -20,7 +20,7 @@ jobs:
           key: ${{ secrets.GCP_VM_SSH_KEY }}
           script: |
             set -e
-            cd ~/arex-platform
+            cd ~/arex-platform-staging
             git pull origin staging
             cd backend
             docker compose -f docker-compose.staging.yml --env-file .env.staging up --build -d backend-staging

@@ -4,8 +4,11 @@
 
 ```
 GitHub branches
-  ├── staging → Vercel preview URL  +  GCP VM backend :8001  (staging)
-  └── main    → Vercel production   +  GCP VM backend :8000  (production)
+  ├── staging → Vercel preview URL  +  GCP VM ~/arex-platform-staging/backend :8001
+  └── main    → Vercel production   +  GCP VM ~/arex-platform-prod/backend    :8000
+
+Each environment has its own isolated directory on the VM — branches and Docker
+builds never share state or conflict with each other.
 
 Supabase is always cloud-hosted. No local Supabase in production or staging.
 ```
@@ -25,6 +28,9 @@ Vercel deploys automatically on every push. No manual steps needed.
 - `main` → production URL
 - `staging` → preview URL (e.g. `arex-platform-git-staging-yourteam.vercel.app`)
 
+> Vercel may detect the `backend/` folder and offer to deploy it as a service.
+> **Ignore it.** Only deploy the frontend (root `/`). The backend runs on GCP VM.
+
 ### One-time Vercel setup
 
 1. Import repo at vercel.com → New Project
@@ -39,18 +45,20 @@ Vercel deploys automatically on every push. No manual steps needed.
 
 5. Deploy. Every future push to `main` or `staging` redeploys automatically.
 
-> If you add a custom domain, update `NEXT_PUBLIC_API_BASE_URL` in Vercel and `CORS_ORIGINS` in the corresponding env file on the VM.
+> If you add a custom domain, update `NEXT_PUBLIC_API_BASE_URL` in Vercel and
+> `CORS_ORIGINS` in the corresponding env file on the VM.
 
 ---
 
 ## Backend — GCP VM
 
-Both environments run on the **same VM**, different ports:
+Production and staging each live in their **own directory** on the VM. They never
+share a git working tree, so `git pull` on one never touches the other.
 
-| Env | Port | Compose file | Env file |
-|---|---|---|---|
-| Production | 8000 | `docker-compose.prod.yml` | `.env.prod` |
-| Staging | 8001 | `docker-compose.staging.yml` | `.env.staging` |
+| Env | Directory | Port | Compose file | Env file |
+|---|---|---|---|---|
+| Production | `~/arex-platform-prod` | 8000 | `docker-compose.prod.yml` | `.env.prod` |
+| Staging | `~/arex-platform-staging` | 8001 | `docker-compose.staging.yml` | `.env.staging` |
 
 ### One-time VM setup
 
@@ -62,25 +70,31 @@ curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
 # log out and back in
 
-# 3. Clone repo
-git clone https://github.com/YOUR_ORG/arex-platform.git ~/arex-platform
+# 3. Clone repo twice — one directory per environment
+git clone -b main    https://github.com/naxocist/arex.git ~/arex-platform-prod
+git clone -b staging https://github.com/naxocist/arex.git ~/arex-platform-staging
 
-# 4. Create prod env file
-cp ~/arex-platform/backend/.env.prod.example ~/arex-platform/backend/.env.prod
-nano ~/arex-platform/backend/.env.prod   # fill in Supabase keys + Vercel prod URL for CORS_ORIGINS
+# 4. Set up production env file
+cp ~/arex-platform-prod/backend/.env.prod.example ~/arex-platform-prod/backend/.env.prod
+nano ~/arex-platform-prod/backend/.env.prod
+# → fill in Supabase keys, set CORS_ORIGINS to your Vercel production URL
 
-# 5. Create staging env file
-cp ~/arex-platform/backend/.env.staging.example ~/arex-platform/backend/.env.staging
-nano ~/arex-platform/backend/.env.staging   # fill in Supabase keys + Vercel staging URL for CORS_ORIGINS
+# 5. Set up staging env file
+cp ~/arex-platform-staging/backend/.env.staging.example ~/arex-platform-staging/backend/.env.staging
+nano ~/arex-platform-staging/backend/.env.staging
+# → fill in Supabase keys, set CORS_ORIGINS to your Vercel staging preview URL
 
 # 6. Open ports in GCP firewall
-# GCP Console → VPC network → Firewall → Add two rules:
-#   Port 8000 (prod):    Direction: Ingress, tcp:8000, Source: 0.0.0.0/0
-#   Port 8001 (staging): Direction: Ingress, tcp:8001, Source: 0.0.0.0/0
+# GCP Console → VPC network → Firewall → Add two ingress rules:
+#   Port 8000 (prod):    tcp:8000, Source: 0.0.0.0/0
+#   Port 8001 (staging): tcp:8001, Source: 0.0.0.0/0
 
-# 7. Start both backends
-cd ~/arex-platform/backend
+# 7. Start production backend
+cd ~/arex-platform-prod/backend
 docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
+
+# 8. Start staging backend
+cd ~/arex-platform-staging/backend
 docker compose -f docker-compose.staging.yml --env-file .env.staging up --build -d
 ```
 
@@ -102,15 +116,16 @@ After this:
 
 ```bash
 ssh user@YOUR_VM_IP
-cd ~/arex-platform
 
-# Production
+# --- Production ---
+cd ~/arex-platform-prod
 git pull origin main
 cd backend
 docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
 docker image prune -f
 
-# Staging
+# --- Staging ---
+cd ~/arex-platform-staging
 git pull origin staging
 cd backend
 docker compose -f docker-compose.staging.yml --env-file .env.staging up --build -d
@@ -120,14 +135,14 @@ docker image prune -f
 ### Useful commands on VM
 
 ```bash
-cd ~/arex-platform/backend
-
 # --- Production ---
+cd ~/arex-platform-prod/backend
 docker compose -f docker-compose.prod.yml logs -f
 docker compose -f docker-compose.prod.yml down
 docker compose -f docker-compose.prod.yml restart backend
 
 # --- Staging ---
+cd ~/arex-platform-staging/backend
 docker compose -f docker-compose.staging.yml logs -f
 docker compose -f docker-compose.staging.yml down
 docker compose -f docker-compose.staging.yml restart backend-staging
@@ -166,11 +181,11 @@ Each environment needs its own `CORS_ORIGINS` pointing to the correct Vercel URL
 When you add or change a URL, update the env file on the VM and restart the relevant service:
 
 ```bash
-cd ~/arex-platform/backend
-
 # Prod
+cd ~/arex-platform-prod/backend
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 
 # Staging
+cd ~/arex-platform-staging/backend
 docker compose -f docker-compose.staging.yml --env-file .env.staging up -d
 ```
