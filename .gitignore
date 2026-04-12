@@ -16,8 +16,9 @@ pnpm-debug.log*
 
 # Environment and local secrets
 .env*
-!.env.example
-!backend/.env.example
+!.env.local.example
+!backend/.env.local.example
+!backend/.env.prod.example
 
 
 # Python caches and virtual envs

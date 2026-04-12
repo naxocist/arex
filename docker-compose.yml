@@ -41,7 +41,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - ./backend/.env
+      - ./backend/.env.local
     environment:
       SUPABASE_URL: http://host.docker.internal:54321
     develop:

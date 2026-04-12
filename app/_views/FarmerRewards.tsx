@@ -10,6 +10,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
+import ConfirmDialog from '@/app/_components/ConfirmDialog';
 import EmptyState from '@/app/_components/EmptyState';
 import SectionCard from '@/app/_components/SectionCard';
 import StatCard from '@/app/_components/StatCard';
@@ -177,6 +178,13 @@ export default function FarmerRewards() {
   const [cancellingRewardRequestId, setCancellingRewardRequestId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<(typeof REWARD_REQUEST_STATUS_OPTIONS)[number]['value']>('all');
 
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, title: '', message: '', onConfirm: () => {} });
+
   const rewardNameById = useMemo(() => {
     const map: Record<string, string> = {};
     for (const reward of rewardsCatalog) {
@@ -249,23 +257,18 @@ export default function FarmerRewards() {
     }
 
     const pointsAfterExchange = availablePoints - rewardPoints;
-    const confirmed =
-      typeof window === 'undefined'
-        ? true
-        : window.confirm(
-            [
-              'ยืนยันการขอแลกรางวัล',
-              `ของรางวัล: ${reward.name_th}`,
-              'จำนวน: 1',
-              `แต้มที่ใช้: ${rewardPoints.toLocaleString('th-TH')} PMUC Coin`,
-              `แต้มคงเหลือหลังแลก: ${pointsAfterExchange.toLocaleString('th-TH')} PMUC Coin`,
-            ].join('\n'),
-          );
+    setConfirmDialog({
+      open: true,
+      title: 'ยืนยันการขอแลกรางวัล',
+      message: `ของรางวัล: ${reward.name_th}\nจำนวน: 1\nแต้มที่ใช้: ${rewardPoints.toLocaleString('th-TH')} PMUC Coin\nแต้มคงเหลือหลังแลก: ${pointsAfterExchange.toLocaleString('th-TH')} PMUC Coin`,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, open: false }));
+        await submitRewardRequest(reward);
+      },
+    });
+  };
 
-    if (!confirmed) {
-      return;
-    }
-
+  const submitRewardRequest = async (reward: FarmerRewardItem) => {
     setRequestingRewardId(reward.id);
     setMessage(null);
     try {
@@ -336,56 +339,40 @@ export default function FarmerRewards() {
               icon={Gift}
             />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
               {rewardsCatalog.map((reward) => {
                 const rewardPoints = Number(reward.points_cost) || 0;
                 const stockQty = Number(reward.stock_qty) || 0;
                 const isInsufficientPoints = availablePoints < rewardPoints;
                 const isUnavailable = !reward.active || stockQty <= 0;
+                const canApply = !isInsufficientPoints && !isUnavailable;
 
                 return (
-                  <article key={reward.id} className="rounded-xl bg-surface-container-low p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-base font-semibold text-stone-900">{reward.name_th}</p>
-                        <p className="mt-2 text-sm leading-6 text-stone-600">
-                          {reward.description_th || 'ไม่มีรายละเอียดเพิ่มเติม'}
-                        </p>
-                      </div>
-                      <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-stone-700">
+                  <div key={reward.id} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 md:flex-row md:items-start md:justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="whitespace-nowrap font-semibold text-stone-900">{reward.name_th}</span>
+                      <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${isInsufficientPoints ? 'bg-stone-100 text-stone-400' : 'bg-violet-50 text-violet-700'}`}>
                         {rewardPoints.toLocaleString('th-TH')} แต้ม
-                      </div>
+                      </span>
+                      <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${stockQty <= 10 ? 'bg-amber-50 text-amber-600' : 'bg-stone-100 text-stone-500'}`}>
+                        {stockQty.toLocaleString('th-TH')} ชิ้น
+                      </span>
                     </div>
-
-                    <div className="mt-4 flex items-center justify-between gap-3 text-sm">
-                      <div className="rounded-xl bg-white px-3 py-2 text-stone-700">
-                        สต็อกคงเหลือ {stockQty.toLocaleString('th-TH')}
-                      </div>
-                      <StatusBadge
-                        status={isUnavailable ? 'cancelled' : isInsufficientPoints ? 'requested' : 'warehouse_approved'}
-                        label={isUnavailable ? 'ของหมด / ปิดใช้งาน' : isInsufficientPoints ? 'แต้มไม่พอ' : 'พร้อมขอแลก'}
-                        size="sm"
-                      />
-                    </div>
-
                     <button
                       type="button"
                       onClick={() => void handleCreateRewardRequest(reward)}
-                      disabled={requestingRewardId === reward.id || isInsufficientPoints || isUnavailable}
-                      className="mt-4 inline-flex items-center gap-2 rounded-full bg-stone-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={requestingRewardId === reward.id || !canApply}
+                      className="rounded-lg bg-stone-900 px-4 py-1.5 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-40"
                     >
-                      <Gift className="h-4 w-4" />
-                      <span>
-                        {requestingRewardId === reward.id
-                          ? 'กำลังส่งคำขอ...'
-                          : isUnavailable
-                            ? 'ยังแลกไม่ได้'
-                            : isInsufficientPoints
-                              ? 'แต้มไม่พอ'
-                              : 'ขอแลกรางวัลนี้'}
-                      </span>
+                      {requestingRewardId === reward.id
+                        ? '...'
+                        : isUnavailable
+                          ? 'ไม่ได้'
+                          : isInsufficientPoints
+                            ? 'แต้มไม่พอ'
+                            : 'ขอแลก'}
                     </button>
-                  </article>
+                  </div>
                 );
               })}
             </div>
@@ -469,6 +456,15 @@ export default function FarmerRewards() {
         </SectionCard>
       </div>
 
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel="ยืนยัน"
+        cancelLabel="ยกเลิก"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }

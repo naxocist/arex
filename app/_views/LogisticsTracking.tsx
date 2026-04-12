@@ -13,7 +13,6 @@ import {
 import AlertBanner from '@/app/_components/AlertBanner';
 import DateRangePicker, { type DateRangeValue } from '@/app/_components/DateRangePicker';
 import EmptyState from '@/app/_components/EmptyState';
-import SectionCard from '@/app/_components/SectionCard';
 import StatCard from '@/app/_components/StatCard';
 import StatusBadge from '@/app/_components/StatusBadge';
 import {
@@ -45,16 +44,6 @@ function formatMaterial(materialType: string): string {
 
 function formatPickupJobStatus(status: string): string {
   const map: Record<string, string> = {
-    pickup_scheduled: 'จัดคิวรับแล้ว',
-    picked_up: 'รับวัสดุแล้ว',
-    delivered_to_factory: 'ส่งถึงโรงงานแล้ว',
-  };
-  return map[status] ?? status;
-}
-
-function formatSubmissionStatus(status: string): string {
-  const map: Record<string, string> = {
-    submitted: 'รอจัดคิว',
     pickup_scheduled: 'จัดคิวรับแล้ว',
     picked_up: 'รับวัสดุแล้ว',
     delivered_to_factory: 'ส่งถึงโรงงานแล้ว',
@@ -138,7 +127,6 @@ function formatLoadIssue(label: string, error: unknown): string {
     }
     return `ยังโหลด${label}ไม่สำเร็จ: ${error.message}`;
   }
-
   return `ยังโหลด${label}ไม่สำเร็จในขณะนี้ โปรดกดรีเฟรชอีกครั้ง`;
 }
 
@@ -184,14 +172,6 @@ export default function LogisticsTracking() {
     () => approvedRewardRequests.filter((item) => !rewardRequestIdsInDelivery.has(item.id)),
     [approvedRewardRequests, rewardRequestIdsInDelivery],
   );
-
-  const factoryOptionById = useMemo(() => {
-    const map: Record<string, LogisticsFactoryOptionItem> = {};
-    for (const factory of factoryOptions) {
-      map[factory.id] = factory;
-    }
-    return map;
-  }, [factoryOptions]);
 
   const loadIssueMessages = useMemo(() => Object.values(loadIssues), [loadIssues]);
 
@@ -455,71 +435,67 @@ export default function LogisticsTracking() {
     { id: 'deliveryJobs', label: 'งานส่งรางวัล', count: activeRewardDeliveryJobs.length },
   ];
 
+  // Shared row class: flat flex-wrap, all data inline, wraps gracefully on mobile
+  const rowCls = 'flex flex-wrap items-center gap-x-2.5 gap-y-1.5 px-3 py-2 text-xs';
+  const nameCls = 'text-sm font-semibold text-stone-900 shrink-0';
+  const badgeCls = 'rounded-full px-2 py-0.5 font-medium shrink-0';
+  const mutedCls = 'text-stone-400 shrink-0';
+  const locCls = 'flex items-center gap-1 text-stone-500 min-w-0';
+  const actionBtnCls = 'rounded-lg bg-stone-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-stone-800 disabled:opacity-40 shrink-0';
+  const outlineBtnCls = 'rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-40 shrink-0';
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-stone-900">ศูนย์ปฏิบัติการขนส่ง</h1>
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <section className="grid grid-cols-2 gap-2 sm:flex sm:gap-3">
+          <StatCard label="คิวรับวัสดุ" value={submittedQueue.length.toLocaleString('th-TH')} detail="ใหม่" icon={CalendarRange} tone="amber" />
+          <StatCard label="ขนส่งวัสดุ" value={pickupJobs.length.toLocaleString('th-TH')} detail="งาน" icon={Truck} tone="sky" />
+          <StatCard label="รางวัลรอส่ง" value={approvedReadyToSchedule.length.toLocaleString('th-TH')} detail="คำขอ" icon={PackageCheck} tone="teal" />
+          <StatCard label="กำลังส่งรางวัล" value={activeRewardDeliveryJobs.length.toLocaleString('th-TH')} detail="งาน" icon={Route} tone="violet" />
+        </section>
         <button
           type="button"
           onClick={() => void loadAll(true)}
           disabled={isLoading}
-          className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-50 disabled:opacity-50"
         >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          {isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล'}
+          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          {isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรช'}
         </button>
       </div>
 
       {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
       {loadIssueMessages.length > 0 ? (
-        <AlertBanner
-          message={loadIssueMessages.join(' ')}
-          tone="info"
-          title="บางส่วนของข้อมูลยังโหลดไม่ครบ"
-        />
+        <AlertBanner message={loadIssueMessages.join(' ')} tone="info" title="บางส่วนของข้อมูลยังโหลดไม่ครบ" />
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="คิวรับวัสดุใหม่" value={submittedQueue.length.toLocaleString('th-TH')} detail="คำขอใหม่ที่ยังไม่ได้จัดรอบรับ" icon={CalendarRange} tone="amber" />
-        <StatCard label="งานขนส่งวัสดุ" value={pickupJobs.length.toLocaleString('th-TH')} detail="งานที่กำลังวิ่งอยู่ในสายส่งเข้าโรงงาน" icon={Truck} tone="sky" />
-        <StatCard label="ของรางวัลพร้อมจัดส่ง" value={approvedReadyToSchedule.length.toLocaleString('th-TH')} detail="คำขอที่คลังอนุมัติแล้วและรอเลือกช่วงส่ง" icon={PackageCheck} tone="teal" />
-        <StatCard label="งานส่งรางวัลที่กำลังดำเนินการ" value={activeRewardDeliveryJobs.length.toLocaleString('th-TH')} detail="รถที่กำลังนำของรางวัลไปส่งเกษตรกร" icon={Route} tone="violet" />
-      </section>
+      {/* Tab bar */}
+      <div className="flex flex-wrap gap-1.5">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+              activeTab === tab.id
+                ? 'bg-stone-950 text-white'
+                : 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
+            }`}
+          >
+            {tab.label}
+            <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${activeTab === tab.id ? 'bg-white/20' : 'bg-stone-100 text-stone-500'}`}>
+              {tab.count.toLocaleString('th-TH')}
+            </span>
+          </button>
+        ))}
+      </div>
 
-      <SectionCard
-        title="ลำดับงานของฝ่ายขนส่ง"
-        description="คิวนี้ครอบคลุมทั้ง Step 2 จัดคิวรับวัสดุ, Step 3 ส่งถึงโรงงาน และ Step 8 ส่งมอบของรางวัลหลังคลังอนุมัติ"
-      >
-        <div className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                activeTab === tab.id
-                  ? 'bg-stone-950 text-white'
-                  : 'border border-line bg-surface-muted text-stone-600'
-              }`}
-            >
-              {tab.label} ({tab.count.toLocaleString('th-TH')})
-            </button>
-          ))}
-        </div>
-      </SectionCard>
-
+      {/* ── Pickup Queue ── */}
       {activeTab === 'pickupQueue' ? (
-        <SectionCard
-          title="คิวรับวัสดุใหม่"
-          description="งานที่ต้องตัดสินใจหลักคือเลือกโรงงานปลายทางและกำหนดช่วงนัดรับให้ชัดก่อนปล่อยรถออกงาน"
-        >
+        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
           {loadIssues.pickupQueue ? (
-            <AlertBanner
-              message={loadIssues.pickupQueue}
-              tone="info"
-              title="บอร์ดคิวรับวัสดุยังไม่พร้อม"
-              className="mb-4"
-            />
+            <AlertBanner message={loadIssues.pickupQueue} tone="info" title="บอร์ดคิวรับวัสดุยังไม่พร้อม" className="m-3" />
           ) : null}
           {submittedQueue.length === 0 ? (
             <EmptyState
@@ -532,124 +508,64 @@ export default function LogisticsTracking() {
               icon={Truck}
             />
           ) : (
-            <div className="space-y-4">
+            <div className="divide-y divide-stone-100">
               {submittedQueue.map((item) => {
                 const selectedFactoryId = destinationFactoryBySubmissionId[item.id] || '';
-                const selectedFactory = selectedFactoryId ? factoryOptionById[selectedFactoryId] : null;
-
+                const canSchedule = pickupRangeBySubmissionId[item.id]?.from && pickupRangeBySubmissionId[item.id]?.to && destinationFactoryBySubmissionId[item.id];
                 return (
-                  <article key={item.id} className="rounded-[1.7rem] border border-line bg-surface-muted p-4">
-                    <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-base font-semibold text-stone-900">
-                            {formatMaterial(item.material_type)} • {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
-                          </p>
-                          <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} size="sm" />
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
-                            <p className="font-semibold text-stone-900">เวลาสร้างรายการ</p>
-                            <p className="mt-1">{formatDateTime(item.created_at)}</p>
-                          </div>
-                          <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
-                            <p className="font-semibold text-stone-900">สถานที่นัดรับ</p>
-                            <p className="mt-1">{item.pickup_location_text}</p>
-                            {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
-                              <a
-                                href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-stone-900 underline underline-offset-2"
-                              >
-                                <MapPin className="h-4 w-4" />
-                                ดูบนแผนที่
-                              </a>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="rounded-2xl border border-line bg-white px-4 py-3">
-                          <label className="block space-y-2">
-                            <span className="text-sm font-medium text-stone-700">เลือกโรงงานปลายทาง</span>
-                            <select
-                              value={selectedFactoryId}
-                              onChange={(event) =>
-                                setDestinationFactoryBySubmissionId((prev) => ({
-                                  ...prev,
-                                  [item.id]: event.target.value,
-                                }))
-                              }
-                              className="w-full rounded-2xl border border-line bg-surface-muted px-4 py-3 text-sm outline-none"
-                            >
-                              <option value="">เลือกโรงงานปลายทาง</option>
-                              {factoryOptions.map((factory) => (
-                                <option key={factory.id} value={factory.id}>
-                                  {factory.name_th}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <p className="mt-2 text-sm leading-6 text-stone-600">
-                            {selectedFactory?.location_text || 'เมื่อเลือกโรงงานแล้ว ระบบจะแสดงที่อยู่เพื่อช่วยตรวจความถูกต้อง'}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-line bg-white px-4 py-3">
-                          <p className="text-sm font-medium text-stone-700">ช่วงวันนัดรับ</p>
-                          <div className="mt-2">
-                            <DateRangePicker
-                              value={pickupRangeBySubmissionId[item.id] || { from: null, to: null }}
-                              onChange={(nextRange) =>
-                                setPickupRangeBySubmissionId((prev) => ({
-                                  ...prev,
-                                  [item.id]: nextRange,
-                                }))
-                              }
-                              minDate={new Date()}
-                              placeholder="เลือกช่วงวันนัดรับ"
-                            />
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => void handleSchedulePickup(item.id)}
-                          disabled={
-                            schedulingSubmissionId === item.id ||
-                            !pickupRangeBySubmissionId[item.id]?.from ||
-                            !pickupRangeBySubmissionId[item.id]?.to ||
-                            !destinationFactoryBySubmissionId[item.id]
-                          }
-                          className="inline-flex items-center gap-2 rounded-full bg-stone-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-60"
-                        >
-                          <CalendarRange className="h-4 w-4" />
-                          <span>{schedulingSubmissionId === item.id ? 'กำลังจัดคิว...' : 'ยืนยันจัดคิวรับงาน'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </article>
+                  <div key={item.id} className={rowCls}>
+                    {/* data */}
+                    <span className={nameCls}>{formatMaterial(item.material_type)}</span>
+                    <span className={`${badgeCls} bg-amber-50 text-amber-700`}>
+                      {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
+                    </span>
+                    <span className={mutedCls}>{formatDateTime(item.created_at)}</span>
+                    <span className={locCls}>
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate max-w-[14rem]">{item.pickup_location_text}</span>
+                      {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                        <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-primary hover:underline">แผนที่</a>
+                      )}
+                    </span>
+                    {/* controls — wrap to line 2 on narrow screens */}
+                    <span className="grow" />
+                    <select
+                      value={selectedFactoryId}
+                      onChange={(event) => setDestinationFactoryBySubmissionId((prev) => ({ ...prev, [item.id]: event.target.value }))}
+                      className="rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs outline-none focus:border-primary shrink-0"
+                    >
+                      <option value="">เลือกโรงงาน</option>
+                      {factoryOptions.map((factory) => (
+                        <option key={factory.id} value={factory.id}>{factory.name_th}</option>
+                      ))}
+                    </select>
+                    <DateRangePicker
+                      value={pickupRangeBySubmissionId[item.id] || { from: null, to: null }}
+                      onChange={(nextRange) => setPickupRangeBySubmissionId((prev) => ({ ...prev, [item.id]: nextRange }))}
+                      minDate={new Date()}
+                      placeholder="ช่วงวัน"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleSchedulePickup(item.id)}
+                      disabled={schedulingSubmissionId === item.id || !canSchedule}
+                      className={actionBtnCls}
+                    >
+                      {schedulingSubmissionId === item.id ? '...' : 'จัดคิว'}
+                    </button>
+                  </div>
                 );
               })}
             </div>
           )}
-        </SectionCard>
+        </div>
       ) : null}
 
+      {/* ── Pickup Jobs ── */}
       {activeTab === 'pickupJobs' ? (
-        <SectionCard
-          title="งานขนส่งวัสดุ"
-          description="ติดตามงานที่ออกจากคิวใหม่แล้วและอัปเดตสถานะจากรับวัสดุจนถึงส่งถึงโรงงาน"
-        >
+        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
           {loadIssues.pickupJobs ? (
-            <AlertBanner
-              message={loadIssues.pickupJobs}
-              tone="info"
-              title="บอร์ดงานขนส่งวัสดุยังไม่พร้อม"
-              className="mb-4"
-            />
+            <AlertBanner message={loadIssues.pickupJobs} tone="info" title="บอร์ดงานขนส่งวัสดุยังไม่พร้อม" className="m-3" />
           ) : null}
           {pickupJobs.length === 0 ? (
             <EmptyState
@@ -662,104 +578,60 @@ export default function LogisticsTracking() {
               icon={Route}
             />
           ) : (
-            <div className="space-y-4">
+            <div className="divide-y divide-stone-100">
               {pickupJobs.map((item) => (
-                <article key={item.id} className="rounded-[1.6rem] border border-line bg-surface-muted p-4">
-                  <div className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-semibold text-stone-900">
-                          {formatMaterial(item.material_type)} • {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
-                        </p>
-                        <StatusBadge status={item.status} label={formatPickupJobStatus(item.status)} size="sm" />
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
-                          <p className="font-semibold text-stone-900">โรงงานปลายทาง</p>
-                          <p className="mt-1">{item.destination_factory_name_th || '-'}</p>
-                          <p className="mt-1 text-stone-500">{item.destination_factory_location_text || 'ยังไม่มีข้อมูลที่อยู่โรงงาน'}</p>
-                        </div>
-                        <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
-                          <p className="font-semibold text-stone-900">ช่วงนัดรับ</p>
-                          <p className="mt-1">
-                            {formatDateTime(item.planned_pickup_at)} - {formatDateTime(item.pickup_window_end_at ?? null)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
-                        <p className="font-semibold text-stone-900">สถานที่รับวัสดุ</p>
-                        <p className="mt-1">{item.pickup_location_text}</p>
-                        {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
-                          <a
-                            href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-stone-900 underline underline-offset-2"
-                          >
-                            <MapPin className="h-4 w-4" />
-                            ดูบนแผนที่
-                          </a>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="rounded-2xl border border-line bg-white px-4 py-3">
-                        <p className="text-sm font-semibold text-stone-900">สิ่งที่ต้องทำถัดไป</p>
-                        <p className="mt-2 text-sm leading-6 text-stone-600">
-                          {item.status === 'pickup_scheduled'
-                            ? 'หลังรับวัสดุขึ้นรถแล้ว ให้กดอัปเดตเป็นรับวัสดุแล้ว'
-                            : item.status === 'picked_up'
-                              ? 'เมื่อส่งถึงโรงงานแล้ว ให้ยืนยันการส่งถึงโรงงานเพื่อส่งต่องานให้ฝ่ายโรงงาน'
-                              : 'งานนี้ส่งถึงโรงงานแล้ว รอฝ่ายโรงงานยืนยันน้ำหนักจริง'}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {item.status === 'pickup_scheduled' ? (
-                          <button
-                            type="button"
-                            onClick={() => void handleMarkPickedUp(item.id)}
-                            disabled={updatingPickupJobId === item.id}
-                            className="inline-flex items-center gap-2 rounded-full bg-stone-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-60"
-                          >
-                            <Truck className="h-4 w-4" />
-                            <span>{updatingPickupJobId === item.id ? 'กำลังอัปเดต...' : 'ยืนยันรับวัสดุ'}</span>
-                          </button>
-                        ) : null}
-                        {(item.status === 'pickup_scheduled' || item.status === 'picked_up') ? (
-                          <button
-                            type="button"
-                            onClick={() => void handleMarkDeliveredToFactory(item.id)}
-                            disabled={updatingPickupJobId === item.id}
-                            className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 transition hover:bg-surface-muted disabled:opacity-60"
-                          >
-                            <Factory className="h-4 w-4" />
-                            <span>{updatingPickupJobId === item.id ? 'กำลังอัปเดต...' : 'ยืนยันส่งถึงโรงงาน'}</span>
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </article>
+                <div key={item.id} className={rowCls}>
+                  <StatusBadge status={item.status} label={formatPickupJobStatus(item.status)} size="sm" />
+                  <span className={nameCls}>{formatMaterial(item.material_type)}</span>
+                  <span className={`${badgeCls} bg-amber-50 text-amber-700`}>
+                    {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
+                  </span>
+                  <span className={`${mutedCls} flex items-center gap-1`}>
+                    <CalendarRange className="h-3 w-3" />
+                    {formatDateTime(item.planned_pickup_at)}
+                  </span>
+                  <span className={locCls}>
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    <span className="truncate max-w-[12rem]">{item.pickup_location_text}</span>
+                    {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                      <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-primary hover:underline">แผนที่</a>
+                    )}
+                  </span>
+                  {item.destination_factory_name_th ? (
+                    <span className="flex items-center gap-1 text-stone-400 shrink-0">
+                      <Factory className="h-3 w-3 shrink-0" />
+                      {item.destination_factory_name_th}
+                      {item.destination_factory_location_text ? (
+                        <span className="text-stone-300">·</span>
+                      ) : null}
+                      {item.destination_factory_location_text ? (
+                        <span className="truncate max-w-[12rem]">{item.destination_factory_location_text}</span>
+                      ) : null}
+                    </span>
+                  ) : null}
+                  <span className="grow" />
+                  {item.status === 'pickup_scheduled' && (
+                    <button type="button" onClick={() => void handleMarkPickedUp(item.id)} disabled={updatingPickupJobId === item.id} className={actionBtnCls}>
+                      {updatingPickupJobId === item.id ? '...' : 'รับแล้ว'}
+                    </button>
+                  )}
+                  {(item.status === 'pickup_scheduled' || item.status === 'picked_up') && (
+                    <button type="button" onClick={() => void handleMarkDeliveredToFactory(item.id)} disabled={updatingPickupJobId === item.id} className={outlineBtnCls}>
+                      {updatingPickupJobId === item.id ? '...' : 'ถึงโรงงาน'}
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           )}
-        </SectionCard>
+        </div>
       ) : null}
 
+      {/* ── Reward Queue ── */}
       {activeTab === 'rewardQueue' ? (
-        <SectionCard
-          title="คำขอรางวัลที่พร้อมจัดรอบส่ง"
-          description="หลังคลังอนุมัติแล้ว งานของฝ่ายขนส่งคือเลือกช่วงวันส่งให้เหมาะกับแต่ละคำขอ"
-        >
+        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
           {loadIssues.rewardQueue ? (
-            <AlertBanner
-              message={loadIssues.rewardQueue}
-              tone="info"
-              title="บอร์ดคำขอรางวัลยังไม่พร้อม"
-              className="mb-4"
-            />
+            <AlertBanner message={loadIssues.rewardQueue} tone="info" title="บอร์ดคำขอรางวัลยังไม่พร้อม" className="m-3" />
           ) : null}
           {approvedReadyToSchedule.length === 0 ? (
             <EmptyState
@@ -772,96 +644,49 @@ export default function LogisticsTracking() {
               icon={PackageCheck}
             />
           ) : (
-            <div className="space-y-4">
-              {approvedReadyToSchedule.map((item) => (
-                <article key={item.id} className="rounded-[1.6rem] border border-line bg-surface-muted p-4">
-                  <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-semibold text-stone-900">
-                          {item.reward_name_th ?? `รหัสรางวัล ${item.reward_id.slice(0, 8)}`}
-                        </p>
-                        <StatusBadge status={item.status} label="คลังอนุมัติแล้ว" size="sm" />
-                      </div>
-                      <p className="text-sm leading-6 text-stone-600">
-                        {item.reward_description_th || 'ไม่มีรายละเอียดเพิ่มเติม'}
-                      </p>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
-                          <p className="font-semibold text-stone-900">รายละเอียดคำขอ</p>
-                          <p className="mt-1">จำนวน {Number(item.quantity).toLocaleString('th-TH')} ชิ้น</p>
-                          <p className="mt-1">ใช้ {Number(item.requested_points).toLocaleString('th-TH')} PMUC Coin</p>
-                        </div>
-                        <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
-                          <p className="font-semibold text-stone-900">จุดส่งมอบ</p>
-                          <p className="mt-1">{item.pickup_location_text || '-'}</p>
-                          {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
-                            <a
-                              href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-stone-900 underline underline-offset-2"
-                            >
-                              <MapPin className="h-4 w-4" />
-                              ดูบนแผนที่
-                            </a>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="rounded-2xl border border-line bg-white px-4 py-3">
-                        <p className="text-sm font-medium text-stone-700">เลือกช่วงวันนำส่ง</p>
-                        <div className="mt-2">
-                          <DateRangePicker
-                            value={deliveryRangeByRequestId[item.id] || { from: null, to: null }}
-                            onChange={(nextRange) =>
-                              setDeliveryRangeByRequestId((prev) => ({
-                                ...prev,
-                                [item.id]: nextRange,
-                              }))
-                            }
-                            minDate={new Date()}
-                            placeholder="เลือกช่วงวันนำส่ง"
-                          />
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => void handleScheduleRewardDelivery(item.id)}
-                        disabled={
-                          schedulingRewardRequestId === item.id ||
-                          !deliveryRangeByRequestId[item.id]?.from ||
-                          !deliveryRangeByRequestId[item.id]?.to
-                        }
-                        className="inline-flex items-center gap-2 rounded-full bg-stone-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-60"
-                      >
-                        <CalendarRange className="h-4 w-4" />
-                        <span>{schedulingRewardRequestId === item.id ? 'กำลังจัดรอบ...' : 'จัดรอบส่งรางวัล'}</span>
-                      </button>
-                    </div>
+            <div className="divide-y divide-stone-100">
+              {approvedReadyToSchedule.map((item) => {
+                const canSchedule = deliveryRangeByRequestId[item.id]?.from && deliveryRangeByRequestId[item.id]?.to;
+                return (
+                  <div key={item.id} className={rowCls}>
+                    <span className={nameCls}>{item.reward_name_th ?? 'รางวัล'}</span>
+                    <span className={`${badgeCls} bg-amber-50 text-amber-700`}>{Number(item.quantity).toLocaleString('th-TH')} ชิ้น</span>
+                    <span className={`${badgeCls} bg-violet-50 text-violet-700`}>{Number(item.requested_points).toLocaleString('th-TH')} แต้ม</span>
+                    <span className={locCls}>
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate max-w-[14rem]">{item.pickup_location_text || '-'}</span>
+                      {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                        <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-primary hover:underline">แผนที่</a>
+                      )}
+                    </span>
+                    <span className="grow" />
+                    <DateRangePicker
+                      value={deliveryRangeByRequestId[item.id] || { from: null, to: null }}
+                      onChange={(nextRange) => setDeliveryRangeByRequestId((prev) => ({ ...prev, [item.id]: nextRange }))}
+                      minDate={new Date()}
+                      placeholder="ช่วงส่ง"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleScheduleRewardDelivery(item.id)}
+                      disabled={schedulingRewardRequestId === item.id || !canSchedule}
+                      className={actionBtnCls}
+                    >
+                      {schedulingRewardRequestId === item.id ? '...' : 'จัดส่ง'}
+                    </button>
                   </div>
-                </article>
-              ))}
+                );
+              })}
             </div>
           )}
-        </SectionCard>
+        </div>
       ) : null}
 
+      {/* ── Delivery Jobs ── */}
       {activeTab === 'deliveryJobs' ? (
-        <SectionCard
-          title="งานส่งรางวัลที่กำลังดำเนินการ"
-          description="อัปเดตจังหวะการส่งจากจัดรอบแล้ว ไปจนถึงส่งมอบสำเร็จ เพื่อให้เกษตรกรและทีมหลังบ้านเห็นสถานะเดียวกัน"
-        >
+        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
           {loadIssues.deliveryJobs ? (
-            <AlertBanner
-              message={loadIssues.deliveryJobs}
-              tone="info"
-              title="บอร์ดงานส่งรางวัลยังไม่พร้อม"
-              className="mb-4"
-            />
+            <AlertBanner message={loadIssues.deliveryJobs} tone="info" title="บอร์ดงานส่งรางวัลยังไม่พร้อม" className="m-3" />
           ) : null}
           {activeRewardDeliveryJobs.length === 0 ? (
             <EmptyState
@@ -874,87 +699,39 @@ export default function LogisticsTracking() {
               icon={PackageCheck}
             />
           ) : (
-            <div className="space-y-4">
+            <div className="divide-y divide-stone-100">
               {activeRewardDeliveryJobs.map((item) => (
-                <article key={item.id} className="rounded-[1.6rem] border border-line bg-surface-muted p-4">
-                  <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-semibold text-stone-900">
-                          {item.reward_name_th ?? `Reward ${item.reward_id ?? '-'}`}
-                        </p>
-                        <StatusBadge status={item.status} label={formatDeliveryStatus(item.status)} size="sm" />
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
-                          <p className="font-semibold text-stone-900">ช่วงนำส่ง</p>
-                          <p className="mt-1">
-                            {formatDateTime(item.planned_delivery_at)} - {formatDateTime(item.delivery_window_end_at ?? null)}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
-                          <p className="font-semibold text-stone-900">จำนวน</p>
-                          <p className="mt-1">{Number(item.quantity).toLocaleString('th-TH')} ชิ้น</p>
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-stone-700">
-                        <p className="font-semibold text-stone-900">ที่อยู่ส่งมอบ</p>
-                        <p className="mt-1">{item.pickup_location_text || '-'}</p>
-                        {hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? (
-                          <a
-                            href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-stone-900 underline underline-offset-2"
-                          >
-                            <MapPin className="h-4 w-4" />
-                            ดูบนแผนที่
-                          </a>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="rounded-2xl border border-line bg-white px-4 py-3">
-                        <p className="text-sm font-semibold text-stone-900">สถานะปัจจุบัน</p>
-                        <p className="mt-2 text-sm leading-6 text-stone-600">
-                          {item.status === 'reward_delivery_scheduled'
-                            ? 'งานนี้จัดรอบแล้ว รอเริ่มนำส่ง'
-                            : 'งานนี้อยู่ระหว่างนำส่ง เมื่อส่งถึงปลายทางแล้วให้กดยืนยันส่งมอบ'}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {item.status === 'reward_delivery_scheduled' ? (
-                          <button
-                            type="button"
-                            onClick={() => void handleMarkOutForDelivery(item.id)}
-                            disabled={updatingDeliveryJobId === item.id}
-                            className="inline-flex items-center gap-2 rounded-full bg-stone-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-60"
-                          >
-                            <Truck className="h-4 w-4" />
-                            <span>{updatingDeliveryJobId === item.id ? 'กำลังอัปเดต...' : 'เริ่มนำส่ง'}</span>
-                          </button>
-                        ) : null}
-                        {item.status === 'out_for_delivery' ? (
-                          <button
-                            type="button"
-                            onClick={() => void handleMarkDelivered(item.id)}
-                            disabled={updatingDeliveryJobId === item.id}
-                            className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 transition hover:bg-surface-muted disabled:opacity-60"
-                          >
-                            <PackageCheck className="h-4 w-4" />
-                            <span>{updatingDeliveryJobId === item.id ? 'กำลังอัปเดต...' : 'ยืนยันส่งมอบสำเร็จ'}</span>
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </article>
+                <div key={item.id} className={rowCls}>
+                  <StatusBadge status={item.status} label={formatDeliveryStatus(item.status)} size="sm" />
+                  <span className={nameCls}>{item.reward_name_th ?? 'รางวัล'}</span>
+                  <span className={`${badgeCls} bg-amber-50 text-amber-700`}>{Number(item.quantity).toLocaleString('th-TH')} ชิ้น</span>
+                  <span className={`${mutedCls} flex items-center gap-1`}>
+                    <CalendarRange className="h-3 w-3" />
+                    {formatDateTime(item.planned_delivery_at)}
+                  </span>
+                  <span className={locCls}>
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    <span className="truncate max-w-[14rem]">{item.pickup_location_text || '-'}</span>
+                    {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                      <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-primary hover:underline">แผนที่</a>
+                    )}
+                  </span>
+                  <span className="grow" />
+                  {item.status === 'reward_delivery_scheduled' && (
+                    <button type="button" onClick={() => void handleMarkOutForDelivery(item.id)} disabled={updatingDeliveryJobId === item.id} className={actionBtnCls}>
+                      {updatingDeliveryJobId === item.id ? '...' : 'เริ่มส่ง'}
+                    </button>
+                  )}
+                  {item.status === 'out_for_delivery' && (
+                    <button type="button" onClick={() => void handleMarkDelivered(item.id)} disabled={updatingDeliveryJobId === item.id} className={outlineBtnCls}>
+                      {updatingDeliveryJobId === item.id ? '...' : 'ส่งแล้ว'}
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           )}
-        </SectionCard>
+        </div>
       ) : null}
     </div>
   );

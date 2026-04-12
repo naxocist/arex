@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     supabase_legacy_service_role_jwt: str | None = None
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=".env.local",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
