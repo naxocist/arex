@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Coins, Plus, RefreshCw, Ruler, Save, Shapes, X } from 'lucide-react';
+import { Coins, Gift, Plus, RefreshCw, Ruler, Save, Shapes, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import SectionCard from '@/app/_components/SectionCard';
 import {
@@ -10,6 +10,7 @@ import {
   type ExecutiveMaterialPointRuleItem,
   type ExecutiveMaterialTypeItem,
   type ExecutiveMeasurementUnitItem,
+  type FarmerRewardItem,
 } from '@/app/_lib/apiClient';
 
 interface MaterialDraftRow {
@@ -55,6 +56,23 @@ const defaultNewUnit: NewUnitDraft = {
   to_kg_factor: '',
   active: true,
 };
+
+interface RewardDraftRow {
+  id: string;
+  name_th: string;
+  description_th: string;
+  points_cost: string;
+  stock_qty: string;
+  active: boolean;
+}
+
+interface NewRewardDraft {
+  name_th: string;
+  description_th: string;
+  points_cost: string;
+  stock_qty: string;
+  active: boolean;
+}
 
 function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
   if (!message) {
@@ -108,6 +126,10 @@ export default function ExecutiveSettings() {
   const [isAddingUnit, setIsAddingUnit] = useState(false);
   const [newUnit, setNewUnit] = useState<NewUnitDraft>(defaultNewUnit);
 
+  const [rewardRows, setRewardRows] = useState<RewardDraftRow[]>([]);
+  const [isAddingReward, setIsAddingReward] = useState(false);
+  const [newReward, setNewReward] = useState<NewRewardDraft>({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true });
+
   const activeMaterialCount = useMemo(
     () => materialRows.filter((row) => row.active).length,
     [materialRows],
@@ -121,10 +143,11 @@ export default function ExecutiveSettings() {
   const loadConfiguration = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      const [materialResponse, unitResponse, pointRuleResponse] = await Promise.all([
+      const [materialResponse, unitResponse, pointRuleResponse, rewardResponse] = await Promise.all([
         executiveApi.listMaterialTypes({ forceRefresh }),
         executiveApi.listMeasurementUnits({ forceRefresh }),
         executiveApi.listMaterialPointRules({ forceRefresh }),
+        executiveApi.listRewards({ forceRefresh }),
       ]);
 
       setMaterialRows(mergeMaterialRows(materialResponse.material_types, pointRuleResponse.rules));
@@ -134,6 +157,16 @@ export default function ExecutiveSettings() {
           code: item.code,
           name_th: item.name_th,
           to_kg_factor: item.to_kg_factor === null ? '' : String(item.to_kg_factor),
+          active: item.active,
+        })),
+      );
+      setRewardRows(
+        rewardResponse.rewards.map((item: FarmerRewardItem) => ({
+          id: item.id,
+          name_th: item.name_th,
+          description_th: item.description_th || '',
+          points_cost: String(item.points_cost),
+          stock_qty: String(item.stock_qty),
           active: item.active,
         })),
       );
@@ -304,6 +337,101 @@ export default function ExecutiveSettings() {
     }
   };
 
+  const updateRewardRow = (index: number, patch: Partial<RewardDraftRow>) => {
+    setRewardRows((prev) => prev.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+  };
+
+  const handleCreateReward = async () => {
+    const name = newReward.name_th.trim();
+    const pointsText = newReward.points_cost.trim();
+    const stockText = newReward.stock_qty.trim();
+
+    if (!name) {
+      setMessage('กรุณาระบุชื่อรางวัล');
+      return;
+    }
+
+    const points = parseInt(pointsText, 10);
+    if (isNaN(points) || points <= 0) {
+      setMessage('กรุณาระบุแต้มที่ใช้เป็นตัวเลขมากกว่า 0');
+      return;
+    }
+
+    const stock = stockText ? parseInt(stockText, 10) : 0;
+    if (isNaN(stock) || stock < 0) {
+      setMessage('กรุณาระบุจำนวนสต็อกเป็นตัวเลขไม่ติดลบ');
+      return;
+    }
+
+    setSavingKey('new-reward');
+    try {
+      await executiveApi.createReward({
+        name_th: name,
+        description_th: newReward.description_th.trim() || undefined,
+        points_cost: points,
+        stock_qty: stock,
+        active: newReward.active,
+      });
+      setMessage('สร้างรางวัลสำเร็จ');
+      setIsAddingReward(false);
+      setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true });
+      await loadConfiguration(true);
+    } catch (error) {
+      if (error instanceof Error) {
+        setMessage(`สร้างรางวัลไม่สำเร็จ: ${error.message}`);
+      } else {
+        setMessage('สร้างรางวัลไม่สำเร็จ');
+      }
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const saveRewardRow = async (row: RewardDraftRow) => {
+    const name = row.name_th.trim();
+    const pointsText = row.points_cost.trim();
+    const stockText = row.stock_qty.trim();
+
+    if (!name) {
+      setMessage('กรุณาระบุชื่อรางวัล');
+      return;
+    }
+
+    const points = pointsText ? parseInt(pointsText, 10) : null;
+    if (points !== null && (isNaN(points) || points <= 0)) {
+      setMessage('แต้มที่ใช้ต้องเป็นตัวเลขมากกว่า 0');
+      return;
+    }
+
+    const stock = stockText ? parseInt(stockText, 10) : null;
+    if (stock !== null && (isNaN(stock) || stock < 0)) {
+      setMessage('จำนวนสต็อกต้องเป็นตัวเลขไม่ติดลบ');
+      return;
+    }
+
+    const requestKey = `reward:${row.id}`;
+    setSavingKey(requestKey);
+    try {
+      await executiveApi.updateReward(row.id, {
+        name_th: name,
+        description_th: row.description_th.trim() || undefined,
+        points_cost: points,
+        stock_qty: stock,
+        active: row.active,
+      });
+      await loadConfiguration(true);
+      setMessage('บันทึกรางวัลสำเร็จ');
+    } catch (error) {
+      if (error instanceof Error) {
+        setMessage(`บันทึกรางวัลไม่สำเร็จ: ${error.message}`);
+      } else {
+        setMessage('บันทึกรางวัลไม่สำเร็จ');
+      }
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -321,51 +449,18 @@ export default function ExecutiveSettings() {
 
       {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
 
-      <SectionCard
-        title="ภาพรวมการตั้งค่าปัจจุบัน"
-        description="ใช้ดูสถานะ master data และสูตรแต้มก่อนลงมือแก้ไข"
-      >
-        <div className="grid gap-4 xl:grid-cols-[0.95fr,0.95fr,1.1fr]">
-          <div className="rounded-[1.6rem] border border-emerald-100 bg-emerald-50/60 p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
-                <Shapes className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-stone-600">ประเภทวัสดุที่เปิดใช้</p>
-                <p className="text-2xl font-semibold text-stone-950">{activeMaterialCount}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[1.6rem] border border-emerald-100 bg-emerald-50/60 p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-white p-3 text-primary shadow-sm">
-                <Ruler className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-stone-600">หน่วยวัดที่เปิดใช้</p>
-                <p className="text-2xl font-semibold text-stone-950">{activeUnitCount}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[1.6rem] border border-emerald-100 bg-white p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-emerald-50 p-3 text-primary">
-                <Coins className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-stone-600">สูตรแต้มที่ตั้งไว้แล้ว</p>
-                <p className="text-2xl font-semibold text-stone-950">{configuredPointCount}</p>
-              </div>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-stone-600">
-              {formulaDescription || 'ยังไม่มีคำอธิบายสูตรจากระบบ'}
-            </p>
-          </div>
+      <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+          <Shapes className="h-4 w-4 text-emerald-600" />
+          <span className="text-lg font-semibold text-stone-950">{activeMaterialCount}</span>
+          <span className="text-sm text-stone-600">ประเภทวัสดุ</span>
         </div>
-      </SectionCard>
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+          <Ruler className="h-4 w-4 text-emerald-600" />
+          <span className="text-lg font-semibold text-stone-950">{activeUnitCount}</span>
+          <span className="text-sm text-stone-600">หน่วยวัด</span>
+        </div>
+      </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.18fr,0.82fr]">
         <SectionCard
@@ -438,73 +533,53 @@ export default function ExecutiveSettings() {
             </div>
           ) : null}
 
-          <div className="xl:max-h-[34rem] xl:overflow-y-auto xl:pr-1">
-            <div className="overflow-x-auto">
-              <table className="w-full border-separate border-spacing-y-2">
-                <thead>
-                  <tr className="text-left text-sm font-medium text-stone-600">
-                    <th className="pb-3 pl-3">รหัส</th>
-                    <th className="pb-3">ชื่อวัสดุ</th>
-                    <th className="pb-3">แต้ม/กก.</th>
-                    <th className="pb-3">สถานะ</th>
-                    <th className="pb-3 pr-3"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {materialRows.map((row, index) => {
-                    const requestKey = `material:${row.originalCode}`;
-                    return (
-                      <tr key={row.originalCode} className="border border-line bg-surface-muted">
-                        <td className="p-2 pl-3">
-                          <input
-                            value={row.code}
-                            onChange={(event) => updateMaterialRow(index, { code: event.target.value })}
-                            className="w-full min-w-[5rem] rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input
-                            value={row.name_th}
-                            onChange={(event) => updateMaterialRow(index, { name_th: event.target.value })}
-                            className="w-full min-w-[10rem] rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input
-                            value={row.points_per_kg}
-                            onChange={(event) => updateMaterialRow(index, { points_per_kg: event.target.value })}
-                            className="w-full min-w-[7rem] rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                            placeholder="แต้ม/กก."
-                          />
-                        </td>
-                        <td className="p-2">
-                          <label className="flex items-center gap-2 whitespace-nowrap text-sm text-stone-700">
-                            <input
-                              type="checkbox"
-                              checked={row.active}
-                              onChange={(event) => updateMaterialRow(index, { active: event.target.checked })}
-                              className="h-4 w-4"
-                            />
-                            ใช้งาน
-                          </label>
-                        </td>
-                        <td className="p-2 pr-3">
-                          <button
-                            type="button"
-                            onClick={() => void saveMaterialRow(row)}
-                            disabled={savingKey === requestKey}
-                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:opacity-60"
-                          >
-                            <Save className="h-4 w-4" />
-                            บันทึก
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <div className="space-y-2">
+            {materialRows.map((row, index) => {
+              const requestKey = `material:${row.originalCode}`;
+              return (
+                <div key={row.originalCode} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 md:flex-row md:items-center">
+                  <div className="flex flex-1 items-center gap-2">
+                    <input
+                      value={row.code}
+                      onChange={(event) => updateMaterialRow(index, { code: event.target.value })}
+                      className="w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      placeholder="รหัส"
+                    />
+                    <input
+                      value={row.name_th}
+                      onChange={(event) => updateMaterialRow(index, { name_th: event.target.value })}
+                      className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      placeholder="ชื่อวัสดุ"
+                    />
+                    <input
+                      value={row.points_per_kg}
+                      onChange={(event) => updateMaterialRow(index, { points_per_kg: event.target.value })}
+                      className="w-24 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      placeholder="แต้ม/กก."
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 text-sm text-stone-600">
+                      <input
+                        type="checkbox"
+                        checked={row.active}
+                        onChange={(event) => updateMaterialRow(index, { active: event.target.checked })}
+                        className="h-4 w-4"
+                      />
+                      ใช้งาน
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void saveMaterialRow(row)}
+                      disabled={savingKey === requestKey}
+                      className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
+                    >
+                      {savingKey === requestKey ? '...' : 'บันทึก'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </SectionCard>
 
@@ -578,73 +653,192 @@ export default function ExecutiveSettings() {
             </div>
           ) : null}
 
-          <div className="xl:max-h-[34rem] xl:overflow-y-auto xl:pr-1">
-            <div className="overflow-x-auto">
-              <table className="w-full border-separate border-spacing-y-2">
-                <thead>
-                  <tr className="text-left text-sm font-medium text-stone-600">
-                    <th className="pb-3 pl-3">รหัส</th>
-                    <th className="pb-3">ชื่อหน่วย</th>
-                    <th className="pb-3">ตัวแปลงเป็นกก.</th>
-                    <th className="pb-3">สถานะ</th>
-                    <th className="pb-3 pr-3"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {unitRows.map((row, index) => {
-                    const requestKey = `unit:${row.originalCode}`;
-                    return (
-                      <tr key={row.originalCode} className="border border-line bg-surface-muted">
-                        <td className="p-2 pl-3">
-                          <input
-                            value={row.code}
-                            onChange={(event) => updateUnitRow(index, { code: event.target.value })}
-                            className="w-full min-w-[5rem] rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input
-                            value={row.name_th}
-                            onChange={(event) => updateUnitRow(index, { name_th: event.target.value })}
-                            className="w-full min-w-[10rem] rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input
-                            value={row.to_kg_factor}
-                            onChange={(event) => updateUnitRow(index, { to_kg_factor: event.target.value })}
-                            className="w-full min-w-[7rem] rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                            placeholder="ปล่อยว่างได้"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <label className="flex items-center gap-2 whitespace-nowrap text-sm text-stone-700">
-                            <input
-                              type="checkbox"
-                              checked={row.active}
-                              onChange={(event) => updateUnitRow(index, { active: event.target.checked })}
-                              className="h-4 w-4"
-                            />
-                            ใช้งาน
-                          </label>
-                        </td>
-                        <td className="p-2 pr-3">
-                          <button
-                            type="button"
-                            onClick={() => void saveUnitRow(row)}
-                            disabled={savingKey === requestKey}
-                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:opacity-60"
-                          >
-                            <Save className="h-4 w-4" />
-                            บันทึก
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <div className="space-y-2">
+            {unitRows.map((row, index) => {
+              const requestKey = `unit:${row.originalCode}`;
+              return (
+                <div key={row.originalCode} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 md:flex-row md:items-center">
+                  <div className="flex flex-1 items-center gap-2">
+                    <input
+                      value={row.code}
+                      onChange={(event) => updateUnitRow(index, { code: event.target.value })}
+                      className="w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      placeholder="รหัส"
+                    />
+                    <input
+                      value={row.name_th}
+                      onChange={(event) => updateUnitRow(index, { name_th: event.target.value })}
+                      className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      placeholder="ชื่อหน่วย"
+                    />
+                    <input
+                      value={row.to_kg_factor}
+                      onChange={(event) => updateUnitRow(index, { to_kg_factor: event.target.value })}
+                      className="w-24 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      placeholder="ตัวแปลง"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 text-sm text-stone-600">
+                      <input
+                        type="checkbox"
+                        checked={row.active}
+                        onChange={(event) => updateUnitRow(index, { active: event.target.checked })}
+                        className="h-4 w-4"
+                      />
+                      ใช้งาน
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void saveUnitRow(row)}
+                      disabled={savingKey === requestKey}
+                      className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
+                    >
+                      {savingKey === requestKey ? '...' : 'บันทึก'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="จัดการรางวัล"
+          description="เพิ่ม แก้ไข และเปิด/ปิดใช้งานรางวัลที่เกษตรกรเห็น"
+          actions={
+            !isAddingReward ? (
+              <button
+                type="button"
+                onClick={() => setIsAddingReward(true)}
+                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-primary/90"
+              >
+                <Plus className="h-4 w-4" />
+                เพิ่มรางวัล
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingReward(false);
+                  setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true });
+                }}
+                className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-1.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
+              >
+                <X className="h-4 w-4" />
+                ยกเลิก
+              </button>
+            )
+          }
+        >
+          {isAddingReward && (
+            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <input
+                  value={newReward.name_th}
+                  onChange={(event) => setNewReward((prev) => ({ ...prev, name_th: event.target.value }))}
+                  placeholder="ชื่อรางวัล"
+                  className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+                <input
+                  value={newReward.description_th}
+                  onChange={(event) => setNewReward((prev) => ({ ...prev, description_th: event.target.value }))}
+                  placeholder="รายละเอียด"
+                  className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+                <input
+                  value={newReward.points_cost}
+                  onChange={(event) => setNewReward((prev) => ({ ...prev, points_cost: event.target.value }))}
+                  placeholder="แต้มที่ใช้"
+                  type="number"
+                  className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+                <input
+                  value={newReward.stock_qty}
+                  onChange={(event) => setNewReward((prev) => ({ ...prev, stock_qty: event.target.value }))}
+                  placeholder="จำนวนในสต็อก"
+                  type="number"
+                  className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-sm text-stone-700">
+                    <input
+                      type="checkbox"
+                      checked={newReward.active}
+                      onChange={(event) => setNewReward((prev) => ({ ...prev, active: event.target.checked }))}
+                      className="h-4 w-4"
+                    />
+                    ใช้งาน
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateReward()}
+                    disabled={savingKey === 'new-reward'}
+                    className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:opacity-60"
+                  >
+                    <Save className="h-4 w-4" />
+                    บันทึก
+                  </button>
+                </div>
+              </div>
             </div>
+          )}
+
+          <div className="space-y-2">
+            {rewardRows.map((row, index) => {
+              const requestKey = `reward:${row.id}`;
+              return (
+                <div key={row.id} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 md:flex-row md:items-center">
+                  <div className="flex flex-1 items-center gap-2">
+                    <input
+                      value={row.name_th}
+                      onChange={(event) => updateRewardRow(index, { name_th: event.target.value })}
+                      className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      placeholder="ชื่อรางวัล"
+                    />
+                    <input
+                      value={row.description_th}
+                      onChange={(event) => updateRewardRow(index, { description_th: event.target.value })}
+                      className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      placeholder="รายละเอียด"
+                    />
+                    <input
+                      value={row.points_cost}
+                      onChange={(event) => updateRewardRow(index, { points_cost: event.target.value })}
+                      className="w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      type="number"
+                      placeholder="แต้ม"
+                    />
+                    <input
+                      value={row.stock_qty}
+                      onChange={(event) => updateRewardRow(index, { stock_qty: event.target.value })}
+                      className="w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      type="number"
+                      placeholder="สต็อก"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 text-sm text-stone-600">
+                      <input
+                        type="checkbox"
+                        checked={row.active}
+                        onChange={(event) => updateRewardRow(index, { active: event.target.checked })}
+                        className="h-4 w-4"
+                      />
+                      ใช้งาน
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void saveRewardRow(row)}
+                      disabled={savingKey === requestKey}
+                      className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
+                    >
+                      {savingKey === requestKey ? '...' : 'บันทึก'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </SectionCard>
       </div>

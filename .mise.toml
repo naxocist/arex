@@ -44,7 +44,7 @@ run = "mise run db:dump:auth && mise run db:dump:public"
 
 [tasks."dev:up"]
 description = "Start Supabase and app containers"
-run = "supabase start --workdir backend && docker compose up --watch"
+run = "supabase start --workdir backend && docker compose up --build --watch"
 
 [tasks."dev:down"]
 description = "Stop app containers and Supabase"
@@ -57,6 +57,18 @@ run = "docker compose logs -f frontend"
 [tasks."logs:backend"]
 description = "Tail backend container logs"
 run = "docker compose logs -f backend"
+
+[tasks."prod:up"]
+description = "Build and start production containers on GCP VM (requires .env.prod)"
+run = "cd backend && docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d"
+
+[tasks."prod:down"]
+description = "Stop production containers"
+run = "cd backend && docker compose -f docker-compose.prod.yml down --remove-orphans"
+
+[tasks."prod:logs"]
+description = "Tail production logs"
+run = "cd backend && docker compose -f docker-compose.prod.yml logs -f"
 
 [tasks.check]
 description = "Run frontend and backend checks"

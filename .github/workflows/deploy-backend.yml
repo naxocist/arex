@@ -1,0 +1,27 @@
+name: Deploy backend to GCP VM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'backend/docker-compose.prod.yml'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_VM_HOST }}
+          username: ${{ secrets.GCP_VM_USER }}
+          key: ${{ secrets.GCP_VM_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/arex-platform
+            git pull origin main
+            cd backend
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d backend
+            docker image prune -f

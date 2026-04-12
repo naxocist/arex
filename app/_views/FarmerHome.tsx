@@ -10,6 +10,7 @@ import {
   Truck,
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
+import ConfirmDialog from '@/app/_components/ConfirmDialog';
 import EmptyState from '@/app/_components/EmptyState';
 import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
@@ -107,6 +108,13 @@ export default function FarmerHome() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<(typeof SUBMISSION_STATUS_OPTIONS)[number]['value']>('all');
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
   const unitNameByCode = useMemo(() => {
     const map: Record<string, string> = {};
@@ -213,24 +221,20 @@ export default function FarmerHome() {
 
     const materialLabel = materialNameByCode[materialType] ?? materialType;
     const unitLabel = unitNameByCode[quantityUnit] ?? fallbackThaiUnit(quantityUnit);
-    const confirmMessage = [
-      'ยืนยันการส่งรายการวัสดุ',
-      '',
-      `วัสดุ: ${materialLabel}`,
-      `ปริมาณ: ${parsedQuantity.toLocaleString('th-TH')} ${unitLabel}`,
-      `จุดนัดรับ: ${pickupLocation}`,
-      '',
-      'หากข้อมูลถูกต้อง กด OK เพื่อส่งรายการ',
-    ].join('\n');
 
-    if (typeof window !== 'undefined') {
-      const confirmed = window.confirm(confirmMessage);
-      if (!confirmed) {
-        setMessage('ยกเลิกการส่งรายการวัสดุ');
-        return;
-      }
-    }
+    setConfirmDialog({
+      open: true,
+      title: 'ยืนยันการส่งรายการวัสดุ',
+      message: `วัสดุ: ${materialLabel}\nปริมาณ: ${parsedQuantity.toLocaleString('th-TH')} ${unitLabel}\nจุดนัดรับ: ${pickupLocation}`,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, open: false }));
+        await submitMaterial();
+      },
+    });
+  };
 
+  const submitMaterial = async () => {
+    const parsedQuantity = Number(quantityValue);
     setIsSubmittingMaterial(true);
     setMessage(null);
     try {
@@ -282,17 +286,17 @@ export default function FarmerHome() {
         >
           <form className="space-y-5" onSubmit={handleSubmitMaterial}>
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-4 rounded-2xl bg-primary p-5 text-white shadow-lg">
+              <div className="space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
                 <div>
-                  <p className="text-sm font-semibold tracking-wide">ข้อมูลหลักของรายการ</p>
-                  <p className="mt-1 text-sm text-white/80">เลือกวัสดุและระบุปริมาณก่อน จากนั้นค่อยปักหมุดจุดนัดรับทางด้านขวา</p>
+                  <p className="text-sm font-semibold tracking-wide text-emerald-800">ข้อมูลหลักของรายการ</p>
+                  <p className="mt-1 text-sm text-emerald-600">เลือกวัสดุและระบุปริมาณก่อน จากนั้นค่อยปักหมุดจุดนัดรับทางด้านขวา</p>
                 </div>
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-white/90">ชนิดวัสดุ</span>
+                  <span className="text-sm font-medium text-stone-700">ชนิดวัสดุ</span>
                   <select
                     value={materialType}
                     onChange={(event) => setMaterialType(event.target.value)}
-                    className="w-full rounded-xl border border-white/25 bg-white px-4 py-3 text-on-surface outline-none"
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-on-surface outline-none"
                     required
                   >
                     {materialTypes.length === 0 ? <option value="">เลือกชนิดวัสดุ</option> : null}
@@ -306,7 +310,7 @@ export default function FarmerHome() {
 
                 <div className="grid gap-4 sm:grid-cols-[1fr,12rem]">
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium text-white/90">ปริมาณ</span>
+                    <span className="text-sm font-medium text-stone-700">ปริมาณ</span>
                     <input
                       type="number"
                       min="0"
@@ -314,15 +318,15 @@ export default function FarmerHome() {
                       value={quantityValue}
                       onChange={(event) => setQuantityValue(event.target.value)}
                       placeholder="เช่น 120"
-                      className="w-full rounded-xl border border-white/25 bg-white px-4 py-3 text-on-surface outline-none"
+                      className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-on-surface outline-none"
                     />
                   </label>
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium text-white/90">หน่วย</span>
+                    <span className="text-sm font-medium text-stone-700">หน่วย</span>
                     <select
                       value={quantityUnit}
                       onChange={(event) => setQuantityUnit(event.target.value)}
-                      className="w-full rounded-xl border border-white/25 bg-white px-4 py-3 text-on-surface outline-none"
+                      className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-on-surface outline-none"
                       required
                     >
                       {measurementUnits.length === 0 ? <option value="">เลือกหน่วย</option> : null}
@@ -335,8 +339,8 @@ export default function FarmerHome() {
                   </label>
                 </div>
 
-                <div className="rounded-xl bg-white/12 px-4 py-3 text-sm leading-6 text-white/90 ring-1 ring-white/12">
-                  เคล็ดลัด: ถ้าปักหมุดแล้ว ระบบจะอัปเดตที่อยู่ให้เอง และถ้ากดใช้ตำแหน่งปัจจุบัน จะล็อกหน้าจอชั่วคราวจนดึงที่อยู่เสร็จ
+                <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700 ring-1 ring-emerald-100">
+                  คำแนะนำ: ถ้าปักหมุดแล้ว ระบบจะอัปเดตรายละเอียดที่นัดรับให้เอง และคุณสามารถแก้ไขรายละเอียดสถานที่นัดรับได้หลังจากปักหมุดแผนที่
                 </div>
               </div>
 
@@ -375,40 +379,56 @@ export default function FarmerHome() {
 
             <button
               type="submit"
-              disabled={isSubmittingMaterial || measurementUnits.length === 0 || materialTypes.length === 0}
+              disabled={
+                isSubmittingMaterial ||
+                measurementUnits.length === 0 ||
+                materialTypes.length === 0 ||
+                !quantityValue.trim() ||
+                !quantityUnit
+              }
               className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition hover:bg-primary-container disabled:opacity-60"
             >
               <PackagePlus className="h-4 w-4" />
-              <span>{isSubmittingMaterial ? 'กำลังส่งรายการ...' : 'ส่งรายการวัสดุ'}</span>
+              <span>
+                {isSubmittingMaterial
+                  ? 'กำลังส่งรายการ...'
+                  : !quantityValue.trim()
+                  ? 'กรุณากรอกปริมาณ'
+                  : !quantityUnit
+                  ? 'กรุณาเลือกหน่วย'
+                  : !materialType
+                  ? 'กรุณาเลือกวัสดุ'
+                  : 'ส่งรายการวัสดุ'}
+              </span>
             </button>
           </form>
         </SectionCard>
 
         <SectionCard
           title="ประวัติรายการวัสดุ"
-          description="กรองสถานะเพื่อดูเฉพาะงานที่สนใจ หรือไล่ดูย้อนหลังทั้งหมดได้จากตารางเดียว"
-          actions={
-            <div className="flex flex-wrap gap-2">
+          description="ย้อนดูรายการของคุณทั้งหมดได้จากตารางเดียว"
+        >
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-stone-600">
+              แสดง {filteredSubmissions.length.toLocaleString('th-TH')} จาก {submissions.length.toLocaleString('th-TH')} รายการ
+            </p>
+            <div className="flex flex-wrap gap-1.5">
               {SUBMISSION_STATUS_OPTIONS.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   onClick={() => setStatusFilter(option.value)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
                     statusFilter === option.value
-                      ? 'bg-stone-950 text-white'
-                      : 'border border-line bg-surface-muted text-stone-600'
+                      ? 'bg-stone-900 text-white'
+                      : 'border border-stone-200 bg-white text-stone-600'
                   }`}
                 >
                   {option.label}
                 </button>
               ))}
             </div>
-          }
-        >
-          <p className="mb-4 text-sm text-stone-600">
-            แสดง {filteredSubmissions.length.toLocaleString('th-TH')} จาก {submissions.length.toLocaleString('th-TH')} รายการ
-          </p>
+          </div>
 
           {filteredSubmissions.length === 0 ? (
             <EmptyState
@@ -438,6 +458,15 @@ export default function FarmerHome() {
         </SectionCard>
       </div>
 
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel="ยืนยัน"
+        cancelLabel="ยกเลิก"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }
