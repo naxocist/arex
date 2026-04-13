@@ -12,16 +12,21 @@ interface StatCardProps {
   className?: string;
 }
 
-const toneClassName: Record<NonNullable<StatCardProps['tone']>, string> = {
-  default: 'border-line bg-white text-stone-900',
-  blue: 'border-blue-200 bg-blue-50 text-blue-950',
-  emerald: 'border-emerald-200 bg-emerald-50 text-emerald-950',
-  green: 'border-green-200 bg-green-50 text-green-950',
-  amber: 'border-amber-200 bg-amber-50 text-amber-950',
-  sky: 'border-sky-200 bg-sky-50 text-sky-950',
-  violet: 'border-violet-200 bg-violet-50 text-violet-950',
-  rose: 'border-rose-200 bg-rose-50 text-rose-950',
-  teal: 'border-teal-200 bg-teal-50 text-teal-950',
+const toneStyles: Record<NonNullable<StatCardProps['tone']>, {
+  bar: string;
+  iconBg: string;
+  iconText: string;
+  value: string;
+}> = {
+  default:  { bar: 'bg-stone-300',    iconBg: 'bg-stone-100',    iconText: 'text-stone-500',    value: 'text-stone-900' },
+  blue:     { bar: 'bg-blue-400',     iconBg: 'bg-blue-50',      iconText: 'text-blue-600',     value: 'text-blue-900' },
+  emerald:  { bar: 'bg-emerald-400',  iconBg: 'bg-emerald-50',   iconText: 'text-emerald-600',  value: 'text-emerald-900' },
+  green:    { bar: 'bg-green-400',    iconBg: 'bg-green-50',     iconText: 'text-green-600',    value: 'text-green-900' },
+  amber:    { bar: 'bg-amber-400',    iconBg: 'bg-amber-50',     iconText: 'text-amber-600',    value: 'text-amber-900' },
+  sky:      { bar: 'bg-sky-400',      iconBg: 'bg-sky-50',       iconText: 'text-sky-600',      value: 'text-sky-900' },
+  violet:   { bar: 'bg-violet-400',   iconBg: 'bg-violet-50',    iconText: 'text-violet-600',   value: 'text-violet-900' },
+  rose:     { bar: 'bg-rose-400',     iconBg: 'bg-rose-50',      iconText: 'text-rose-600',     value: 'text-rose-900' },
+  teal:     { bar: 'bg-teal-400',     iconBg: 'bg-teal-50',      iconText: 'text-teal-600',     value: 'text-teal-900' },
 };
 
 export default function StatCard({
@@ -33,26 +38,38 @@ export default function StatCard({
   className,
 }: StatCardProps) {
   const reduceMotion = useReducedMotion();
+  const s = toneStyles[tone];
 
   return (
     <motion.article
-      initial={reduceMotion ? undefined : { opacity: 0, y: 18, scale: 0.98 }}
-      whileInView={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+      initial={reduceMotion ? undefined : { opacity: 0, y: 12 }}
+      whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.25 }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
-      whileHover={reduceMotion ? undefined : { y: -2 }}
-      className={cn('group rounded-2xl border px-5 py-5 shadow-sm transition-colors hover:bg-primary/5', toneClassName[tone], className)}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+      className={cn(
+        'relative overflow-hidden rounded-2xl border border-stone-200/70 bg-white shadow-sm flex flex-col',
+        className
+      )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] opacity-70">{label}</p>
-        {Icon ? (
-          <div className="rounded-xl bg-white/70 p-2.5 shadow-sm transition-colors group-hover:bg-primary group-hover:text-white">
-            <Icon className="h-4 w-4" />
-          </div>
-        ) : null}
+      {/* accent bar */}
+      <div className={cn('h-1 w-full shrink-0', s.bar)} />
+
+      <div className="flex flex-1 flex-col gap-3 px-5 py-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{label}</p>
+          {Icon && (
+            <div className={cn('flex h-8 w-8 items-center justify-center rounded-xl shrink-0', s.iconBg)}>
+              <Icon className={cn('h-4 w-4', s.iconText)} />
+            </div>
+          )}
+        </div>
+
+        <p className={cn('text-3xl font-semibold leading-none tracking-tight', s.value)}>{value}</p>
+
+        {detail && (
+          <p className="text-xs text-stone-400 leading-snug">{detail}</p>
+        )}
       </div>
-      <p className="mt-4 text-3xl font-light tracking-tight">{value}</p>
-      {detail ? <p className="mt-1 text-sm leading-6 opacity-80">{detail}</p> : null}
     </motion.article>
   );
 }

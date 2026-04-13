@@ -454,6 +454,7 @@ export interface FarmerRewardItem {
   points_cost: number;
   stock_qty: number;
   active: boolean;
+  image_url: string | null;
 }
 
 export interface FarmerRewardDeliveryJobItem {
@@ -554,6 +555,8 @@ export interface LogisticsPickupJobItem {
   pickup_lat?: number | null;
   pickup_lng?: number | null;
   submission_status: string;
+  farmer_display_name?: string | null;
+  farmer_phone?: string | null;
 }
 
 export interface SchedulePickupResponse {
@@ -585,6 +588,8 @@ export interface LogisticsApprovedRewardRequestItem {
   requested_points: number;
   status: string;
   requested_at: string;
+  farmer_display_name?: string | null;
+  farmer_phone?: string | null;
 }
 
 export interface LogisticsRewardDeliveryJobItem {
@@ -704,7 +709,7 @@ export interface UpsertLogisticsInfoPayload {
 }
 
 export interface RejectRewardRequestPayload {
-  reason: string;
+  reason?: string;
 }
 
 export interface WarehousePendingRequestItem {
@@ -743,7 +748,12 @@ export interface RegisterBasePayload {
 
 export interface RegisterFarmerPayload extends RegisterBasePayload {}
 
-export interface RegisterLogisticsPayload extends RegisterBasePayload {}
+export interface RegisterLogisticsPayload extends RegisterBasePayload {
+  name_th: string;
+  location_text?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+}
 
 export interface RegisterFactoryPayload extends RegisterBasePayload {
   name_th: string;
@@ -826,6 +836,13 @@ export const farmerApi = {
         method: 'POST',
       },
     ),
+  getProfile: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ id: string; display_name: string | null; phone: string | null; province: string | null }>('/farmer/profile', options),
+  updateProfile: (payload: { display_name?: string | null; phone?: string | null; province?: string | null }) =>
+    apiRequest<{ id: string; display_name: string | null; phone: string | null; province: string | null }>('/farmer/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const logisticsApi = {

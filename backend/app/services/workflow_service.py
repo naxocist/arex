@@ -11,6 +11,7 @@ from app.models.workflow import (
     RejectRewardRequest,
     SchedulePickupRequest,
     ScheduleRewardDeliveryRequest,
+    UpdateFarmerProfileRequest,
     UpsertFactoryInfoRequest,
     UpsertLogisticsInfoRequest,
     UpsertMaterialPointRuleRequest,
@@ -513,7 +514,7 @@ class WorkflowService:
         try:
             response = (
                 self.client.table("rewards_catalog")
-                .select("id, name_th, description_th, points_cost, stock_qty, active")
+                .select("id, name_th, description_th, points_cost, stock_qty, active, image_url")
                 .eq("active", True)
                 .gt("stock_qty", 0)
                 .order("points_cost", desc=False)
@@ -528,7 +529,7 @@ class WorkflowService:
             response = (
                 self.client.table("rewards_catalog")
                 .select(
-                    "id, name_th, description_th, points_cost, stock_qty, active, created_at, updated_at"
+                    "id, name_th, description_th, points_cost, stock_qty, active, image_url, created_at, updated_at"
                 )
                 .order("points_cost", desc=False)
                 .execute()
@@ -618,7 +619,7 @@ class WorkflowService:
             updated_response = (
                 self.client.table("rewards_catalog")
                 .select(
-                    "id, name_th, description_th, points_cost, stock_qty, active, created_at, updated_at"
+                    "id, name_th, description_th, points_cost, stock_qty, active, image_url, created_at, updated_at"
                 )
                 .eq("id", reward_id)
                 .limit(1)
@@ -688,6 +689,50 @@ class WorkflowService:
             }
         except Exception as exc:
             raise WorkflowError(f"Failed to fetch farmer points: {exc}") from exc
+
+    def get_farmer_profile(self, farmer_profile_id: str) -> dict[str, Any]:
+        try:
+            response = (
+                self.client.table("profiles")
+                .select("id, display_name, phone, province")
+                .eq("id", farmer_profile_id)
+                .limit(1)
+                .execute()
+            )
+            rows = response.data or []
+            if not rows:
+                raise WorkflowError("Profile not found")
+            return rows[0]
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to fetch farmer profile: {exc}") from exc
+
+    def update_farmer_profile(self, farmer_profile_id: str, payload: UpdateFarmerProfileRequest) -> dict[str, Any]:
+        try:
+            patch: dict[str, Any] = {}
+            if payload.display_name is not None:
+                patch["display_name"] = payload.display_name.strip() or None
+            if payload.phone is not None:
+                patch["phone"] = payload.phone.strip() or None
+            if payload.province is not None:
+                patch["province"] = payload.province.strip() or None
+            if not patch:
+                return self.get_farmer_profile(farmer_profile_id)
+            response = (
+                self.client.table("profiles")
+                .update(patch)
+                .eq("id", farmer_profile_id)
+                .execute()
+            )
+            rows = response.data or []
+            if not rows:
+                raise WorkflowError("Profile update returned no data")
+            return rows[0]
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to update farmer profile: {exc}") from exc
 
     def create_reward_request(
         self, farmer_profile_id: str, payload: CreateRewardRequest
@@ -821,7 +866,7 @@ class WorkflowService:
             submissions_response = (
                 self.client.table("material_submissions")
                 .select(
-                    "id, material_type, quantity_value, quantity_unit, pickup_location_text, pickup_lat, pickup_lng, status"
+                    "id, farmer_profile_id, material_type, quantity_value, quantity_unit, pickup_location_text, pickup_lat, pickup_lng, status"
                 )
                 .in_("id", submission_ids)
                 .execute()
@@ -830,6 +875,21 @@ class WorkflowService:
             submissions_by_id = {
                 str(row["id"]): row for row in submissions if row.get("id")
             }
+
+            farmer_profile_ids = list(
+                {str(s["farmer_profile_id"]) for s in submissions if s.get("farmer_profile_id")}
+            )
+            farmer_by_id: dict[str, dict[str, Any]] = {}
+            if farmer_profile_ids:
+                profiles_response = (
+                    self.client.table("profiles")
+                    .select("id, display_name, phone")
+                    .in_("id", farmer_profile_ids)
+                    .execute()
+                )
+                for row in profiles_response.data or []:
+                    if row.get("id"):
+                        farmer_by_id[str(row["id"])] = row
 
             material_codes = list(
                 {s.get("material_type") for s in submissions if s.get("material_type")}
@@ -925,6 +985,12 @@ class WorkflowService:
                         "pickup_lat": submission.get("pickup_lat"),
                         "pickup_lng": submission.get("pickup_lng"),
                         "submission_status": submission.get("status"),
+                        "farmer_display_name": farmer_by_id.get(
+                            str(submission.get("farmer_profile_id") or ""), {}
+                        ).get("display_name"),
+                        "farmer_phone": farmer_by_id.get(
+                            str(submission.get("farmer_profile_id") or ""), {}
+                        ).get("phone"),
                     }
                 )
 
@@ -1144,7 +1210,6 @@ class WorkflowService:
                     "id, reward_request_id, logistics_profile_id, status, planned_delivery_at, delivery_window_end_at, out_for_delivery_at, delivered_at, created_at"
                 )
                 .eq("logistics_profile_id", logistics_profile_id)
-                .in_("status", ["reward_delivery_scheduled", "out_for_delivery"])
                 .order("created_at", desc=True)
                 .execute()
             )

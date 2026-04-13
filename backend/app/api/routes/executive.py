@@ -37,7 +37,7 @@ def get_dashboard_overview(
 @router.get("/material-types")
 def list_material_types(
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:
@@ -57,7 +57,7 @@ def list_material_types(
 def create_material_type(
     payload: UpsertMaterialTypeRequest,
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:
@@ -79,7 +79,7 @@ def update_material_type(
     material_code: str,
     payload: UpsertMaterialTypeRequest,
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:
@@ -99,7 +99,7 @@ def update_material_type(
 @router.get("/measurement-units")
 def list_measurement_units(
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:
@@ -119,7 +119,7 @@ def list_measurement_units(
 def create_measurement_unit(
     payload: UpsertMeasurementUnitRequest,
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:
@@ -141,7 +141,7 @@ def update_measurement_unit(
     unit_code: str,
     payload: UpsertMeasurementUnitRequest,
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:
@@ -161,7 +161,7 @@ def update_measurement_unit(
 @router.get("/material-point-rules")
 def list_material_point_rules(
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:
@@ -183,7 +183,7 @@ def upsert_material_point_rule(
     material_code: str,
     payload: UpsertMaterialPointRuleRequest,
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:

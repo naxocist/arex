@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion, useSpring, useTransform } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
-import { ChevronDown, Coins, Gift, PackagePlus, RefreshCw, Route, Sprout, Truck } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { ChevronDown, Coins, Gift, Kanban, LayoutList, PackagePlus, RefreshCw, Route, Sprout, Truck, User, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ConfirmDialog from '@/app/_components/ConfirmDialog';
 import EmptyState from '@/app/_components/EmptyState';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
-import { SkeletonCard, SkeletonStatCard } from '@/app/_components/Skeleton';
-import StatCard from '@/app/_components/StatCard';
+import { SkeletonCard } from '@/app/_components/Skeleton';
 import StatusBadge from '@/app/_components/StatusBadge';
 import StatusStepper from '@/app/_components/StatusStepper';
 import {
@@ -22,6 +22,7 @@ import {
   type FarmerMeasurementUnitItem,
   type FarmerSubmissionItem,
 } from '@/app/_lib/apiClient';
+import { THAI_PROVINCES } from '@/app/_lib/utils';
 
 const ACTIVE_STATUSES = new Set(['submitted', 'pickup_scheduled', 'picked_up', 'delivered_to_factory', 'factory_confirmed']);
 const LIVE_DOT_STATUSES = new Set(['pickup_scheduled', 'picked_up']);
@@ -33,7 +34,8 @@ const STATUS_GROUP_OPTIONS = [
 ] as const;
 
 type StatusGroup = (typeof STATUS_GROUP_OPTIONS)[number]['value'];
-type SortMode = 'newest' | 'oldest' | 'status';
+type SortCol = 'date' | 'qty' | 'status';
+type SortDir = 'asc' | 'desc';
 
 const STATUS_ORDER: Record<string, number> = {
   pickup_scheduled: 0,
@@ -56,27 +58,19 @@ function formatSubmissionStatus(status: string): string {
     picked_up: 'รับวัสดุแล้ว',
     delivered_to_factory: 'ส่งถึงโรงงานแล้ว',
     factory_confirmed: 'โรงงานยืนยันแล้ว',
-    points_credited: 'ได้รับ PMUC Coin แล้ว',
+    points_credited: 'ได้รับแต้มแล้ว',
   };
   return map[status] ?? status;
 }
 
 function formatDate(dateTime: string | null | undefined): string {
   if (!dateTime) return '-';
-  return new Date(dateTime).toLocaleDateString('th-TH', {
-    day: '2-digit',
-    month: 'short',
-  });
+  return new Date(dateTime).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
 }
 
 function formatDateTime(dateTime: string | null | undefined): string {
   if (!dateTime) return '-';
-  return new Date(dateTime).toLocaleString('th-TH', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return new Date(dateTime).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 function formatPickupWindow(start: string | null | undefined, end: string | null | undefined): string {
@@ -99,16 +93,26 @@ function inferMessageTone(message: string | null): 'info' | 'success' | 'error' 
   return 'info';
 }
 
-/* Animated integer counter */
-function AnimatedNumber({ value }: { value: number }) {
-  const spring = useSpring(0, { stiffness: 60, damping: 18 });
-  const display = useTransform(spring, (v) => Math.round(v).toLocaleString('th-TH'));
-  useEffect(() => { spring.set(value); }, [spring, value]);
-  return <motion.span>{display}</motion.span>;
+/* ── Status dot ── */
+function StatusDot({ status }: { status: string }) {
+  const isLive = LIVE_DOT_STATUSES.has(status);
+  const isActive = ACTIVE_STATUSES.has(status);
+  if (isLive) {
+    return (
+      <span className="relative flex h-3 w-3">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+        <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+      </span>
+    );
+  }
+  if (status === 'points_credited') return <span className="h-3 w-3 rounded-full bg-emerald-300" />;
+  if (isActive) return <span className="h-3 w-3 rounded-full bg-amber-400" />;
+  return <span className="h-3 w-3 rounded-full bg-stone-200" />;
 }
 
 export default function FarmerHome() {
   const reduceMotion = useReducedMotion();
+  const searchParams = useSearchParams();
 
   const [materialType, setMaterialType] = useState<CreateSubmissionPayload['material_type']>('');
   const [quantityValue, setQuantityValue] = useState('');
@@ -125,17 +129,23 @@ export default function FarmerHome() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [statusGroup, setStatusGroup] = useState<StatusGroup>('all');
-  const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [boardExpandedId, setBoardExpandedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  // track filter/sort changes to re-key list for exit/enter animations
-  const listKey = `${statusGroup}-${sortMode}`;
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
+  const [sortCol, setSortCol] = useState<SortCol>('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const [showProfile, setShowProfile] = useState(false);
+  const [profile, setProfile] = useState<{ display_name: string | null; phone: string | null; province: string | null } | null>(null);
+  const [profileForm, setProfileForm] = useState({ display_name: '', phone: '', province: '' });
+  const [provinceSearch, setProvinceSearch] = useState('');
+  const [provinceOpen, setProvinceOpen] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
+    open: boolean; title: string; message: string; fields?: { label: string; value: string }[]; onConfirm: () => void;
   }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
   const unitNameByCode = useMemo(() => {
@@ -152,33 +162,36 @@ export default function FarmerHome() {
 
   const stats = useMemo(() => ({
     all: submissions.length,
-    waitingPickup: submissions.filter((item) => item.status === 'submitted' || item.status === 'pickup_scheduled').length,
-    inTransit: submissions.filter((item) => item.status === 'picked_up' || item.status === 'delivered_to_factory').length,
-    completed: submissions.filter((item) => item.status === 'points_credited').length,
+    waitingPickup: submissions.filter((s) => s.status === 'submitted' || s.status === 'pickup_scheduled').length,
+    inTransit: submissions.filter((s) => s.status === 'picked_up' || s.status === 'delivered_to_factory').length,
+    completed: submissions.filter((s) => s.status === 'points_credited').length,
   }), [submissions]);
 
   const filteredSubmissions = useMemo(() => {
     let list = submissions;
     if (statusGroup === 'active') list = list.filter((s) => ACTIVE_STATUSES.has(s.status));
     else if (statusGroup === 'done') list = list.filter((s) => s.status === 'points_credited');
-
+    const dir = sortDir === 'asc' ? 1 : -1;
     return [...list].sort((a, b) => {
-      if (sortMode === 'status') {
+      if (sortCol === 'status') {
         const diff = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
-        if (diff !== 0) return diff;
+        if (diff !== 0) return diff * dir;
+      }
+      if (sortCol === 'qty') {
+        const diff = (Number(a.quantity_value) || 0) - (Number(b.quantity_value) || 0);
+        if (diff !== 0) return diff * dir;
       }
       const ta = new Date(a.created_at ?? 0).getTime();
       const tb = new Date(b.created_at ?? 0).getTime();
-      return sortMode === 'oldest' ? ta - tb : tb - ta;
+      return (ta - tb) * (sortCol === 'date' ? dir : 1);
     });
-  }, [submissions, statusGroup, sortMode]);
+  }, [submissions, statusGroup, sortCol, sortDir]);
 
   const loadDashboard = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
       setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
       return;
     }
-
     setIsLoading(true);
     try {
       const [submissionsResponse, materialTypesResponse, unitsResponse, pointsResponse] = await Promise.all([
@@ -189,61 +202,91 @@ export default function FarmerHome() {
       ]);
       setSubmissions(submissionsResponse.submissions);
       setAvailablePoints(pointsResponse.available_points);
-
       const nextMaterialTypes = materialTypesResponse.material_types || [];
       setMaterialTypes(nextMaterialTypes);
-      if (nextMaterialTypes.length > 0 && !nextMaterialTypes.some((material) => material.code === materialType)) {
+      if (nextMaterialTypes.length > 0 && !nextMaterialTypes.some((m) => m.code === materialType)) {
         setMaterialType(nextMaterialTypes[0].code);
       }
-
       const nextUnits = unitsResponse.units || [];
       setMeasurementUnits(nextUnits);
-      if (nextUnits.length > 0 && !nextUnits.some((unit) => unit.code === quantityUnit)) {
+      if (nextUnits.length > 0 && !nextUnits.some((u) => u.code === quantityUnit)) {
         setQuantityUnit(nextUnits[0].code);
       }
       setMessage(null);
     } catch (error) {
-      if (error instanceof ApiError) {
-        setMessage(`โหลดข้อมูลไม่สำเร็จ: ${error.message}`);
-      } else {
-        setMessage('โหลดข้อมูลไม่สำเร็จ');
-      }
+      setMessage(error instanceof ApiError ? `โหลดข้อมูลไม่สำเร็จ: ${error.message}` : 'โหลดข้อมูลไม่สำเร็จ');
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    void loadDashboard();
-  }, []);
+  useEffect(() => { void loadDashboard(); }, []);
+  useEffect(() => { if (searchParams.get('profile') === '1') handleOpenProfile(); }, [searchParams]);
+
+  const loadProfile = async () => {
+    try {
+      const res = await farmerApi.getProfile({ forceRefresh: true });
+      setProfile(res);
+      setProfileForm({
+        display_name: res.display_name ?? '',
+        phone: res.phone ?? '',
+        province: res.province ?? '',
+      });
+    } catch {
+      // non-fatal — profile sheet will just be empty
+    }
+  };
+
+  const handleOpenProfile = () => {
+    setProfileMessage(null);
+    if (!profile) void loadProfile();
+    setShowProfile(true);
+  };
+
+  const handleSaveProfile = async () => {
+    setProfileMessage(null);
+    if (!profileForm.display_name.trim()) { setProfileMessage('กรุณาระบุชื่อผู้ใช้งาน'); return; }
+    const digitsOnly = profileForm.phone.replace(/\D/g, '');
+    if (digitsOnly.length !== 10) { setProfileMessage('เบอร์โทรต้องมี 10 หลัก'); return; }
+    if (!profileForm.province || !THAI_PROVINCES.includes(profileForm.province as typeof THAI_PROVINCES[number])) {
+      setProfileMessage('เลือกจังหวัดจากรายการ'); return;
+    }
+    setIsSavingProfile(true);
+    try {
+      const res = await farmerApi.updateProfile({
+        display_name: profileForm.display_name.trim() || null,
+        phone: digitsOnly || null,
+        province: profileForm.province.trim() || null,
+      });
+      setProfile(res);
+      setProfileMessage('บันทึกข้อมูลสำเร็จแล้ว');
+    } catch (error) {
+      setProfileMessage(error instanceof ApiError ? `บันทึกไม่สำเร็จ: ${error.message}` : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const handleSubmitMaterial = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (!hasAccessToken()) {
-      setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI');
-      return;
-    }
-
+    if (!hasAccessToken()) { setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI'); return; }
     const parsedQuantity = Number(quantityValue);
-    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
-      setMessage('กรุณาระบุปริมาณมากกว่า 0');
-      return;
-    }
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) { setMessage('กรุณาระบุปริมาณมากกว่า 0'); return; }
     if (!quantityUnit) { setMessage('กรุณาเลือกหน่วย'); return; }
     if (!materialType) { setMessage('กรุณาเลือกชนิดวัสดุ'); return; }
-    if (pickupLat === null || pickupLng === null) {
-      setMessage('กรุณาเลือกจุดนัดรับบนแผนที่ก่อนส่งรายการ');
-      return;
-    }
+    if (pickupLat === null || pickupLng === null) { setMessage('กรุณาเลือกจุดนัดรับบนแผนที่ก่อนส่งรายการ'); return; }
 
     const materialLabel = materialNameByCode[materialType] ?? materialType;
     const unitLabel = unitNameByCode[quantityUnit] ?? fallbackThaiUnit(quantityUnit);
-
     setConfirmDialog({
       open: true,
       title: 'ยืนยันการส่งรายการวัสดุ',
-      message: `วัสดุ: ${materialLabel}\nปริมาณ: ${parsedQuantity.toLocaleString('th-TH')} ${unitLabel}\nจุดนัดรับ: ${pickupLocation}`,
+      message: '',
+      fields: [
+        { label: 'วัสดุ', value: materialLabel },
+        { label: 'ปริมาณ', value: `${parsedQuantity.toLocaleString('th-TH')} ${unitLabel}` },
+        { label: 'จุดนัดรับ', value: pickupLocation },
+      ],
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, open: false }));
         await submitMaterial();
@@ -269,568 +312,827 @@ export default function FarmerHome() {
       setShowForm(false);
       await loadDashboard(true);
     } catch (error) {
-      if (error instanceof ApiError) {
-        setMessage(`ส่งรายการไม่สำเร็จ: ${error.message}`);
-      } else {
-        setMessage('ส่งรายการไม่สำเร็จ กรุณาลองใหม่');
-      }
+      setMessage(error instanceof ApiError ? `ส่งรายการไม่สำเร็จ: ${error.message}` : 'ส่งรายการไม่สำเร็จ กรุณาลองใหม่');
     } finally {
       setIsSubmittingMaterial(false);
     }
   };
 
-  /* ── animation variants ── */
-  const fadeUp = reduceMotion
-    ? {}
-    : { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } };
-
-  const listItem = reduceMotion
-    ? {}
-    : {
-        hidden: { opacity: 0, y: 8 },
-        show: { opacity: 1, y: 0, transition: { duration: 0.22, ease: [0.25, 0, 0, 1] as [number, number, number, number] } },
-        exit: { opacity: 0, y: -6, transition: { duration: 0.15 } },
-      };
+  const selectedUnit = measurementUnits.find((u) => u.code === quantityUnit);
+  const approxKg = (() => {
+    if (!selectedUnit || !selectedUnit.to_kg_factor) return null;
+    if (['กิโลกรัม', 'ตัน'].includes(selectedUnit.name_th)) return null;
+    const qty = parseFloat(quantityValue);
+    return Number.isFinite(qty) && qty > 0 ? qty * selectedUnit.to_kg_factor : null;
+  })();
 
   return (
     <ErrorBoundary>
-      <motion.div
-        className="space-y-6 pb-10"
-        initial="hidden"
-        animate="show"
-        variants={reduceMotion ? {} : { hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}
-      >
-        {/* ── Header ── */}
-        <motion.div
-          variants={fadeUp}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="flex items-start justify-between gap-4"
-        >
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">แดชบอร์ด</p>
-            <h1 className="mt-0.5 text-3xl font-light tracking-tight text-on-surface sm:text-4xl">ส่งวัสดุเกษตร</h1>
-          </div>
+      <div className="space-y-0 pb-28">
 
-          <div className="flex shrink-0 items-center gap-2">
-            {/* Points pill */}
-            <motion.div
-              className="primary-gradient flex items-center gap-1.5 rounded-full px-3.5 py-2 shadow-sm"
-              initial={reduceMotion ? {} : { scale: 0.85, opacity: 0 }}
-              animate={reduceMotion ? {} : { scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, duration: 0.4, type: 'spring', stiffness: 200, damping: 18 }}
-            >
-              <Coins className="h-4 w-4 text-white" />
-              {availablePoints === null ? (
-                <span className="h-4 w-12 animate-pulse rounded-full bg-white/30" />
-              ) : (
-                <span className="text-sm font-bold text-white">
-                  PMUC Coin <AnimatedNumber value={availablePoints} /> แต้ม
-                </span>
-              )}
-            </motion.div>
-
-            <motion.button
-              type="button"
-              onClick={() => void loadDashboard(true)}
-              disabled={isLoading}
-              aria-label="รีเฟรชข้อมูล"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant/20 bg-white text-on-surface-variant transition hover:bg-stone-50 disabled:opacity-50"
-              whileTap={reduceMotion ? {} : { scale: 0.88 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </motion.button>
+        {/* ── Hero coin banner ── */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-emerald-600 px-5 py-5 shadow-md shadow-primary/15 mb-5">
+          <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/5" />
+          <div className="pointer-events-none absolute -bottom-6 right-12 h-20 w-20 rounded-full bg-white/5" />
+          <div className="relative flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-white/70">PMUC Coin คงเหลือ</p>
+              <div className="mt-1 flex items-end gap-1.5">
+                {availablePoints === null ? (
+                  <div className="h-10 w-28 animate-pulse rounded-full bg-white/20" />
+                ) : (
+                  <>
+                    <span className="text-5xl font-light tabular-nums text-white">
+                      {availablePoints.toLocaleString('th-TH')}
+                    </span>
+                    <span className="mb-1.5 text-base font-medium text-white/70">แต้ม</span>
+                  </>
+                )}
+              </div>
+              <p className="mt-1.5 text-sm text-white/60">ใช้แลกรางวัลได้ทันที</p>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenProfile}
+                  aria-label="แก้ไขโปรไฟล์"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+                >
+                  <User className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void loadDashboard(true)}
+                  disabled={isLoading}
+                  aria-label="รีเฟรช"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+              <Link
+                href="/farmer/rewards"
+                className="flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/25"
+              >
+                <Gift className="h-4 w-4" />
+                แลกรางวัล
+              </Link>
+            </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* ── Alert ── */}
         <AnimatePresence>
           {message && (
             <motion.div
               key="alert"
-              initial={reduceMotion ? {} : { opacity: 0, y: -8, scale: 0.98 }}
-              animate={reduceMotion ? {} : { opacity: 1, y: 0, scale: 1 }}
-              exit={reduceMotion ? {} : { opacity: 0, y: -8, scale: 0.98 }}
-              transition={{ duration: 0.22 }}
+              initial={reduceMotion ? {} : { opacity: 0, y: -8 }}
+              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+              exit={reduceMotion ? {} : { opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="mb-4"
             >
               <AlertBanner message={message} tone={inferMessageTone(message)} />
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* ── Desktop bento layout ── */}
-        <motion.div
-          variants={fadeUp}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="grid gap-6 xl:grid-cols-[1fr,340px]"
-        >
-          {/* Left column */}
-          <div className="space-y-6">
+        {/* ── Stats strip (horizontal scroll on mobile) ── */}
+        <div className="mb-5 -mx-1 flex gap-3 overflow-x-auto px-1 pb-1 scrollbar-hide">
+          {[
+            { label: 'รายการทั้งหมด', value: stats.all, icon: Sprout, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'รอรับวัสดุ', value: stats.waitingPickup, icon: Truck, color: 'text-amber-600', bg: 'bg-amber-50' },
+            { label: 'ระหว่างขนส่ง', value: stats.inTransit, icon: Route, color: 'text-sky-600', bg: 'bg-sky-50' },
+            { label: 'ได้แต้มแล้ว', value: stats.completed, icon: Coins, color: 'text-violet-600', bg: 'bg-violet-50' },
+          ].map((s) => (
+            <div key={s.label} className="flex shrink-0 items-center gap-2.5 rounded-2xl border border-stone-100 bg-white px-4 py-3 shadow-sm">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${s.bg}`}>
+                <s.icon className={`h-4 w-4 ${s.color}`} />
+              </div>
+              <div>
+                <p className="text-xl font-bold leading-none text-stone-900">{isLoading ? '—' : s.value}</p>
+                <p className="mt-0.5 text-xs text-stone-500">{s.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
 
-            {/* ── Submission history ── */}
-            <motion.section
-              className="rounded-2xl border border-outline-variant/10 bg-white shadow-sm"
-              variants={fadeUp}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
+        {/* ── View toggle ── */}
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm font-semibold text-stone-600">รายการวัสดุ</p>
+          <div className="flex rounded-xl border border-stone-200 bg-stone-50 p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${viewMode === 'list' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}
+              aria-label="มุมมองรายการ"
             >
-              {/* Section header */}
-              <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 sm:px-6">
-                <h2 className="text-base font-semibold text-on-surface sm:text-lg">รายการวัสดุ</h2>
+              <LayoutList className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('board')}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${viewMode === 'board' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}
+              aria-label="มุมมองกระดาน"
+            >
+              <Kanban className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
 
-                {/* Sort segmented control */}
-                <div className="flex items-center gap-0.5 rounded-xl border border-outline-variant/20 bg-stone-50 p-0.5">
-                  {([['newest', 'ล่าสุดก่อน'], ['oldest', 'เก่าสุดก่อน'], ['status', 'ตามสถานะ']] as [SortMode, string][]).map(([val, label]) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setSortMode(val)}
-                      className={`relative rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                        sortMode === val
-                          ? 'bg-white text-on-surface shadow-sm'
-                          : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+        {/* ── Board / Pipeline view ── */}
+        {viewMode === 'board' && (() => {
+          const STAGES: {
+            statuses: string[];
+            label: string;
+            sublabel: string;
+            icon: React.ReactNode;
+            accent: string;      // tailwind text color
+            accentBg: string;    // tailwind bg color (light)
+            trackColor: string;  // tailwind bg for the left track bar
+            live: boolean;
+          }[] = [
+            {
+              statuses: ['submitted'],
+              label: 'รอจัดคิวรถ',
+              sublabel: 'ส่งรายการแล้ว รอทีมขนส่งนัดหมาย',
+              icon: <PackagePlus className="h-4 w-4" />,
+              accent: 'text-amber-700', accentBg: 'bg-amber-50', trackColor: 'bg-amber-400', live: false,
+            },
+            {
+              statuses: ['pickup_scheduled', 'picked_up'],
+              label: 'ขนส่งกำลังดำเนินการ',
+              sublabel: 'รถอยู่ระหว่างเดินทางหรือรับวัสดุแล้ว',
+              icon: <Truck className="h-4 w-4" />,
+              accent: 'text-sky-700', accentBg: 'bg-sky-50', trackColor: 'bg-sky-400', live: true,
+            },
+            {
+              statuses: ['delivered_to_factory', 'factory_confirmed'],
+              label: 'ถึงโรงงานแล้ว',
+              sublabel: 'รอโรงงานชั่งน้ำหนักและยืนยัน',
+              icon: <Route className="h-4 w-4" />,
+              accent: 'text-violet-700', accentBg: 'bg-violet-50', trackColor: 'bg-violet-400', live: false,
+            },
+            {
+              statuses: ['points_credited'],
+              label: 'เสร็จสิ้น — ได้แต้มแล้ว',
+              sublabel: 'PMUC Coin เข้าบัญชีเรียบร้อย',
+              icon: <Coins className="h-4 w-4" />,
+              accent: 'text-emerald-700', accentBg: 'bg-emerald-50', trackColor: 'bg-emerald-400', live: false,
+            },
+          ];
+
+          const totalActive = submissions.filter((s) => ACTIVE_STATUSES.has(s.status)).length;
+
+          return (
+            <div className="space-y-2">
+              {/* Pipeline header */}
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-stone-800">สถานะวัสดุทั้งหมด</p>
+                  <p className="text-xs text-stone-400">
+                    {totalActive > 0 ? `${totalActive} รายการกำลังดำเนินการ` : 'ไม่มีรายการที่กำลังดำเนินการ'}
+                  </p>
                 </div>
               </div>
 
-              {/* Grouped tabs */}
-              <div className="flex gap-1 border-b border-outline-variant/10 px-5 sm:px-6">
-                {STATUS_GROUP_OPTIONS.map((opt) => {
-                  const count =
-                    opt.value === 'all' ? submissions.length
-                    : opt.value === 'active' ? submissions.filter((s) => ACTIVE_STATUSES.has(s.status)).length
-                    : submissions.filter((s) => s.status === 'points_credited').length;
-                  const isActive = statusGroup === opt.value;
+              {isLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="h-16 animate-pulse rounded-2xl bg-stone-100" />
+                  ))}
+                </div>
+              ) : (
+                STAGES.map((stage, si) => {
+                  const items = submissions.filter((s) => stage.statuses.includes(s.status));
+                  const isEmpty = items.length === 0;
+                  const isLast = si === STAGES.length - 1;
                   return (
+                    <div key={stage.label} className="relative flex gap-0">
+                      {/* Left timeline track */}
+                      <div className="flex flex-col items-center" style={{ width: 32, flexShrink: 0 }}>
+                        <div className={`mt-4 h-5 w-5 rounded-full flex items-center justify-center z-10 relative ${isEmpty ? 'bg-stone-200' : stage.trackColor}`}>
+                          {stage.live && !isEmpty ? (
+                            <>
+                              <span className={`animate-ping absolute inline-flex h-5 w-5 rounded-full opacity-40 ${stage.trackColor}`} />
+                              <span className="relative h-2 w-2 rounded-full bg-white" />
+                            </>
+                          ) : (
+                            <span className={`text-[9px] font-bold ${isEmpty ? 'text-stone-400' : 'text-white'}`}>{si + 1}</span>
+                          )}
+                        </div>
+                        {!isLast && (
+                          <div className={`w-0.5 flex-1 mt-1 ${isEmpty ? 'bg-stone-100' : stage.trackColor} opacity-40`} style={{ minHeight: 16 }} />
+                        )}
+                      </div>
+
+                      {/* Stage card */}
+                      <div className={`flex-1 mb-2 rounded-2xl border overflow-hidden transition-all ${
+                        isEmpty ? 'border-stone-100 bg-stone-50/60' : `border-transparent ${stage.accentBg} shadow-sm`
+                      }`}>
+                        {/* Stage header */}
+                        <div className="flex items-center gap-2.5 px-3 py-3">
+                          <span className={`${isEmpty ? 'text-stone-300' : stage.accent}`}>{stage.icon}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-sm font-bold leading-none ${isEmpty ? 'text-stone-400' : stage.accent}`}>{stage.label}</p>
+                            {!isEmpty && <p className="mt-0.5 text-[11px] text-stone-500 leading-tight">{stage.sublabel}</p>}
+                          </div>
+                          {!isEmpty && (
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${stage.accentBg} ${stage.accent} border border-current border-opacity-20`}>
+                              {items.length}
+                            </span>
+                          )}
+                          {isEmpty && <span className="text-xs text-stone-300">ว่าง</span>}
+                        </div>
+
+                        {/* Item chips + inline expansion */}
+                        {!isEmpty && (
+                          <div className="flex flex-col gap-1.5 px-3 pb-3">
+                            {items.map((item) => {
+                              const isBoardExpanded = boardExpandedId === item.id;
+                              const isActiveStatus = ACTIVE_STATUSES.has(item.status);
+                              return (
+                                <div key={item.id} className="rounded-xl bg-white/80 border border-white shadow-sm overflow-hidden">
+                                  {/* Chip row */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setBoardExpandedId(isBoardExpanded ? null : item.id)}
+                                    className="flex w-full items-center gap-2 px-2.5 py-2 text-left transition active:bg-stone-50"
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <span className="text-xs font-bold text-stone-800">
+                                        {materialNameByCode[item.material_type] ?? item.material_type}
+                                      </span>
+                                      <span className="mx-1.5 text-[10px] text-stone-300">·</span>
+                                      <span className="text-[10px] text-stone-500">
+                                        {Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
+                                      </span>
+                                      <span className="mx-1.5 text-[10px] text-stone-300">·</span>
+                                      <span className="text-[10px] text-stone-400">ส่งเมื่อ {formatDate(item.created_at)}</span>
+                                    </div>
+                                    <motion.span
+                                      animate={reduceMotion ? {} : { rotate: isBoardExpanded ? 180 : 0 }}
+                                      transition={{ duration: 0.18 }}
+                                      style={{ display: 'inline-flex' }}
+                                      className="shrink-0 text-stone-300"
+                                    >
+                                      <ChevronDown className="h-3.5 w-3.5" />
+                                    </motion.span>
+                                  </button>
+
+                                  {/* Inline detail */}
+                                  <AnimatePresence initial={false}>
+                                    {isBoardExpanded && (
+                                      <motion.div
+                                        initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
+                                        animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
+                                        exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.22, ease: 'easeInOut' }}
+                                        style={{ overflow: 'hidden' }}
+                                      >
+                                        <div className="space-y-2 border-t border-stone-100 px-3 pb-3 pt-2.5">
+                                          {item.pickup_location_text && (
+                                            <p className="text-xs text-stone-600">
+                                              <span className="font-semibold">จุดนัดรับ: </span>
+                                              {item.pickup_location_text}
+                                            </p>
+                                          )}
+                                          {item.pickup_lat != null && item.pickup_lng != null && (
+                                            <a
+                                              href={`https://www.google.com/maps?q=${item.pickup_lat},${item.pickup_lng}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700"
+                                            >
+                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                                              เปิดแผนที่
+                                            </a>
+                                          )}
+                                          {isActiveStatus && (
+                                            <StatusStepper
+                                              currentStatus={item.status}
+                                              createdAt={formatDateTime(item.created_at)}
+                                              pickupWindow={formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at)}
+                                            />
+                                          )}
+                                          {!isActiveStatus && (
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                              <div>
+                                                <p className="text-stone-400">ส่งรายการ</p>
+                                                <p className="font-semibold text-stone-700">{formatDateTime(item.created_at)}</p>
+                                              </div>
+                                              <div>
+                                                <p className="text-stone-400">วันนัดรับ</p>
+                                                <p className="font-semibold text-stone-700">{formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at)}</p>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ── Submission table view ── */}
+        {viewMode === 'list' && (() => {
+          // Sort toggle helper
+          const handleColSort = (col: SortCol) => {
+            if (sortCol === col) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+            else { setSortCol(col); setSortDir(col === 'date' ? 'desc' : 'asc'); }
+          };
+          const SortArrow = ({ col }: { col: SortCol }) => {
+            if (sortCol !== col) return null;
+            const label = col === 'date'
+              ? (sortDir === 'desc' ? 'ล่าสุดก่อน' : 'เก่าสุดก่อน')
+              : col === 'qty'
+              ? (sortDir === 'desc' ? 'มากก่อน' : 'น้อยก่อน')
+              : (sortDir === 'asc' ? 'ตามขั้นตอน' : 'ย้อนกลับ');
+            return <span className="ml-1 whitespace-nowrap rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary leading-none">{label}</span>;
+          };
+
+          const countAll = submissions.length;
+          const countActive = submissions.filter((s) => ACTIVE_STATUSES.has(s.status)).length;
+          const countDone = submissions.filter((s) => s.status === 'points_credited').length;
+
+          return (
+            <div className="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+
+              {/* Filter + count header */}
+              <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-3">
+                {/* Segmented filter */}
+                <div className="flex rounded-xl bg-stone-100 p-0.5 gap-0.5">
+                  {([
+                    ['all', 'ทั้งหมด', countAll],
+                    ['active', 'กำลังดำเนินการ', countActive],
+                    ['done', 'เสร็จสิ้น', countDone],
+                  ] as [StatusGroup, string, number][]).map(([val, label, count]) => (
                     <button
-                      key={opt.value}
+                      key={val}
                       type="button"
-                      onClick={() => setStatusGroup(opt.value)}
-                      className={`relative flex items-center gap-1.5 px-3 pb-2.5 pt-1 text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'text-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-primary after:content-[""]'
-                          : 'text-on-surface-variant hover:text-on-surface'
+                      onClick={() => setStatusGroup(val)}
+                      className={`flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-all ${
+                        statusGroup === val
+                          ? 'bg-white text-stone-900 shadow-sm'
+                          : 'text-stone-500 hover:text-stone-700'
                       }`}
                     >
-                      {opt.label}
-                      <motion.span
-                        layout
-                        className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
-                          isActive ? 'bg-primary/10 text-primary' : 'bg-stone-100 text-stone-500'
-                        }`}
-                      >
-                        {count}
-                      </motion.span>
+                      {label}
+                      {count > 0 && (
+                        <span className={`rounded-full min-w-[18px] text-center px-1 py-0.5 text-[10px] font-bold leading-none ${
+                          statusGroup === val ? 'bg-primary/10 text-primary' : 'bg-stone-200 text-stone-400'
+                        }`}>{count}</span>
+                      )}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+                <p className="text-xs text-stone-400 shrink-0">{filteredSubmissions.length} รายการ</p>
               </div>
 
-              {/* List */}
-              <div className="px-5 pb-5 sm:px-6">
+              {/* Sort hint — permanent small note */}
+              {!isLoading && filteredSubmissions.length > 0 && (
+                <div className="flex items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2">
+                  <span className="text-sm">💡</span>
+                  <p className="text-xs text-amber-700">กดชื่อคอลัมน์เพื่อเรียงลำดับ</p>
+                </div>
+              )}
+
+              {/* Column headers — clickable for sort */}
+              {!isLoading && filteredSubmissions.length > 0 && (
+                <div className="grid grid-cols-[1fr_5rem_9rem] items-center border-b border-stone-100 bg-stone-50/60 px-4 py-2 text-xs font-semibold text-stone-400">
+                  <button type="button" onClick={() => handleColSort('date')} className="flex items-center gap-0.5 text-left hover:text-stone-600 transition-colors">
+                    ส่งเมื่อ<SortArrow col="date" />
+                  </button>
+                  <button type="button" onClick={() => handleColSort('qty')} className="flex items-center justify-end gap-0.5 pr-4 hover:text-stone-600 transition-colors">
+                    ปริมาณ<SortArrow col="qty" />
+                  </button>
+                  <button type="button" onClick={() => handleColSort('status')} className="flex items-center justify-end gap-0.5 hover:text-stone-600 transition-colors">
+                    สถานะ<SortArrow col="status" />
+                  </button>
+                </div>
+              )}
+
+              {/* Rows */}
+              <div>
                 {isLoading ? (
-                  <div className="space-y-3 pt-3">
+                  <div className="divide-y divide-stone-100">
                     {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
                   </div>
                 ) : filteredSubmissions.length === 0 ? (
-                  <motion.div
-                    key="empty"
-                    initial={reduceMotion ? {} : { opacity: 0 }}
-                    animate={reduceMotion ? {} : { opacity: 1 }}
-                    transition={{ duration: 0.2 }}
-                  >
+                  <div className="px-4 py-10">
                     <EmptyState
-                      title="ไม่พบรายการตามตัวกรองนี้"
-                      description="ลองสลับสถานะด้านบน หรือสร้างรายการวัสดุใหม่"
+                      title="ไม่พบรายการ"
+                      description="ลองสลับตัวกรองด้านบน หรือกดปุ่มเพื่อส่งรายการวัสดุใหม่"
                     />
-                  </motion.div>
+                  </div>
                 ) : (
                   <motion.div
-                    key={listKey}
-                    className="divide-y divide-outline-variant/8"
+                    key={`${statusGroup}-${sortCol}-${sortDir}`}
+                    className="divide-y divide-stone-100"
                     initial={reduceMotion ? {} : { opacity: 0 }}
                     animate={reduceMotion ? {} : { opacity: 1 }}
-                    transition={{ duration: 0.18 }}
+                    transition={{ duration: 0.15 }}
                   >
                     {filteredSubmissions.map((item) => {
                       const isExpanded = expandedId === item.id;
                       const isActiveStatus = ACTIVE_STATUSES.has(item.status);
-                      const isLive = LIVE_DOT_STATUSES.has(item.status);
                       return (
-                        <motion.article
-                          key={item.id}
-                          variants={listItem}
-                          initial="hidden"
-                          animate="show"
-                          exit="exit"
-                          layout
-                        >
-                          {/* Compact row */}
-                          <motion.button
+                        <article key={item.id}>
+                          {/* Table row */}
+                          <button
                             type="button"
                             onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                            className="flex w-full items-center gap-3 px-1 py-4 text-left"
-                            whileHover={reduceMotion ? {} : { backgroundColor: 'rgba(245,245,244,0.6)' }}
-                            whileTap={reduceMotion ? {} : { scale: 0.995 }}
-                            transition={{ duration: 0.12 }}
+                            className={`grid w-full grid-cols-[1fr_5rem_9rem] items-center gap-2 px-4 py-3.5 text-left transition-colors ${
+                              isExpanded ? 'bg-stone-50' : 'hover:bg-stone-50/60 active:bg-stone-50'
+                            }`}
                           >
-                            {/* Status dot */}
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-                              {isLive ? (
-                                <span className="relative flex h-3 w-3">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                  <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
-                                </span>
-                              ) : (
-                                <span className={`h-2.5 w-2.5 rounded-full ${isActiveStatus ? 'bg-amber-400' : 'bg-stone-200'}`} />
-                              )}
-                            </span>
-
-                            {/* Main info */}
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-base font-semibold text-on-surface">
-                                {materialNameByCode[item.material_type] ?? item.material_type}
-                              </p>
-                              <p className="mt-0.5 text-sm text-on-surface-variant">
-                                ปริมาณ {Number(item.quantity_value).toLocaleString('th-TH')}{' '}
-                                {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
-                              </p>
-                              <p className="text-xs text-stone-400">
-                                ส่งรายการเมื่อ {formatDateTime(item.created_at)}
-                              </p>
+                            {/* Col 1: material + date */}
+                            <div className="min-w-0 flex items-center gap-3">
+                              <StatusDot status={item.status} />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-stone-900">
+                                  {materialNameByCode[item.material_type] ?? item.material_type}
+                                </p>
+                                <p className="text-xs text-stone-400">ส่งเมื่อ {formatDateTime(item.created_at)}</p>
+                              </div>
                             </div>
 
-                            <div className="flex shrink-0 flex-col items-end gap-1.5">
+                            {/* Col 2: quantity */}
+                            <div className="pr-4 text-right">
+                              <p className="text-sm font-semibold tabular-nums text-stone-700">
+                                {Number(item.quantity_value).toLocaleString('th-TH')}
+                              </p>
+                              <p className="text-xs text-stone-400">{unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}</p>
+                            </div>
+
+                            {/* Col 3: status badge + chevron — right-aligned, fixed width */}
+                            <div className="flex flex-col items-end gap-1 min-w-0">
                               <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} size="sm" />
-                              <span className="flex items-center gap-1 text-xs text-stone-400">
-                                {isExpanded ? 'ซ่อน' : 'รายละเอียด'}
-                                <motion.span
-                                  animate={reduceMotion ? {} : { rotate: isExpanded ? 180 : 0 }}
-                                  transition={{ duration: 0.22, ease: 'easeInOut' }}
-                                  style={{ display: 'inline-flex' }}
-                                >
-                                  <ChevronDown className="h-3.5 w-3.5" />
-                                </motion.span>
-                              </span>
+                              <motion.span
+                                animate={reduceMotion ? {} : { rotate: isExpanded ? 180 : 0 }}
+                                transition={{ duration: 0.18 }}
+                                style={{ display: 'inline-flex' }}
+                                className="text-stone-300"
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </motion.span>
                             </div>
-                          </motion.button>
+                          </button>
 
-                          {/* Expanded details — animated height */}
+                          {/* Expanded detail */}
                           <AnimatePresence initial={false}>
                             {isExpanded && (
                               <motion.div
-                                key="details"
+                                key="detail"
                                 initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
                                 animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
                                 exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
-                                transition={{ duration: 0.28, ease: 'easeInOut' }}
+                                transition={{ duration: 0.24, ease: 'easeInOut' }}
                                 style={{ overflow: 'hidden' }}
                               >
-                                <div className="mb-3 ml-9 space-y-2.5 rounded-xl border border-outline-variant/10 bg-stone-50/60 px-4 py-3">
+                                <div className="mx-4 mb-4 mt-1 space-y-2.5 rounded-2xl bg-stone-50 px-4 py-3.5">
                                   {item.pickup_location_text && (
-                                    <p className="text-sm text-on-surface-variant">
-                                      <span className="font-semibold text-on-surface">จุดนัดรับ: </span>{item.pickup_location_text}
+                                    <p className="text-sm text-stone-600">
+                                      <span className="font-semibold text-stone-800">จุดนัดรับ: </span>
+                                      {item.pickup_location_text}
                                     </p>
                                   )}
-                                  <p className="text-sm text-on-surface-variant">
-                                    <span className="font-semibold text-on-surface">วันที่ส่งรายการ: </span>
-                                    {formatDateTime(item.created_at)}
-                                  </p>
-                                  <p className="text-sm text-on-surface-variant">
-                                    <span className="font-semibold text-on-surface">วันนัดรับวัสดุ: </span>
-                                    {formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at)}
-                                  </p>
-                                  {isActiveStatus && <StatusStepper currentStatus={item.status} />}
+                                  {item.pickup_lat != null && item.pickup_lng != null && (
+                                    <a
+                                      href={`https://www.google.com/maps?q=${item.pickup_lat},${item.pickup_lng}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                                      เปิดแผนที่
+                                    </a>
+                                  )}
+                                  {isActiveStatus && (
+                                    <StatusStepper
+                                      currentStatus={item.status}
+                                      createdAt={formatDateTime(item.created_at)}
+                                      pickupWindow={formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at)}
+                                    />
+                                  )}
+                                  {!isActiveStatus && (
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                      <div>
+                                        <p className="text-xs text-stone-400">วันที่ส่งรายการ</p>
+                                        <p className="font-medium text-stone-800">ส่งเมื่อ {formatDateTime(item.created_at)}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-stone-400">วันนัดรับวัสดุ</p>
+                                        <p className="font-medium text-stone-800">{formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at)}</p>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </motion.div>
                             )}
                           </AnimatePresence>
-                        </motion.article>
+                        </article>
                       );
                     })}
                   </motion.div>
                 )}
               </div>
-            </motion.section>
+            </div>
+          );
+        })()}
 
-            {/* ── Submit form (collapsible) ── */}
-            <motion.section
-              className="rounded-2xl border border-outline-variant/10 bg-white shadow-sm"
-              variants={fadeUp}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
-            >
-              <motion.button
-                type="button"
-                onClick={() => setShowForm((v) => !v)}
-                className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left sm:px-6"
-                whileTap={reduceMotion ? {} : { scale: 0.995 }}
+        {/* ── Submit form sheet ── */}
+        <AnimatePresence>
+          {showForm && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                key="backdrop"
+                className="fixed inset-0 z-40 bg-black/40"
+                initial={reduceMotion ? {} : { opacity: 0 }}
+                animate={reduceMotion ? {} : { opacity: 1 }}
+                exit={reduceMotion ? {} : { opacity: 0 }}
+                onClick={() => setShowForm(false)}
+              />
+              {/* Bottom sheet */}
+              <motion.div
+                key="sheet"
+                className="fixed inset-x-0 bottom-0 z-50 max-h-[92dvh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl"
+                initial={reduceMotion ? {} : { y: '100%' }}
+                animate={reduceMotion ? {} : { y: 0 }}
+                exit={reduceMotion ? {} : { y: '100%' }}
+                transition={{ type: 'spring', stiffness: 320, damping: 34 }}
               >
-                <div className="flex items-center gap-3">
-                  <motion.div
-                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10"
-                    animate={reduceMotion ? {} : { rotate: showForm ? 15 : 0 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  >
-                    <PackagePlus className="h-5 w-5 text-primary" />
-                  </motion.div>
-                  <div>
-                    <p className="text-base font-semibold text-on-surface">ส่งรายการวัสดุใหม่</p>
-                    <p className="text-xs text-on-surface-variant">กรอกข้อมูลและปักหมุดจุดนัดรับบนแผนที่</p>
-                  </div>
-                </div>
-                <motion.span
-                  animate={reduceMotion ? {} : { rotate: showForm ? 180 : 0 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                  style={{ display: 'inline-flex' }}
-                >
-                  <ChevronDown className="h-5 w-5 text-on-surface-variant" />
-                </motion.span>
-              </motion.button>
-
-              <AnimatePresence initial={false}>
-                {showForm && (
-                  <motion.div
-                    key="form"
-                    initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
-                    animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
-                    exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
-                    transition={{ duration: 0.32, ease: 'easeInOut' }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <div className="border-t border-outline-variant/10 px-5 pb-6 pt-5 sm:px-6">
-                      <form className="space-y-5" onSubmit={handleSubmitMaterial}>
-                        <div className="grid gap-4 lg:grid-cols-2">
-                          <div className="space-y-4">
-                            <label className="block space-y-1.5">
-                              <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">ชนิดวัสดุ</span>
-                              <select
-                                value={materialType}
-                                onChange={(event) => setMaterialType(event.target.value)}
-                                className="w-full rounded-xl border-none bg-surface-container-high px-4 py-3 text-base text-on-surface outline-none focus:ring-2 focus:ring-primary/20 min-h-[52px]"
-                                required
-                              >
-                                {materialTypes.length === 0 ? <option value="">เลือกชนิดวัสดุ</option> : null}
-                                {materialTypes.map((material) => (
-                                  <option key={material.code} value={material.code}>
-                                    {material.name_th}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-
-                            <div className="grid gap-3 sm:grid-cols-[1fr,10rem]">
-                              <label className="block space-y-1.5">
-                                <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">ปริมาณ</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={quantityValue}
-                                  onChange={(event) => setQuantityValue(event.target.value)}
-                                  placeholder="เช่น 120"
-                                  className="w-full rounded-xl border-none bg-surface-container-high px-4 py-3 text-base outline-none focus:ring-2 focus:ring-primary/20 min-h-[52px]"
-                                />
-                              </label>
-                              <label className="block space-y-1.5">
-                                <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">หน่วย</span>
-                                <select
-                                  value={quantityUnit}
-                                  onChange={(event) => setQuantityUnit(event.target.value)}
-                                  className="w-full rounded-xl border-none bg-surface-container-high px-4 py-3 text-base outline-none focus:ring-2 focus:ring-primary/20 min-h-[52px]"
-                                  required
-                                >
-                                  {measurementUnits.length === 0 ? <option value="">หน่วย</option> : null}
-                                  {measurementUnits.map((unit) => (
-                                    <option key={unit.code} value={unit.code}>
-                                      {unit.name_th}{unit.to_kg_factor != null && unit.to_kg_factor !== 1 ? ` (1 ${unit.name_th} = ${unit.to_kg_factor.toLocaleString('th-TH')} กก.)` : unit.to_kg_factor === 1 ? ' (= กิโลกรัม)' : ''}
-                                    </option>
-                                  ))}
-                                </select>
-                                {(() => {
-                                  const qty = parseFloat(quantityValue);
-                                  const selectedUnit = measurementUnits.find((u) => u.code === quantityUnit);
-                                  if (!selectedUnit || !Number.isFinite(qty) || qty <= 0) return null;
-                                  if (selectedUnit.to_kg_factor == null) return (
-                                    <p className="mt-1 text-xs text-stone-400">หน่วยนี้ยังไม่มีค่าแปลงเป็น กก. — โรงงานจะชั่งจริงอีกครั้ง</p>
-                                  );
-                                  const approxKg = qty * selectedUnit.to_kg_factor;
-                                  return (
-                                    <p className="mt-1 text-xs text-emerald-600 font-medium">
-                                      ≈ {approxKg.toLocaleString('th-TH', { maximumFractionDigits: 2 })} กิโลกรัม (ประมาณการ)
-                                    </p>
-                                  );
-                                })()}
-                              </label>
-                            </div>
-
-                            <label className="block space-y-1.5">
-                              <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">สถานที่นัดรับ</span>
-                              <input
-                                type="text"
-                                value={pickupLocation}
-                                onChange={(event) => setPickupLocation(event.target.value)}
-                                placeholder="เช่น หน้าวัด / จุดสังเกต"
-                                className="w-full rounded-xl border-none bg-surface-container-high px-4 py-3 text-base outline-none focus:ring-2 focus:ring-primary/20 min-h-[52px]"
-                                required
-                              />
-                            </label>
-
-                            <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700 ring-1 ring-emerald-100">
-                              ปักหมุดบนแผนที่ ระบบจะกรอกที่อยู่นัดรับให้อัตโนมัติ
-                            </div>
-                          </div>
-
-                          <div className="space-y-3">
-                            <PickupLocationMapPicker
-                              lat={pickupLat}
-                              lng={pickupLng}
-                              onChange={({ lat, lng }) => {
-                                setPickupLat(lat);
-                                setPickupLng(lng);
-                              }}
-                              onAddressResolved={(address) => {
-                                setPickupLocation(address);
-                              }}
-                              mapHeightClassName="h-[240px] w-full overflow-hidden rounded-2xl sm:h-[300px]"
-                            />
-                            <div className="rounded-xl bg-stone-50 px-4 py-2.5 text-sm text-stone-500">
-                              พิกัด:{' '}
-                              {pickupLat !== null && pickupLng !== null
-                                ? `${pickupLat.toFixed(6)}, ${pickupLng.toFixed(6)}`
-                                : 'ยังไม่ได้เลือก'}
-                            </div>
-                          </div>
-                        </div>
-
-                        <motion.button
-                          type="submit"
-                          disabled={
-                            isSubmittingMaterial ||
-                            measurementUnits.length === 0 ||
-                            materialTypes.length === 0 ||
-                            !quantityValue.trim() ||
-                            !quantityUnit
-                          }
-                          className="inline-flex w-full min-h-[52px] items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-base font-semibold text-white shadow-md shadow-primary/20 transition hover:opacity-90 disabled:opacity-50 sm:w-auto"
-                          whileTap={reduceMotion ? {} : { scale: 0.97 }}
-                          whileHover={reduceMotion ? {} : { scale: 1.02 }}
-                          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                        >
-                          <PackagePlus className="h-5 w-5" />
-                          <span>
-                            {isSubmittingMaterial
-                              ? 'กำลังส่งรายการ...'
-                              : !quantityValue.trim()
-                              ? 'กรุณากรอกปริมาณ'
-                              : !quantityUnit
-                              ? 'กรุณาเลือกหน่วย'
-                              : !materialType
-                              ? 'กรุณาเลือกวัสดุ'
-                              : 'ส่งรายการวัสดุ'}
-                          </span>
-                        </motion.button>
-                      </form>
+                {/* Handle */}
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-100 bg-white px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
+                      <PackagePlus className="h-5 w-5 text-primary" />
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.section>
-
-            {/* ── Stats ── */}
-            <motion.section
-              variants={fadeUp}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
-            >
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">สรุปภาพรวม</p>
-              {isLoading ? (
-                <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
-                  {Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)}
+                    <div>
+                      <p className="text-base font-bold text-stone-900">ส่งรายการวัสดุใหม่</p>
+                      <p className="text-xs text-stone-400">กรอกข้อมูลแล้วกดยืนยัน</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-500"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
                 </div>
-              ) : (
-                <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
-                  <StatCard label="รายการทั้งหมด" value={stats.all.toLocaleString('th-TH')} detail="ทุกคำขอในบัญชีนี้" icon={Sprout} tone="emerald" />
-                  <StatCard label="รอรับวัสดุ" value={stats.waitingPickup.toLocaleString('th-TH')} detail="รอจัดคิวหรือรอรถเข้ารับ" icon={Truck} tone="amber" />
-                  <StatCard label="ระหว่างขนส่ง" value={stats.inTransit.toLocaleString('th-TH')} detail="รถรับแล้วหรือกำลังส่งโรงงาน" icon={Route} tone="sky" />
-                  <StatCard label="ปิดงานแล้ว" value={stats.completed.toLocaleString('th-TH')} detail="ได้รับ PMUC Coin เรียบร้อย" icon={Coins} tone="violet" />
-                </div>
-              )}
-            </motion.section>
-          </div>
 
-          {/* ── Sidebar ── */}
-          <motion.div
-            className="space-y-4"
-            variants={fadeUp}
-            transition={{ duration: 0.35, ease: 'easeOut', delay: 0.1 }}
-          >
-            {/* Points card */}
-            <motion.div
-              className="rounded-2xl border border-outline-variant/10 bg-white p-5 shadow-sm"
-              whileHover={reduceMotion ? {} : { y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.07)' }}
-              transition={{ duration: 0.2 }}
-            >
-              <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">PMUC Coin คงเหลือ</p>
-              <div className="mt-3 flex items-end gap-2">
-                {availablePoints === null ? (
-                  <div className="h-10 w-28 animate-pulse rounded-full bg-stone-100" />
-                ) : (
-                  <>
-                    <span className="text-4xl font-light text-primary">
-                      <AnimatedNumber value={availablePoints} />
-                    </span>
-                    <span className="mb-1 text-sm text-on-surface-variant">แต้ม</span>
-                  </>
-                )}
-              </div>
-              <p className="mt-2 text-xs text-on-surface-variant">ใช้แลกรางวัลได้ทันที</p>
-            </motion.div>
+                <form className="space-y-5 px-5 pb-8 pt-5" onSubmit={handleSubmitMaterial}>
+                  {/* Material type */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-stone-700">ชนิดวัสดุ</label>
+                    <select
+                      value={materialType}
+                      onChange={(e) => setMaterialType(e.target.value)}
+                      className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      required
+                    >
+                      {materialTypes.length === 0 ? <option value="">เลือกชนิดวัสดุ</option> : null}
+                      {materialTypes.map((m) => (
+                        <option key={m.code} value={m.code}>{m.name_th}</option>
+                      ))}
+                    </select>
+                  </div>
 
-            {/* Redeem link */}
+                  {/* Quantity + unit */}
+                  <div className="grid grid-cols-[1fr,10rem] gap-3">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-stone-700">ปริมาณ</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={quantityValue}
+                        onChange={(e) => setQuantityValue(e.target.value)}
+                        placeholder="เช่น 120"
+                        className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-stone-700">หน่วย</label>
+                      <select
+                        value={quantityUnit}
+                        onChange={(e) => setQuantityUnit(e.target.value)}
+                        className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                        required
+                      >
+                        {measurementUnits.length === 0 ? <option value="">หน่วย</option> : null}
+                        {measurementUnits.map((u) => (
+                          <option key={u.code} value={u.code}>{u.name_th}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {approxKg !== null && (
+                    <p className="rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700">
+                      ≈ {approxKg.toLocaleString('th-TH', { maximumFractionDigits: 2 })} กิโลกรัม
+                    </p>
+                  )}
+
+                  {/* Pickup location */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-stone-700">สถานที่นัดรับ</label>
+                    <input
+                      type="text"
+                      value={pickupLocation}
+                      onChange={(e) => setPickupLocation(e.target.value)}
+                      placeholder="เช่น หน้าวัด / จุดสังเกต"
+                      className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      required
+                    />
+                  </div>
+
+                  {/* Map hint */}
+                  <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    ปักหมุดบนแผนที่ด้านล่าง — ระบบจะกรอกที่อยู่ให้อัตโนมัติ
+                  </div>
+
+                  {/* Map */}
+                  <PickupLocationMapPicker
+                    lat={pickupLat}
+                    lng={pickupLng}
+                    onChange={({ lat, lng }) => { setPickupLat(lat); setPickupLng(lng); }}
+                    onAddressResolved={(address) => setPickupLocation(address)}
+                    mapHeightClassName="h-[280px] w-full overflow-hidden rounded-2xl"
+                    currentLocationButtonLabel="ใช้ตำแหน่งปัจจุบัน"
+                  />
+
+                  {/* Submit */}
+                  <button
+                    type="submit"
+                    disabled={isSubmittingMaterial || !quantityValue.trim() || !quantityUnit || !materialType}
+                    className="flex w-full min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    <PackagePlus className="h-5 w-5" />
+                    {isSubmittingMaterial ? 'กำลังส่งรายการ...' : 'ส่งรายการวัสดุ'}
+                  </button>
+                </form>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ── Floating action button ── */}
+      <div className="fixed bottom-6 left-1/2 z-30 -translate-x-1/2">
+        <motion.button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className="flex min-h-[56px] items-center gap-2.5 rounded-full bg-primary px-7 text-base font-bold text-white shadow-lg shadow-primary/30 transition active:scale-95"
+          whileHover={reduceMotion ? {} : { scale: 1.04 }}
+          whileTap={reduceMotion ? {} : { scale: 0.95 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+        >
+          <PackagePlus className="h-5 w-5" />
+          ส่งรายการวัสดุใหม่
+        </motion.button>
+      </div>
+
+      {/* ── Profile sheet ── */}
+      <AnimatePresence>
+        {showProfile && (
+          <>
             <motion.div
-              whileHover={reduceMotion ? {} : { y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}
-              transition={{ duration: 0.2 }}
+              key="profile-backdrop"
+              className="fixed inset-0 z-40 bg-black/40"
+              initial={reduceMotion ? {} : { opacity: 0 }}
+              animate={reduceMotion ? {} : { opacity: 1 }}
+              exit={reduceMotion ? {} : { opacity: 0 }}
+              onClick={() => setShowProfile(false)}
+            />
+            <motion.div
+              key="profile-sheet"
+              className="fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl"
+              initial={reduceMotion ? {} : { y: '100%' }}
+              animate={reduceMotion ? {} : { y: 0 }}
+              exit={reduceMotion ? {} : { y: '100%' }}
+              transition={{ type: 'spring', stiffness: 320, damping: 34 }}
             >
-              <Link
-                href="/farmer/rewards"
-                className="flex min-h-[56px] items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/5 px-5 py-4 transition hover:bg-primary/10"
-              >
+              {/* Header */}
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-100 bg-white px-5 py-4">
                 <div className="flex items-center gap-3">
-                  <Gift className="h-5 w-5 text-primary" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
+                    <User className="h-5 w-5 text-primary" />
+                  </div>
                   <div>
-                    <p className="text-sm font-semibold text-primary">แลกรางวัล</p>
-                    <p className="text-xs text-on-surface-variant">ดูของรางวัลที่แลกได้</p>
+                    <p className="text-base font-bold text-stone-900">ข้อมูลส่วนตัว</p>
+                    <p className="text-xs text-stone-400">แก้ไขได้ทุกเมื่อ</p>
                   </div>
                 </div>
-                <span className="text-lg text-primary">›</span>
-              </Link>
-            </motion.div>
+                <button
+                  type="button"
+                  onClick={() => setShowProfile(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-500"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
 
-            {/* Submit CTA */}
-            <motion.button
-              type="button"
-              onClick={() => {
-                setShowForm(true);
-                document.getElementById('submit-form-section')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="flex w-full min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-primary/20"
-              whileHover={reduceMotion ? {} : { scale: 1.02, opacity: 0.95 }}
-              whileTap={reduceMotion ? {} : { scale: 0.97 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-            >
-              <PackagePlus className="h-4 w-4" />
-              ส่งรายการวัสดุใหม่
-            </motion.button>
-          </motion.div>
-        </motion.div>
-      </motion.div>
+              {/* Form */}
+              <div className="space-y-5 px-5 pb-8 pt-5">
+                {profileMessage && (
+                  <AlertBanner message={profileMessage} tone={inferMessageTone(profileMessage)} />
+                )}
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-stone-700">ชื่อผู้ใช้งาน <span className="text-rose-500">*</span></label>
+                  <input
+                    type="text"
+                    value={profileForm.display_name}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, display_name: e.target.value }))}
+                    placeholder="เช่น นายสมชาย ใจดี"
+                    className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-stone-700">เบอร์โทร <span className="text-rose-500">*</span></label>
+                  <input
+                    type="tel"
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    placeholder="เช่น 08xxxxxxxx"
+                    className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                  />
+                  <p className="text-xs text-stone-400">10 หลัก ไม่ต้องใส่ขีด</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-stone-700">จังหวัด <span className="text-rose-500">*</span></label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={provinceSearch !== '' ? provinceSearch : profileForm.province}
+                      onChange={(e) => {
+                        setProvinceSearch(e.target.value);
+                        setProvinceOpen(true);
+                        setProfileForm((prev) => ({ ...prev, province: '' }));
+                      }}
+                      onFocus={() => { setProvinceSearch(profileForm.province); setProvinceOpen(true); }}
+                      onBlur={() => setTimeout(() => setProvinceOpen(false), 150)}
+                      placeholder="พิมพ์เพื่อค้นหาจังหวัด"
+                      className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                    />
+                    {provinceOpen && (
+                      <ul className="absolute z-50 bottom-full mb-1 max-h-52 w-full overflow-y-auto rounded-2xl border border-stone-200 bg-white shadow-lg">
+                        {THAI_PROVINCES.filter((p) => !provinceSearch || p.includes(provinceSearch)).map((p) => (
+                          <li
+                            key={p}
+                            onMouseDown={() => {
+                              setProfileForm((prev) => ({ ...prev, province: p }));
+                              setProvinceSearch('');
+                              setProvinceOpen(false);
+                            }}
+                            className="cursor-pointer px-4 py-3 text-base hover:bg-emerald-50 hover:text-emerald-900"
+                          >
+                            {p}
+                          </li>
+                        ))}
+                        {THAI_PROVINCES.filter((p) => !provinceSearch || p.includes(provinceSearch)).length === 0 && (
+                          <li className="px-4 py-3 text-base text-stone-400">ไม่พบจังหวัด</li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleSaveProfile()}
+                  disabled={isSavingProfile}
+                  className="flex w-full min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {isSavingProfile ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <ConfirmDialog
         open={confirmDialog.open}
         title={confirmDialog.title}
         message={confirmDialog.message}
+        fields={confirmDialog.fields}
         confirmLabel="ยืนยัน"
         cancelLabel="ยกเลิก"
         onConfirm={confirmDialog.onConfirm}

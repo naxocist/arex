@@ -48,7 +48,7 @@ class ScheduleRewardDeliveryRequest(BaseModel):
 
 
 class RejectRewardRequest(BaseModel):
-    reason: str = Field(min_length=3, max_length=1000)
+    reason: str = Field(default="", max_length=1000)
 
 
 class UpsertMaterialTypeRequest(BaseModel):
@@ -73,3 +73,9 @@ class UpsertLogisticsInfoRequest(BaseModel):
 
 class UpsertMaterialPointRuleRequest(BaseModel):
     points_per_kg: float = Field(gt=0)
+
+
+class UpdateFarmerProfileRequest(BaseModel):
+    display_name: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=20)
+    province: str | None = Field(default=None, max_length=100)

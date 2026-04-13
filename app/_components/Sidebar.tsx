@@ -43,10 +43,10 @@ function NavLink({
       href={item.path}
       onClick={onClick}
       className={cn(
-        'flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-all duration-200',
+        'flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-all duration-200',
         isActive
           ? 'bg-emerald-100 text-emerald-900 font-semibold'
-          : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900 hover:translate-x-1',
+          : 'text-stone-600 hover:bg-stone-200/60 hover:text-stone-900 hover:translate-x-0.5',
       )}
     >
       <Icon className="h-5 w-5 shrink-0" />
@@ -82,57 +82,50 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-start justify-between border-b border-stone-200/60 px-4 py-5">
-        <div className="flex items-start gap-3">
+      {/* Brand header */}
+      <div className="flex items-center justify-between border-b border-stone-200/60 px-4 py-4">
+        <div className="flex items-center gap-2.5">
           <div className="relative shrink-0">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl primary-gradient text-white shadow-md">
-              <Leaf className="h-5 w-5 fill-current" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg primary-gradient text-white shadow-sm">
+              <Leaf className="h-4 w-4 fill-current" />
             </div>
-            {/* PMUC logo badge */}
-            <div className="absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full border border-stone-200 bg-white p-0.5 shadow-md">
-              <Image src="/assets/pmuc_logo.png" alt="บพข" width={18} height={18} className="object-contain" />
+            <div className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-stone-200 bg-white p-0.5 shadow-sm">
+              <Image src="/assets/pmuc_logo.png" alt="บพข" width={14} height={14} className="object-contain" />
             </div>
           </div>
-          <div className="pt-0.5">
-            <h1 className="text-base font-semibold leading-tight text-emerald-900">AREX Platform</h1>
-            <p className="mt-0.5 text-[10px] font-medium leading-tight text-stone-500">ระบบบริหารจัดการวัสดุเหลือใช้</p>
-            <p className="mt-0.5 text-[9px] font-medium text-stone-400">ภายใต้ บพข. (อว.)</p>
+          <div>
+            <h1 className="text-sm font-bold leading-tight tracking-tight text-emerald-900">AREX</h1>
+            {roleInfo
+              ? <p className="text-[11px] font-medium text-stone-500 leading-tight">{roleInfo.label}</p>
+              : <p className="text-[11px] text-stone-400 leading-tight">Platform</p>
+            }
           </div>
         </div>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="mt-1 rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 lg:hidden"
+            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-200/60 lg:hidden"
             aria-label="ปิดเมนู"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         )}
       </div>
 
-      {roleInfo && (
-        <div className="mx-4 mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-700">
-            บทบาท
-          </p>
-          <p className="text-sm font-semibold text-emerald-900">{roleInfo.label}</p>
-        </div>
-      )}
-
-      <nav className="flex-1 overflow-y-auto p-2">
-        <div className="space-y-1">{navItems}</div>
+      <nav className="flex-1 overflow-y-auto p-2 pt-3">
+        <div className="space-y-0.5">{navItems}</div>
       </nav>
 
       <div className="border-t border-stone-200/60 p-2">
         <button
           type="button"
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-rose-700 hover:bg-rose-50 transition-all duration-200"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-700 hover:bg-rose-50 transition-all duration-200"
         >
-          <LogOut className="h-5 w-5 shrink-0" />
+          <LogOut className="h-4 w-4 shrink-0" />
           <span className="hidden sm:inline">ออกจากระบบ</span>
           <span className="sm:hidden">ออก</span>
         </button>
@@ -209,9 +202,9 @@ export function MobileTopBar({ onOpen }: { onOpen: () => void }) {
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between border-b border-stone-200/80 bg-stone-50/95 px-4 py-3 backdrop-blur-sm lg:hidden">
       {/* Brand + role */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         <div className="relative shrink-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl primary-gradient text-white shadow-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg primary-gradient text-white shadow-sm">
             <Leaf className="h-4 w-4 fill-current" />
           </div>
           <div className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-stone-200 bg-white p-0.5 shadow-sm">
@@ -219,9 +212,9 @@ export function MobileTopBar({ onOpen }: { onOpen: () => void }) {
           </div>
         </div>
         <div>
-          <p className="text-sm font-semibold leading-tight text-emerald-900">AREX Platform</p>
+          <p className="text-sm font-bold leading-tight tracking-tight text-emerald-900">AREX</p>
           {roleInfo && (
-            <p className="text-[11px] font-medium text-stone-400">{roleInfo.label}</p>
+            <p className="text-[11px] font-medium text-stone-500">{roleInfo.label}</p>
           )}
         </div>
       </div>
@@ -251,7 +244,7 @@ export function DesktopSidebar() {
   }, []);
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-stone-200/60 bg-stone-50 lg:flex">
+    <aside className="sticky top-0 hidden h-screen w-52 shrink-0 flex-col border-r border-stone-200/60 bg-stone-100/60 lg:flex">
       <SidebarContent
         navItems={
           !mounted || !role ? null : (

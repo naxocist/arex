@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
+  ArrowUpDown,
   CalendarRange,
   CheckCheck,
   ChevronDown,
@@ -11,9 +12,11 @@ import {
   Factory,
   MapPin,
   PackageCheck,
+  Phone,
   RefreshCw,
   Route,
   Truck,
+  User,
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import DateRangePicker, { type DateRangeValue } from '@/app/_components/DateRangePicker';
@@ -21,7 +24,6 @@ import { generatePickupJobPdf, generateDeliveryJobPdf } from '@/app/_lib/pdfGene
 import EmptyState from '@/app/_components/EmptyState';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import { SkeletonCard } from '@/app/_components/Skeleton';
-import StatCard from '@/app/_components/StatCard';
 import StatusBadge from '@/app/_components/StatusBadge';
 import {
   ApiError,
@@ -52,7 +54,7 @@ function formatMaterial(materialType: string): string {
 
 function formatPickupJobStatus(status: string): string {
   const map: Record<string, string> = {
-    pickup_scheduled: 'จัดคิวรับแล้ว',
+    pickup_scheduled: 'กำลังไปรับวัสดุ',
     picked_up: 'รับวัสดุแล้ว',
     delivered_to_factory: 'ส่งถึงโรงงานแล้ว',
   };
@@ -129,6 +131,13 @@ type LogisticsTab = 'pickupQueue' | 'pickupJobs' | 'rewardQueue' | 'deliveryJobs
 type LogisticsLoadIssueKey = 'pickupQueue' | 'pickupJobs' | 'rewardQueue' | 'deliveryJobs' | 'factories';
 
 /* ── Expandable card wrapper ── */
+const accentBorder: Record<string, string> = {
+  amber: 'border-l-amber-400',
+  sky: 'border-l-sky-400',
+  violet: 'border-l-violet-400',
+  emerald: 'border-l-emerald-400',
+};
+
 function JobCard({
   children,
   expandedContent,
@@ -143,33 +152,23 @@ function JobCard({
   accent?: 'amber' | 'sky' | 'violet' | 'emerald';
 }) {
   const reduceMotion = useReducedMotion();
-  const accentBar: Record<string, string> = {
-    amber: 'bg-amber-400',
-    sky: 'bg-sky-400',
-    violet: 'bg-violet-400',
-    emerald: 'bg-emerald-400',
-  };
 
   return (
     <motion.div
-      layout
-      className="overflow-hidden rounded-xl border border-outline-variant/10 bg-white shadow-sm"
+      className={`overflow-hidden rounded-xl border border-stone-200/80 border-l-4 bg-white shadow-sm transition-shadow hover:shadow-md ${accent ? accentBorder[accent] : 'border-l-stone-300'}`}
     >
-      {/* Accent bar */}
-      {accent && <div className={`h-0.5 w-full ${accentBar[accent]}`} />}
-
       {/* Summary row — tap to expand */}
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-4 text-left"
+        className="flex w-full items-start gap-3 px-5 py-4 text-left"
       >
         <div className="min-w-0 flex-1">{children}</div>
         <motion.span
           animate={reduceMotion ? {} : { rotate: isExpanded ? 180 : 0 }}
           transition={{ duration: 0.22 }}
           style={{ display: 'inline-flex' }}
-          className="shrink-0 text-stone-400"
+          className="mt-0.5 shrink-0 text-stone-400"
         >
           <ChevronDown className="h-4 w-4" />
         </motion.span>
@@ -186,13 +185,81 @@ function JobCard({
             transition={{ duration: 0.26, ease: 'easeInOut' }}
             style={{ overflow: 'hidden' }}
           >
-            <div className="border-t border-outline-variant/10 px-4 pb-4 pt-3">
+            <div className="border-t border-stone-100 bg-stone-50/60 px-5 pb-5 pt-4">
               {expandedContent}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+type SortDir = 'asc' | 'desc';
+
+function SortHeaderBar<T extends string>({
+  cols,
+  sort,
+  onSort,
+}: {
+  cols: { key: T; label: string; dirLabels?: [string, string] }[];
+  sort: { key: T; dir: SortDir };
+  onSort: (key: T) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1 border-b border-stone-100 bg-stone-50/70 px-4 py-2 rounded-t-xl -mb-1 flex-wrap">
+      {cols.map((col) => {
+        const active = sort.key === col.key;
+        const [ascLabel, descLabel] = col.dirLabels ?? ['ก่อน', 'หลัง'];
+        return (
+          <button
+            key={col.key}
+            type="button"
+            onClick={() => onSort(col.key)}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+              active ? 'text-primary' : 'text-stone-400 hover:text-stone-600'
+            }`}
+          >
+            {col.label}
+            {active ? (
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? 'bg-primary/10 text-primary' : 'bg-stone-100 text-stone-400'}`}>
+                {sort.dir === 'asc' ? ascLabel : descLabel}
+              </span>
+            ) : (
+              <ArrowUpDown className="h-3 w-3 opacity-40" />
+            )}
+          </button>
+        );
+      })}
+      <span className="ml-auto text-[10px] text-stone-300 hidden sm:inline">💡 กดชื่อคอลัมน์เพื่อเรียงลำดับ</span>
+    </div>
+  );
+}
+
+function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm px-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 8 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
+      >
+        <p className="text-base font-semibold text-stone-800">{message}</p>
+        <p className="mt-1 text-sm text-stone-500">การกระทำนี้จะอัปเดตสถานะในระบบทันที</p>
+        <div className="mt-5 flex gap-3">
+          <button type="button" onClick={onCancel}
+            className="flex-1 rounded-xl border border-stone-200 bg-white py-2.5 text-sm font-semibold text-stone-600 hover:bg-stone-50 transition-colors">
+            ยกเลิก
+          </button>
+          <button type="button" onClick={onConfirm}
+            className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity">
+            ยืนยัน
+          </button>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
@@ -219,6 +286,11 @@ export default function LogisticsTracking() {
   const [activeTab, setActiveTab] = useState<LogisticsTab>('pickupQueue');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const [pickupQueueSort, setPickupQueueSort] = useState<{ key: 'created_at' | 'material'; dir: SortDir }>({ key: 'created_at', dir: 'desc' });
+  const [pickupJobSort, setPickupJobSort] = useState<{ key: 'planned_pickup_at' | 'material' | 'status'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'asc' });
+  const [rewardQueueSort, setRewardQueueSort] = useState<{ key: 'requested_points' | 'reward_name' | 'requested_at'; dir: SortDir }>({ key: 'requested_at', dir: 'asc' });
+  const [deliveryJobSort, setDeliveryJobSort] = useState<{ key: 'planned_delivery_at' | 'status'; dir: SortDir }>({ key: 'planned_delivery_at', dir: 'asc' });
 
   const submittedQueue = useMemo(() => pickupQueue.filter((i) => i.status === 'submitted'), [pickupQueue]);
 
@@ -238,6 +310,40 @@ export default function LogisticsTracking() {
   );
 
   const loadIssueMessages = useMemo(() => Object.values(loadIssues), [loadIssues]);
+
+  function toggleSort<T extends string>(
+    current: { key: T; dir: SortDir },
+    key: T,
+    setter: React.Dispatch<React.SetStateAction<{ key: T; dir: SortDir }>>
+  ) {
+    setter(current.key === key ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
+  }
+
+  const sortedPickupQueue = useMemo(() => [...submittedQueue].sort((a, b) => {
+    const mul = pickupQueueSort.dir === 'asc' ? 1 : -1;
+    if (pickupQueueSort.key === 'material') return mul * (a.material_type ?? '').localeCompare(b.material_type ?? '');
+    return mul * (new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime());
+  }), [submittedQueue, pickupQueueSort]);
+
+  const sortedPickupJobs = useMemo(() => [...pickupJobs].filter((i) => i.status !== 'delivered_to_factory').sort((a, b) => {
+    const mul = pickupJobSort.dir === 'asc' ? 1 : -1;
+    if (pickupJobSort.key === 'material') return mul * (a.material_type ?? '').localeCompare(b.material_type ?? '');
+    if (pickupJobSort.key === 'status') return mul * (a.status ?? '').localeCompare(b.status ?? '');
+    return mul * (new Date(a.planned_pickup_at ?? 0).getTime() - new Date(b.planned_pickup_at ?? 0).getTime());
+  }), [pickupJobs, pickupJobSort]);
+
+  const sortedRewardQueue = useMemo(() => [...approvedReadyToSchedule].sort((a, b) => {
+    const mul = rewardQueueSort.dir === 'asc' ? 1 : -1;
+    if (rewardQueueSort.key === 'reward_name') return mul * (a.reward_name_th ?? '').localeCompare(b.reward_name_th ?? '');
+    if (rewardQueueSort.key === 'requested_at') return mul * (a.requested_at < b.requested_at ? -1 : a.requested_at > b.requested_at ? 1 : 0);
+    return mul * (Number(a.requested_points) - Number(b.requested_points));
+  }), [approvedReadyToSchedule, rewardQueueSort]);
+
+  const sortedDeliveryJobs = useMemo(() => [...activeRewardDeliveryJobs].sort((a, b) => {
+    const mul = deliveryJobSort.dir === 'asc' ? 1 : -1;
+    if (deliveryJobSort.key === 'status') return mul * (a.status ?? '').localeCompare(b.status ?? '');
+    return mul * (new Date(a.planned_delivery_at ?? 0).getTime() - new Date(b.planned_delivery_at ?? 0).getTime());
+  }), [activeRewardDeliveryJobs, deliveryJobSort]);
 
   const loadAll = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
@@ -373,33 +479,30 @@ export default function LogisticsTracking() {
 
   const toggleExpand = (id: string) => setExpandedId((cur) => cur === id ? null : id);
 
-  const tabs: { id: LogisticsTab; label: string; count: number; tone: string }[] = [
-    { id: 'pickupQueue', label: 'คิวรับวัสดุ', count: submittedQueue.length, tone: 'amber' },
-    { id: 'pickupJobs', label: 'งานขนส่ง', count: pickupJobs.length, tone: 'sky' },
-    { id: 'rewardQueue', label: 'รางวัลรอส่ง', count: approvedReadyToSchedule.length, tone: 'violet' },
-    { id: 'deliveryJobs', label: 'งานส่งรางวัล', count: activeRewardDeliveryJobs.length, tone: 'emerald' },
+  const tabs: { id: LogisticsTab; label: string; sublabel: string; count: number; tone: string }[] = [
+    { id: 'pickupQueue', label: 'วัสดุรอจัดรอบ', sublabel: 'รอจัดรอบ', count: submittedQueue.length, tone: 'amber' },
+    { id: 'pickupJobs', label: 'วัสดุกำลังขนส่ง', sublabel: 'กำลังขนส่ง', count: pickupJobs.length, tone: 'sky' },
+    { id: 'rewardQueue', label: 'รางวัลรอจัดรอบ', sublabel: 'รอจัดรอบ', count: approvedReadyToSchedule.length, tone: 'violet' },
+    { id: 'deliveryJobs', label: 'รางวัลกำลังขนส่ง', sublabel: 'กำลังขนส่ง', count: activeRewardDeliveryJobs.length, tone: 'emerald' },
   ];
 
-  const fadeUp = reduceMotion ? {} : { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } };
-  const listItem = reduceMotion ? {} : {
-    hidden: { opacity: 0, y: 8 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.22, ease: [0.25, 0, 0, 1] as [number, number, number, number] } },
-  };
+
+  const confirm = (message: string, onConfirm: () => void) => setConfirmPending({ message, onConfirm });
 
   return (
     <ErrorBoundary>
-      <motion.div
-        className="space-y-6 pb-10"
-        initial="hidden"
-        animate="show"
-        variants={reduceMotion ? {} : { hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}
-      >
+      <AnimatePresence>
+        {confirmPending && (
+          <ConfirmDialog
+            message={confirmPending.message}
+            onConfirm={() => { confirmPending.onConfirm(); setConfirmPending(null); }}
+            onCancel={() => setConfirmPending(null)}
+          />
+        )}
+      </AnimatePresence>
+      <div className="space-y-6 pb-10">
         {/* ── Header ── */}
-        <motion.div
-          variants={fadeUp}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="flex items-start justify-between gap-4"
-        >
+        <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">โลจิสติกส์</p>
             <h1 className="mt-0.5 text-3xl font-light tracking-tight text-on-surface sm:text-4xl">ศูนย์ปฏิบัติการขนส่ง</h1>
@@ -416,7 +519,7 @@ export default function LogisticsTracking() {
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </motion.button>
-        </motion.div>
+        </div>
 
         {/* ── Alerts ── */}
         <AnimatePresence>
@@ -435,54 +538,67 @@ export default function LogisticsTracking() {
           <AlertBanner message={loadIssueMessages.join(' ')} tone="info" title="บางส่วนของข้อมูลยังโหลดไม่ครบ" />
         )}
 
-        {/* ── Stats ── */}
-        <motion.div
-          variants={fadeUp}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="grid grid-cols-2 gap-4 sm:grid-cols-4"
-        >
-          <StatCard label="คิวรับวัสดุใหม่" value={submittedQueue.length.toLocaleString('th-TH')} detail="รอจัดคิว" icon={CalendarRange} tone="amber" />
-          <StatCard label="งานขนส่งวัสดุ" value={pickupJobs.length.toLocaleString('th-TH')} detail="ทุกสถานะ" icon={Truck} tone="sky" />
-          <StatCard label="รางวัลรอจัดส่ง" value={approvedReadyToSchedule.length.toLocaleString('th-TH')} detail="คำขอ" icon={PackageCheck} tone="teal" />
-          <StatCard label="กำลังส่งรางวัล" value={activeRewardDeliveryJobs.length.toLocaleString('th-TH')} detail="งาน" icon={Route} tone="violet" />
-        </motion.div>
-
         {/* ── Tab bar ── */}
-        <motion.div
-          variants={fadeUp}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="rounded-2xl border border-outline-variant/10 bg-white shadow-sm"
-        >
-          <div className="flex overflow-x-auto no-scrollbar">
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => { setActiveTab(tab.id); setExpandedId(null); }}
-                  className={`relative flex flex-1 shrink-0 items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold transition-colors ${
-                    isActive ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  {tab.label}
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                    isActive ? 'bg-primary/10 text-primary' : 'bg-stone-100 text-stone-500'
-                  }`}>
-                    {tab.count}
-                  </span>
-                  {isActive && (
-                    <motion.span
-                      layoutId="tab-indicator"
-                      className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary"
-                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    />
-                  )}
-                </button>
-              );
-            })}
+        <div className="flex rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+          {/* วัสดุ half */}
+          <div className="flex flex-1 flex-col">
+            <div className="flex items-center gap-1.5 border-b border-stone-100 px-4 pt-2.5 pb-2">
+              <Truck className="h-3 w-3 text-amber-400 shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">วัสดุ</span>
+            </div>
+            <div className="flex flex-1">
+              {tabs.slice(0, 2).map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => { setActiveTab(tab.id); setExpandedId(null); }}
+                    className={`flex flex-1 items-center justify-center gap-2 px-3 py-3 text-sm font-semibold transition-colors ${
+                      isActive ? 'text-amber-700 bg-amber-50/60' : 'text-stone-400 hover:text-stone-600 hover:bg-stone-50'
+                    }`}
+                  >
+                    <span>{tab.sublabel}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none ${
+                      isActive ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-400'
+                    }`}>{tab.count}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </motion.div>
+
+          {/* Full-height rule */}
+          <div className="w-px bg-stone-200 shrink-0" />
+
+          {/* รางวัล half */}
+          <div className="flex flex-1 flex-col">
+            <div className="flex items-center gap-1.5 border-b border-stone-100 px-4 pt-2.5 pb-2">
+              <PackageCheck className="h-3 w-3 text-violet-400 shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-violet-500">รางวัล</span>
+            </div>
+            <div className="flex flex-1">
+              {tabs.slice(2).map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => { setActiveTab(tab.id); setExpandedId(null); }}
+                    className={`flex flex-1 items-center justify-center gap-2 px-3 py-3 text-sm font-semibold transition-colors ${
+                      isActive ? 'text-violet-700 bg-violet-50/60' : 'text-stone-400 hover:text-stone-600 hover:bg-stone-50'
+                    }`}
+                  >
+                    <span>{tab.sublabel}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none ${
+                      isActive ? 'bg-violet-100 text-violet-700' : 'bg-stone-100 text-stone-400'
+                    }`}>{tab.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
         {/* ── Tab content ── */}
         <AnimatePresence mode="wait">
@@ -500,6 +616,16 @@ export default function LogisticsTracking() {
                 {loadIssues.pickupQueue && (
                   <AlertBanner message={loadIssues.pickupQueue} tone="info" title="บอร์ดคิวรับวัสดุยังไม่พร้อม" />
                 )}
+                {!isLoading && submittedQueue.length > 0 && (
+                  <SortHeaderBar
+                    cols={[
+                      { key: 'created_at' as const, label: 'วันที่ส่ง', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
+                      { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+                    ]}
+                    sort={pickupQueueSort}
+                    onSort={(key) => toggleSort(pickupQueueSort, key, setPickupQueueSort)}
+                  />
+                )}
                 {isLoading ? (
                   <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}</div>
                 ) : submittedQueue.length === 0 ? (
@@ -509,13 +635,13 @@ export default function LogisticsTracking() {
                     icon={Truck}
                   />
                 ) : (
-                  submittedQueue.map((item) => {
+                  sortedPickupQueue.map((item) => {
                     const selFactoryId = destinationFactoryBySubmissionId[item.id] || '';
                     const selFactory = factoryOptions.find((f) => f.id === selFactoryId);
                     const canSchedule = pickupRangeBySubmissionId[item.id]?.from && pickupRangeBySubmissionId[item.id]?.to && selFactoryId;
                     const isExp = expandedId === item.id;
                     return (
-                      <motion.div key={item.id} variants={listItem} initial="hidden" animate="show">
+                      <div key={item.id}>
                         <JobCard
                           isExpanded={isExp}
                           onToggle={() => toggleExpand(item.id)}
@@ -558,7 +684,7 @@ export default function LogisticsTracking() {
                               {/* Action */}
                               <motion.button
                                 type="button"
-                                onClick={() => void handleSchedulePickup(item.id)}
+                                onClick={() => confirm('ยืนยันจัดคิวรับวัสดุ?', () => void handleSchedulePickup(item.id))}
                                 disabled={schedulingSubmissionId === item.id || !canSchedule}
                                 className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-white shadow-sm shadow-primary/20 transition hover:opacity-90 disabled:opacity-40"
                                 whileTap={reduceMotion ? {} : { scale: 0.97 }}
@@ -569,27 +695,36 @@ export default function LogisticsTracking() {
                           }
                         >
                           {/* Summary */}
-                          <div className="space-y-1">
-                            <p className="text-base font-semibold text-on-surface">
-                              {item.material_name_th || formatMaterial(item.material_type)}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-on-surface-variant">
-                              <span className="font-medium text-amber-600">
+                          <div className="space-y-2">
+                            {/* Row 1: name + qty */}
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[15px] font-bold text-on-surface leading-tight">
+                                {item.material_name_th || formatMaterial(item.material_type)}
+                              </p>
+                              <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-700">
                                 {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
                               </span>
-                              <span className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                <span className="truncate max-w-[12rem]">{item.pickup_location_text}</span>
-                                {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                  <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
-                                    className="ml-1 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
-                                )}
+                            </div>
+                            {/* Row 2: date chip */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                                <CalendarRange className="h-3 w-3 text-stone-400" />
+                                ส่งคำขอ {formatDateTime(item.created_at)}
                               </span>
-                              <span className="text-xs text-stone-400">{formatDateTime(item.created_at)}</span>
+                              {item.pickup_location_text && (
+                                <span className="flex items-center gap-1 text-xs text-stone-400 min-w-0">
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{item.pickup_location_text}</span>
+                                  {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                                    <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
+                                      className="shrink-0 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
+                                  )}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </JobCard>
-                      </motion.div>
+                      </div>
                     );
                   })
                 )}
@@ -602,125 +737,182 @@ export default function LogisticsTracking() {
                 {loadIssues.pickupJobs && (
                   <AlertBanner message={loadIssues.pickupJobs} tone="info" title="บอร์ดงานขนส่งวัสดุยังไม่พร้อม" />
                 )}
+                {!isLoading && pickupJobs.length > 0 && (
+                  <SortHeaderBar
+                    cols={[
+                      { key: 'planned_pickup_at' as const, label: 'วันนัดรับ', dirLabels: ['เร็วก่อน', 'ช้าก่อน'] },
+                      { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+                      { key: 'status' as const, label: 'สถานะ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+                    ]}
+                    sort={pickupJobSort}
+                    onSort={(key) => toggleSort(pickupJobSort, key, setPickupJobSort)}
+                  />
+                )}
                 {isLoading ? (
                   <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}</div>
-                ) : pickupJobs.length === 0 ? (
+                ) : sortedPickupJobs.length === 0 ? (
                   <EmptyState
                     title={loadIssues.pickupJobs ? 'ยังแสดงงานขนส่งวัสดุไม่ได้' : 'ยังไม่มีงานขนส่งวัสดุ'}
                     description={loadIssues.pickupJobs ? 'โปรดกดรีเฟรชอีกครั้ง' : 'เมื่อมีการจัดคิวรับวัสดุ รายการจะเริ่มแสดงในบอร์ดนี้'}
                     icon={Route}
                   />
                 ) : (
-                  pickupJobs.map((item) => {
+                  sortedPickupJobs.map((item) => {
                     const isExp = expandedId === item.id;
                     const isBusy = updatingPickupJobId === item.id;
                     const isLive = item.status === 'picked_up';
                     const handleCopy = () => {
                       const lines = [
-                        `วัสดุ: ${item.material_name_th || formatMaterial(item.material_type)} ${Number(item.quantity_value).toLocaleString('th-TH')} ${fallbackThaiUnit(item.quantity_unit)}`,
-                        `จุดรับ: ${item.pickup_location_text}`,
+                        `[ใบรับวัสดุ AREX] เลขที่ ${item.id.slice(0, 8).toUpperCase()}`,
+                        `สถานะ: ${formatPickupJobStatus(item.status)}`,
+                        ``,
+                        `วัสดุ: ${item.material_name_th || formatMaterial(item.material_type)}`,
+                        `ปริมาณ: ${Number(item.quantity_value).toLocaleString('th-TH')} ${fallbackThaiUnit(item.quantity_unit)}`,
+                        ``,
+                        item.farmer_display_name ? `เกษตรกร: ${item.farmer_display_name}` : null,
+                        item.farmer_phone ? `เบอร์โทร: ${item.farmer_phone}` : null,
+                        `จุดรับวัสดุ: ${item.pickup_location_text || '-'}`,
                         hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? `แผนที่จุดรับ: ${buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}` : null,
-                        `นัดรับ: ${formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}`,
-                        item.destination_factory_name_th ? `โรงงาน: ${item.destination_factory_name_th}` : null,
+                        `วันนัดรับ: ${formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}`,
+                        item.destination_factory_name_th ? `` : null,
+                        item.destination_factory_name_th ? `โรงงานปลายทาง: ${item.destination_factory_name_th}` : null,
+                        item.destination_factory_location_text ? `ที่อยู่โรงงาน: ${item.destination_factory_location_text}` : null,
                         hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng) ? `แผนที่โรงงาน: ${buildGoogleMapsUrl(item.destination_factory_lat as number, item.destination_factory_lng as number)}` : null,
-                      ].filter(Boolean).join('\n');
+                      ].filter((l) => l !== null).join('\n');
                       void copyToClipboard(lines).then(() => { setCopiedId(item.id); setTimeout(() => setCopiedId(null), 1500); });
                     };
                     return (
-                      <motion.div key={item.id} variants={listItem} initial="hidden" animate="show">
+                      <div key={item.id}>
                         <JobCard
                           isExpanded={isExp}
                           onToggle={() => toggleExpand(item.id)}
                           accent={isLive ? 'sky' : item.status === 'delivered_to_factory' ? 'emerald' : 'sky'}
                           expandedContent={
                             <div className="space-y-3">
-                              {/* Factory row */}
-                              {item.destination_factory_name_th && (
+                              {/* ── Compact step track ── */}
+                              {item.status !== 'delivered_to_factory' && (
                                 <div className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2.5">
-                                  <Factory className="h-4 w-4 shrink-0 text-stone-400" />
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-semibold text-on-surface">{item.destination_factory_name_th}</p>
-                                    {item.destination_factory_location_text && (
-                                      <p className="truncate text-xs text-on-surface-variant">{item.destination_factory_location_text}</p>
+                                  {/* Step 1 */}
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0 ${
+                                      item.status === 'pickup_scheduled' ? 'bg-sky-500 text-white' : 'bg-emerald-500 text-white'
+                                    }`}>
+                                      {item.status === 'pickup_scheduled' ? '1' : <CheckCheck className="h-2.5 w-2.5" />}
+                                    </span>
+                                    <span className={`text-xs font-semibold ${item.status === 'pickup_scheduled' ? 'text-sky-700' : 'text-emerald-600'}`}>รับวัสดุ</span>
+                                  </div>
+                                  <span className="text-stone-300 text-xs shrink-0">──→</span>
+                                  {/* Step 2 */}
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0 ${
+                                      item.status === 'picked_up' ? 'bg-emerald-500 text-white' : 'bg-stone-200 text-stone-400'
+                                    }`}>2</span>
+                                    <span className={`text-xs font-semibold ${item.status === 'picked_up' ? 'text-emerald-700' : 'text-stone-400'}`}>ส่งโรงงาน</span>
+                                  </div>
+                                  {/* Action button — pushes right */}
+                                  <div className="ml-auto">
+                                    {item.status === 'pickup_scheduled' && (
+                                      <motion.button type="button"
+                                        onClick={() => confirm('ยืนยันว่ารับวัสดุจากเกษตรกรแล้ว?', () => void handleMarkPickedUp(item.id))}
+                                        disabled={isBusy}
+                                        className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-sky-500 px-3 text-xs font-semibold text-white transition hover:bg-sky-600 disabled:opacity-40"
+                                        whileTap={reduceMotion ? {} : { scale: 0.97 }}>
+                                        <Truck className="h-3 w-3" />
+                                        {isBusy ? 'กำลังอัปเดต...' : 'กดเมื่อรับวัสดุแล้ว'}
+                                      </motion.button>
+                                    )}
+                                    {item.status === 'picked_up' && (
+                                      <motion.button type="button"
+                                        onClick={() => confirm('ยืนยันว่าส่งถึงโรงงานแล้ว?', () => void handleMarkDeliveredToFactory(item.id))}
+                                        disabled={isBusy}
+                                        className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                                        whileTap={reduceMotion ? {} : { scale: 0.97 }}>
+                                        <Factory className="h-3 w-3" />
+                                        {isBusy ? 'กำลังอัปเดต...' : 'กดเมื่อส่งถึงโรงงานแล้ว'}
+                                      </motion.button>
                                     )}
                                   </div>
-                                  {item.destination_factory_is_focal_point && (
-                                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Focal Point</span>
-                                  )}
-                                  {hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng) && (
-                                    <a href={buildGoogleMapsUrl(item.destination_factory_lat as number, item.destination_factory_lng as number)} target="_blank" rel="noopener noreferrer"
-                                      className="shrink-0 text-sm text-primary hover:underline">แผนที่</a>
-                                  )}
                                 </div>
                               )}
-                              {/* Actions */}
-                              <div className="flex flex-wrap gap-2">
-                                {item.status === 'pickup_scheduled' && (
-                                  <motion.button type="button" onClick={() => void handleMarkPickedUp(item.id)} disabled={isBusy}
-                                    className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-white disabled:opacity-40"
-                                    whileTap={reduceMotion ? {} : { scale: 0.97 }}>
-                                    <Truck className="h-4 w-4" />
-                                    {isBusy ? 'กำลังอัปเดต...' : 'ยืนยันรับวัสดุแล้ว'}
-                                  </motion.button>
-                                )}
-                                {(item.status === 'pickup_scheduled' || item.status === 'picked_up') && (
-                                  <motion.button type="button" onClick={() => void handleMarkDeliveredToFactory(item.id)} disabled={isBusy}
-                                    className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border border-outline-variant/20 bg-white px-4 text-sm font-semibold text-on-surface disabled:opacity-40"
-                                    whileTap={reduceMotion ? {} : { scale: 0.97 }}>
-                                    <Factory className="h-4 w-4" />
-                                    {isBusy ? 'กำลังอัปเดต...' : 'ส่งถึงโรงงานแล้ว'}
-                                  </motion.button>
-                                )}
-                                <button type="button" onClick={handleCopy} disabled={copiedId === item.id}
-                                  className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-outline-variant/20 bg-white px-3 text-sm text-on-surface-variant hover:bg-stone-50 disabled:opacity-40">
-                                  {copiedId === item.id ? <CheckCheck className="h-4 w-4 text-emerald-500" /> : <ClipboardCopy className="h-4 w-4" />}
-                                  {copiedId === item.id ? 'คัดลอกแล้ว' : 'คัดลอก'}
-                                </button>
-                                <button type="button" onClick={() => generatePickupJobPdf(item)}
-                                  className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-outline-variant/20 bg-white px-3 text-sm text-on-surface-variant hover:bg-stone-50">
-                                  <Download className="h-4 w-4" /> PDF
-                                </button>
-                              </div>
                             </div>
                           }
                         >
                           {/* Summary */}
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              {isLive && (
-                                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
-                                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sky-500" />
-                                </span>
-                              )}
-                              <p className="text-base font-semibold text-on-surface">
-                                {item.material_name_th || formatMaterial(item.material_type)}
-                              </p>
+                          <div className="space-y-2">
+                            {/* Row 1: name + status */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {isLive && (
+                                  <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-500" />
+                                  </span>
+                                )}
+                                <p className="text-[15px] font-bold text-on-surface leading-tight truncate">
+                                  {item.material_name_th || formatMaterial(item.material_type)}
+                                </p>
+                              </div>
                               <StatusBadge status={item.status} label={formatPickupJobStatus(item.status)} size="sm" />
                             </div>
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-on-surface-variant">
-                              <span className="font-medium text-amber-600">
+                            {/* Row 2: qty + date + factory chips */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="rounded-md bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-700">
                                 {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
                               </span>
-                              <span className="flex items-center gap-1">
-                                <CalendarRange className="h-3 w-3" />
-                                {formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}
+                              <span className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                                <CalendarRange className="h-3 w-3 text-stone-400" />
+                                นัดรับ {formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}
                               </span>
-                              <span className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                <span className="truncate max-w-[10rem]">{item.pickup_location_text}</span>
-                                {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                  <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
-                                    className="ml-1 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
+                              {item.destination_factory_name_th && (
+                                <span className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                                  <Factory className="h-3 w-3 text-stone-400" />
+                                  {item.destination_factory_name_th}
+                                  {hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng) && (
+                                    <a href={buildGoogleMapsUrl(item.destination_factory_lat as number, item.destination_factory_lng as number)} target="_blank" rel="noopener noreferrer"
+                                      className="text-primary hover:underline ml-0.5" onClick={(e) => e.stopPropagation()}>แผนที่</a>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                            {/* Row 3: farmer + location + actions */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-stone-400 min-w-0">
+                                {item.farmer_display_name && (
+                                  <span className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />{item.farmer_display_name}
+                                    {item.farmer_phone && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{item.farmer_phone}</span>}
+                                  </span>
                                 )}
-                              </span>
+                                {item.pickup_location_text && (
+                                  <span className="flex items-center gap-1 min-w-0">
+                                    <MapPin className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{item.pickup_location_text}</span>
+                                    {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                                      <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
+                                        className="shrink-0 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <button type="button" onClick={handleCopy} disabled={copiedId === item.id}
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40 transition-colors">
+                                  {copiedId === item.id ? <CheckCheck className="h-4 w-4 text-emerald-500" /> : <ClipboardCopy className="h-4 w-4" />}
+                                </button>
+                                <button type="button" onClick={() => generatePickupJobPdf(item)}
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors">
+                                  <Download className="h-4 w-4" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </JobCard>
-                      </motion.div>
+                      </div>
                     );
                   })
                 )}
+
+                {/* ── Delivered (completed) section ── */}
               </div>
             )}
 
@@ -729,6 +921,17 @@ export default function LogisticsTracking() {
               <div className="space-y-3">
                 {loadIssues.rewardQueue && (
                   <AlertBanner message={loadIssues.rewardQueue} tone="info" title="บอร์ดคำขอรางวัลยังไม่พร้อม" />
+                )}
+                {!isLoading && approvedReadyToSchedule.length > 0 && (
+                  <SortHeaderBar
+                    cols={[
+                      { key: 'requested_at' as const, label: 'วันที่ขอแลก', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
+                      { key: 'requested_points' as const, label: 'แต้ม', dirLabels: ['น้อยก่อน', 'มากก่อน'] },
+                      { key: 'reward_name' as const, label: 'ชื่อรางวัล', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+                    ]}
+                    sort={rewardQueueSort}
+                    onSort={(key) => toggleSort(rewardQueueSort, key, setRewardQueueSort)}
+                  />
                 )}
                 {isLoading ? (
                   <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}</div>
@@ -739,11 +942,11 @@ export default function LogisticsTracking() {
                     icon={PackageCheck}
                   />
                 ) : (
-                  approvedReadyToSchedule.map((item) => {
+                  sortedRewardQueue.map((item) => {
                     const isExp = expandedId === item.id;
                     const canSchedule = deliveryRangeByRequestId[item.id]?.from && deliveryRangeByRequestId[item.id]?.to;
                     return (
-                      <motion.div key={item.id} variants={listItem} initial="hidden" animate="show">
+                      <div key={item.id}>
                         <JobCard
                           isExpanded={isExp}
                           onToggle={() => toggleExpand(item.id)}
@@ -761,7 +964,7 @@ export default function LogisticsTracking() {
                               </div>
                               <motion.button
                                 type="button"
-                                onClick={() => void handleScheduleRewardDelivery(item.id)}
+                                onClick={() => confirm('ยืนยันจัดรอบส่งรางวัล?', () => void handleScheduleRewardDelivery(item.id))}
                                 disabled={schedulingRewardRequestId === item.id || !canSchedule}
                                 className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-white shadow-sm shadow-primary/20 transition hover:opacity-90 disabled:opacity-40"
                                 whileTap={reduceMotion ? {} : { scale: 0.97 }}
@@ -771,25 +974,50 @@ export default function LogisticsTracking() {
                             </div>
                           }
                         >
-                          <div className="space-y-1">
-                            <p className="text-base font-semibold text-on-surface">{item.reward_name_th ?? 'รางวัล'}</p>
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-on-surface-variant">
-                              <span className="font-medium text-violet-600">{Number(item.requested_points).toLocaleString('th-TH')} แต้ม</span>
-                              <span className="text-stone-500">{Number(item.quantity).toLocaleString('th-TH')} ชิ้น</span>
-                              {item.pickup_location_text && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  <span className="truncate max-w-[10rem]">{item.pickup_location_text}</span>
-                                  {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                    <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
-                                      className="ml-1 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
-                                  )}
-                                </span>
-                              )}
+                          <div className="space-y-2">
+                            {/* Row 1: name + points badge */}
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[15px] font-bold text-on-surface leading-tight truncate">
+                                {item.reward_name_th ?? 'รางวัล'}
+                              </p>
+                              <span className="shrink-0 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-bold text-violet-700">
+                                {Number(item.requested_points).toLocaleString('th-TH')} แต้ม
+                              </span>
                             </div>
+                            {/* Row 2: qty + date chips */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                                {Number(item.quantity).toLocaleString('th-TH')} ชิ้น
+                              </span>
+                              <span className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                                <CalendarRange className="h-3 w-3 text-stone-400" />
+                                วันส่งคำขอแลก {formatDateTime(item.requested_at)}
+                              </span>
+                            </div>
+                            {/* Row 3: farmer + location (dimmed) */}
+                            {(item.farmer_display_name || item.pickup_location_text) && (
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-stone-400">
+                                {item.farmer_display_name && (
+                                  <span className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />{item.farmer_display_name}
+                                    {item.farmer_phone && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{item.farmer_phone}</span>}
+                                  </span>
+                                )}
+                                {item.pickup_location_text && (
+                                  <span className="flex items-center gap-1 min-w-0">
+                                    <MapPin className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{item.pickup_location_text}</span>
+                                    {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                                      <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
+                                        className="shrink-0 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </JobCard>
-                      </motion.div>
+                      </div>
                     );
                   })
                 )}
@@ -797,10 +1025,21 @@ export default function LogisticsTracking() {
             )}
 
             {/* ── Delivery Jobs ── */}
+
             {activeTab === 'deliveryJobs' && (
               <div className="space-y-3">
                 {loadIssues.deliveryJobs && (
                   <AlertBanner message={loadIssues.deliveryJobs} tone="info" title="บอร์ดงานส่งรางวัลยังไม่พร้อม" />
+                )}
+                {!isLoading && activeRewardDeliveryJobs.length > 0 && (
+                  <SortHeaderBar
+                    cols={[
+                      { key: 'planned_delivery_at' as const, label: 'วันนัดส่ง', dirLabels: ['เร็วก่อน', 'ช้าก่อน'] },
+                      { key: 'status' as const, label: 'สถานะ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+                    ]}
+                    sort={deliveryJobSort}
+                    onSort={(key) => toggleSort(deliveryJobSort, key, setDeliveryJobSort)}
+                  />
                 )}
                 {isLoading ? (
                   <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}</div>
@@ -811,89 +1050,140 @@ export default function LogisticsTracking() {
                     icon={PackageCheck}
                   />
                 ) : (
-                  activeRewardDeliveryJobs.map((item) => {
+                  sortedDeliveryJobs.map((item) => {
                     const isExp = expandedId === item.id;
                     const isBusy = updatingDeliveryJobId === item.id;
                     const isOnRoute = item.status === 'out_for_delivery';
                     const handleCopy = () => {
                       const lines = [
-                        `รางวัล: ${item.reward_name_th ?? 'รางวัล'}`,
+                        `[ใบส่งรางวัล AREX] เลขที่ ${item.id.slice(0, 8).toUpperCase()}`,
+                        `สถานะ: ${formatDeliveryStatus(item.status)}`,
+                        ``,
+                        `รางวัล: ${item.reward_name_th || 'รางวัล'}`,
                         `จำนวน: ${Number(item.quantity).toLocaleString('th-TH')} ชิ้น`,
-                        `จุดส่ง: ${item.pickup_location_text || '-'}`,
-                        hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? `แผนที่: ${buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}` : null,
-                        `นัดส่ง: ${formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}`,
-                      ].filter(Boolean).join('\n');
+                        ``,
+                        item.farmer_display_name ? `ผู้รับ: ${item.farmer_display_name}` : null,
+                        item.farmer_phone ? `เบอร์โทร: ${item.farmer_phone}` : null,
+                        `จุดส่งมอบ: ${item.pickup_location_text || '-'}`,
+                        hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? `แผนที่จุดส่ง: ${buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}` : null,
+                        `วันนัดส่ง: ${formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}`,
+                      ].filter((l) => l !== null).join('\n');
                       void copyToClipboard(lines).then(() => { setCopiedId(item.id); setTimeout(() => setCopiedId(null), 1500); });
                     };
                     return (
-                      <motion.div key={item.id} variants={listItem} initial="hidden" animate="show">
+                      <div key={item.id}>
                         <JobCard
                           isExpanded={isExp}
                           onToggle={() => toggleExpand(item.id)}
                           accent={isOnRoute ? 'emerald' : 'violet'}
                           expandedContent={
                             <div className="space-y-3">
-                              <div className="flex flex-wrap gap-2">
-                                {item.status === 'reward_delivery_scheduled' && (
-                                  <motion.button type="button" onClick={() => void handleMarkOutForDelivery(item.id)} disabled={isBusy}
-                                    className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-white disabled:opacity-40"
-                                    whileTap={reduceMotion ? {} : { scale: 0.97 }}>
-                                    <Truck className="h-4 w-4" />
-                                    {isBusy ? 'กำลังอัปเดต...' : 'ยืนยันออกนำส่งแล้ว'}
-                                  </motion.button>
-                                )}
-                                {item.status === 'out_for_delivery' && (
-                                  <motion.button type="button" onClick={() => void handleMarkDelivered(item.id)} disabled={isBusy}
-                                    className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-white disabled:opacity-40"
-                                    whileTap={reduceMotion ? {} : { scale: 0.97 }}>
-                                    <CheckCheck className="h-4 w-4" />
-                                    {isBusy ? 'กำลังอัปเดต...' : 'ยืนยันส่งมอบสำเร็จ'}
-                                  </motion.button>
-                                )}
-                                <button type="button" onClick={handleCopy} disabled={copiedId === item.id}
-                                  className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-outline-variant/20 bg-white px-3 text-sm text-on-surface-variant hover:bg-stone-50 disabled:opacity-40">
-                                  {copiedId === item.id ? <CheckCheck className="h-4 w-4 text-emerald-500" /> : <ClipboardCopy className="h-4 w-4" />}
-                                  {copiedId === item.id ? 'คัดลอกแล้ว' : 'คัดลอก'}
-                                </button>
-                                <button type="button" onClick={() => generateDeliveryJobPdf(item)}
-                                  className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-outline-variant/20 bg-white px-3 text-sm text-on-surface-variant hover:bg-stone-50">
-                                  <Download className="h-4 w-4" /> PDF
-                                </button>
+                              {/* ── Compact step track ── */}
+                              <div className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2.5">
+                                {/* Step 1 */}
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0 ${
+                                    item.status === 'reward_delivery_scheduled' ? 'bg-violet-500 text-white' : 'bg-emerald-500 text-white'
+                                  }`}>
+                                    {item.status === 'reward_delivery_scheduled' ? '1' : <CheckCheck className="h-2.5 w-2.5" />}
+                                  </span>
+                                  <span className={`text-xs font-semibold ${item.status === 'reward_delivery_scheduled' ? 'text-violet-700' : 'text-emerald-600'}`}>ออกนำส่ง</span>
+                                </div>
+                                <span className="text-stone-300 text-xs shrink-0">──→</span>
+                                {/* Step 2 */}
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0 ${
+                                    item.status === 'out_for_delivery' ? 'bg-emerald-500 text-white' : 'bg-stone-200 text-stone-400'
+                                  }`}>2</span>
+                                  <span className={`text-xs font-semibold ${item.status === 'out_for_delivery' ? 'text-emerald-700' : 'text-stone-400'}`}>ส่งมอบ</span>
+                                </div>
+                                {/* Action button — pushes right */}
+                                <div className="ml-auto">
+                                  {item.status === 'reward_delivery_scheduled' && (
+                                    <motion.button type="button"
+                                      onClick={() => confirm('ยืนยันออกนำส่งแล้ว?', () => void handleMarkOutForDelivery(item.id))}
+                                      disabled={isBusy}
+                                      className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-violet-500 px-3 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-40"
+                                      whileTap={reduceMotion ? {} : { scale: 0.97 }}>
+                                      <Truck className="h-3 w-3" />
+                                      {isBusy ? 'กำลังอัปเดต...' : 'กดเมื่อออกนำส่งแล้ว'}
+                                    </motion.button>
+                                  )}
+                                  {item.status === 'out_for_delivery' && (
+                                    <motion.button type="button"
+                                      onClick={() => confirm('ยืนยันส่งมอบสำเร็จ?', () => void handleMarkDelivered(item.id))}
+                                      disabled={isBusy}
+                                      className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                                      whileTap={reduceMotion ? {} : { scale: 0.97 }}>
+                                      <CheckCheck className="h-3 w-3" />
+                                      {isBusy ? 'กำลังอัปเดต...' : 'กดเมื่อส่งมอบสำเร็จ'}
+                                    </motion.button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           }
                         >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              {isOnRoute && (
-                                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                                </span>
-                              )}
-                              <p className="text-base font-semibold text-on-surface">{item.reward_name_th ?? 'รางวัล'}</p>
+                          <div className="space-y-2">
+                            {/* Row 1: name + status */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {isOnRoute && (
+                                  <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                                  </span>
+                                )}
+                                <p className="text-[15px] font-bold text-on-surface leading-tight truncate">
+                                  {item.reward_name_th ?? 'รางวัล'}
+                                </p>
+                              </div>
                               <StatusBadge status={item.status} label={formatDeliveryStatus(item.status)} size="sm" />
                             </div>
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-on-surface-variant">
-                              <span className="text-stone-500">{Number(item.quantity).toLocaleString('th-TH')} ชิ้น</span>
-                              <span className="flex items-center gap-1">
-                                <CalendarRange className="h-3 w-3" />
-                                {formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}
+                            {/* Row 2: qty + date chips */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                                {Number(item.quantity).toLocaleString('th-TH')} ชิ้น
                               </span>
-                              {item.pickup_location_text && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  <span className="truncate max-w-[10rem]">{item.pickup_location_text}</span>
-                                  {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                    <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
-                                      className="ml-1 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
-                                  )}
-                                </span>
-                              )}
+                              <span className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                                <CalendarRange className="h-3 w-3 text-stone-400" />
+                                นัดส่ง {formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}
+                              </span>
+                            </div>
+                            {/* Row 3: farmer + location (dimmed) + copy/pdf */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-stone-400 min-w-0">
+                                {item.farmer_display_name && (
+                                  <span className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />{item.farmer_display_name}
+                                    {item.farmer_phone && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{item.farmer_phone}</span>}
+                                  </span>
+                                )}
+                                {item.pickup_location_text && (
+                                  <span className="flex items-center gap-1 min-w-0">
+                                    <MapPin className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{item.pickup_location_text}</span>
+                                    {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                                      <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
+                                        className="shrink-0 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <button type="button" onClick={handleCopy} disabled={copiedId === item.id}
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40 transition-colors">
+                                  {copiedId === item.id ? <CheckCheck className="h-4 w-4 text-emerald-500" /> : <ClipboardCopy className="h-4 w-4" />}
+                                </button>
+                                <button type="button" onClick={() => generateDeliveryJobPdf(item)}
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors">
+                                  <Download className="h-4 w-4" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </JobCard>
-                      </motion.div>
+                      </div>
                     );
                   })
                 )}
@@ -902,7 +1192,7 @@ export default function LogisticsTracking() {
 
           </motion.div>
         </AnimatePresence>
-      </motion.div>
+      </div>
     </ErrorBoundary>
   );
 }

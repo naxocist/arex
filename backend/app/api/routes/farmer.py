@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.api.deps import require_roles
 from app.core.errors import WorkflowError
 from app.models.auth import AuthenticatedUser, Role
-from app.models.workflow import CreateRewardRequest, CreateSubmissionRequest
+from app.models.workflow import CreateRewardRequest, CreateSubmissionRequest, UpdateFarmerProfileRequest
 from app.services.workflow_service import WorkflowService, get_workflow_service
 
 router = APIRouter(prefix="/farmer", tags=["farmer"])
@@ -20,6 +20,29 @@ def get_me(
         "email": current_user.email,
         "role": current_user.role.value,
     }
+
+
+@router.get("/profile")
+def get_profile(
+    current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
+    workflow_service: WorkflowService = Depends(get_workflow_service),
+) -> dict[str, Any]:
+    try:
+        return workflow_service.get_farmer_profile(current_user.user_id)
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.patch("/profile")
+def update_profile(
+    payload: UpdateFarmerProfileRequest,
+    current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
+    workflow_service: WorkflowService = Depends(get_workflow_service),
+) -> dict[str, Any]:
+    try:
+        return workflow_service.update_farmer_profile(current_user.user_id, payload)
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/submissions")

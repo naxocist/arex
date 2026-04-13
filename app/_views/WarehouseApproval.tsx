@@ -125,7 +125,10 @@ function PendingRequestCard({
             <p className="text-base font-semibold leading-tight text-on-surface">
               {item.reward_name_th ?? 'รางวัลที่เลือก'}
             </p>
-            <p className="mt-0.5 text-xs text-stone-400">ยื่นเมื่อ {formatDateTime(item.requested_at)}</p>
+            {item.reward_description_th && (
+              <p className="mt-0.5 text-sm leading-snug text-stone-400">{item.reward_description_th}</p>
+            )}
+            <p className="mt-0.5 text-xs text-stone-400">ขอแลกเมื่อ {formatDateTime(item.requested_at)}</p>
           </div>
           <StatusBadge status={item.status} label={formatRewardRequestStatus(item.status)} size="sm" className="shrink-0" />
         </div>
@@ -190,41 +193,6 @@ function PendingRequestCard({
           </div>
         )}
 
-        {/* Toggle extra details */}
-        {item.reward_description_th && (
-          <>
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="mt-3 flex items-center gap-1 text-xs font-medium text-stone-400 hover:text-stone-600"
-            >
-              <motion.span
-                animate={reduceMotion ? {} : { rotate: expanded ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
-                style={{ display: 'inline-flex' }}
-              >
-                <ChevronDown className="h-3.5 w-3.5" />
-              </motion.span>
-              {expanded ? 'ซ่อนรายละเอียด' : 'ดูรายละเอียดรางวัล'}
-            </button>
-            <AnimatePresence initial={false}>
-              {expanded && (
-                <motion.div
-                  key="desc"
-                  initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
-                  animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
-                  exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
-                  transition={{ duration: 0.24, ease: 'easeInOut' }}
-                  style={{ overflow: 'hidden' }}
-                >
-                  <p className="mt-2 rounded-xl bg-stone-50 px-3 py-2.5 text-sm leading-relaxed text-stone-500">
-                    {item.reward_description_th}
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </>
-        )}
 
         {/* Action area */}
         <div className="mt-4 space-y-3">
@@ -273,57 +241,98 @@ function AnsweredRequestCard({ item }: { item: WarehousePendingRequestItem }) {
   const hasLocation = Boolean(item.delivery_location_text);
   const hasMapLink = item.delivery_lat != null && item.delivery_lng != null;
 
+  // Visual system: approved = emerald tint, rejected = red tint
+  const cardBg = isApproved ? 'bg-emerald-50/40' : isRejected ? 'bg-red-50/30' : 'bg-white';
+  const leftBorder = isApproved ? 'border-l-emerald-400' : isRejected ? 'border-l-red-300' : 'border-l-stone-200';
+  const verdictColor = isApproved ? 'text-emerald-700' : isRejected ? 'text-red-600' : 'text-stone-500';
+  const verdictBg = isApproved ? 'bg-emerald-100' : isRejected ? 'bg-red-100' : 'bg-stone-100';
+  const verdictLabel = isApproved ? 'อนุมัติแล้ว' : isRejected ? 'ปฏิเสธแล้ว' : 'รอดำเนินการ';
+  const VerdictIcon = isApproved ? CheckCircle2 : isRejected ? XCircle : Clock;
+
   return (
     <motion.article
       variants={listItem}
       initial="hidden"
       animate="show"
       layout
-      className="overflow-hidden rounded-2xl border border-outline-variant/10 bg-white shadow-sm"
+      className={`overflow-hidden rounded-2xl border border-stone-200/70 border-l-4 ${leftBorder} ${cardBg} shadow-sm`}
     >
-      {/* Accent bar */}
-      <div className={`h-1 w-full ${isApproved ? 'bg-emerald-400' : isRejected ? 'bg-red-300' : 'bg-stone-200'}`} />
+      {/* Always-visible summary — everything needed at a glance */}
+      <div className="px-4 pt-4 pb-3">
+        {/* Row 1: verdict badge + reward name */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            {/* Verdict — dominant signal, first thing eyes land on */}
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <VerdictIcon className={`h-4 w-4 shrink-0 ${verdictColor}`} />
+              <span className={`text-sm font-bold ${verdictColor}`}>{verdictLabel}</span>
+              {item.warehouse_decision_at && (
+                <span className="text-xs text-stone-400">· ตัดสินเมื่อ {formatDateTime(item.warehouse_decision_at)}</span>
+              )}
+            </div>
+            {/* Reward — bold, what was decided on */}
+            <p className="text-base font-semibold leading-snug text-on-surface">
+              {item.reward_name_th ?? 'รางวัลที่เลือก'}
+            </p>
+            {item.reward_description_th && (
+              <p className="mt-0.5 text-xs text-stone-400 leading-snug">{item.reward_description_th}</p>
+            )}
+          </div>
+          {/* Points — prominent secondary */}
+          <div className={`shrink-0 rounded-xl px-3 py-1.5 text-center ${verdictBg}`}>
+            <p className={`text-base font-bold tabular-nums ${verdictColor}`}>
+              {Number(item.requested_points).toLocaleString('th-TH')}
+            </p>
+            <p className={`text-[10px] font-medium ${verdictColor} opacity-70`}>แต้ม</p>
+          </div>
+        </div>
 
-      {/* Compact row */}
-      <motion.button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-start gap-3 px-5 py-4 text-left"
-        whileHover={reduceMotion ? {} : { backgroundColor: 'rgba(245,245,244,0.5)' }}
-        whileTap={reduceMotion ? {} : { scale: 0.995 }}
-        transition={{ duration: 0.12 }}
-      >
-        {/* Status dot */}
-        <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-          isApproved ? 'bg-emerald-400' : isRejected ? 'bg-red-300' : 'bg-stone-300'
-        }`} />
-
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-on-surface">{item.reward_name_th ?? 'รางวัลที่เลือก'}</p>
-          <p className="mt-0.5 text-sm text-on-surface-variant">
-            {Number(item.requested_points).toLocaleString('th-TH')} แต้ม · {Number(item.quantity)} ชิ้น
-          </p>
+        {/* Row 2: farmer + rejection reason — critical secondary info */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           {item.farmer_display_name && (
-            <p className="mt-0.5 text-xs text-stone-400">{item.farmer_display_name}</p>
+            <span className="flex items-center gap-1 text-sm font-medium text-stone-600">
+              <User className="h-3.5 w-3.5 text-stone-400" />
+              {item.farmer_display_name}
+            </span>
+          )}
+          {item.farmer_province && (
+            <span className="text-xs text-stone-400">{item.farmer_province}</span>
+          )}
+          {item.farmer_phone && (
+            <a href={`tel:${item.farmer_phone}`} className="text-xs font-medium text-primary hover:underline">
+              {item.farmer_phone}
+            </a>
           )}
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <StatusBadge status={item.status} label={formatRewardRequestStatus(item.status)} size="sm" />
-          <span className="flex items-center gap-1 text-xs text-stone-400">
-            {expanded ? 'ซ่อน' : 'รายละเอียด'}
+        {/* Rejection reason — always visible, prominent on rejection */}
+        {isRejected && item.rejection_reason && (
+          <div className="mt-2.5 flex items-start gap-1.5 rounded-lg bg-red-100 px-3 py-2">
+            <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
+            <p className="text-sm font-medium text-red-700 leading-snug">{item.rejection_reason}</p>
+          </div>
+        )}
+
+        {/* Expand toggle — only if there's more to show */}
+        {(hasLocation || item.requested_at) && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-2.5 flex items-center gap-1 text-xs text-stone-400 hover:text-stone-600 transition-colors"
+          >
             <motion.span
               animate={reduceMotion ? {} : { rotate: expanded ? 180 : 0 }}
-              transition={{ duration: 0.22, ease: 'easeInOut' }}
+              transition={{ duration: 0.2 }}
               style={{ display: 'inline-flex' }}
             >
               <ChevronDown className="h-3.5 w-3.5" />
             </motion.span>
-          </span>
-        </div>
-      </motion.button>
+            {expanded ? 'ซ่อนรายละเอียด' : 'ดูรายละเอียดเพิ่มเติม'}
+          </button>
+        )}
+      </div>
 
-      {/* Expanded details */}
+      {/* Expanded: audit detail + delivery location */}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
@@ -331,52 +340,37 @@ function AnsweredRequestCard({ item }: { item: WarehousePendingRequestItem }) {
             initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
             animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
             exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: 'easeInOut' }}
+            transition={{ duration: 0.26, ease: 'easeInOut' }}
             style={{ overflow: 'hidden' }}
           >
-            <div className="space-y-3 border-t border-outline-variant/8 px-5 pb-5 pt-3">
-
-              {/* Farmer info */}
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {item.farmer_display_name && (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">ชื่อเกษตรกร</p>
-                    <p className="mt-0.5 text-sm text-on-surface">{item.farmer_display_name}</p>
-                  </div>
-                )}
-                {item.farmer_phone && (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">เบอร์โทรศัพท์</p>
-                    <a href={`tel:${item.farmer_phone}`} className="mt-0.5 block text-sm font-medium text-primary hover:underline">
-                      {item.farmer_phone}
-                    </a>
-                  </div>
-                )}
-                {item.farmer_province && (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">จังหวัด</p>
-                    <p className="mt-0.5 text-sm text-on-surface">{item.farmer_province}</p>
-                  </div>
-                )}
+            <div className="space-y-2.5 border-t border-stone-100 px-4 pb-4 pt-3">
+              {/* Timestamps */}
+              <div className="flex flex-wrap gap-x-6 gap-y-1">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">วันที่ยื่นคำขอ</p>
-                  <p className="mt-0.5 text-sm text-on-surface">{formatDateTime(item.requested_at)}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">ยื่นคำขอเมื่อ</p>
+                  <p className="text-xs text-stone-500">{formatDateTime(item.requested_at)}</p>
                 </div>
+                {item.warehouse_decision_at && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">ตัดสินใจเมื่อ</p>
+                    <p className="text-xs text-stone-500">{formatDateTime(item.warehouse_decision_at)}</p>
+                  </div>
+                )}
               </div>
 
-              {/* Location */}
+              {/* Delivery location */}
               {hasLocation ? (
-                <div className="flex items-start gap-2 rounded-xl bg-stone-50 px-3 py-2.5">
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                <div className="flex items-start gap-2 rounded-xl bg-white px-3 py-2.5 border border-stone-100">
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-stone-400" />
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">สถานที่รับของรางวัล</p>
-                    <p className="mt-0.5 text-sm leading-relaxed text-on-surface">{item.delivery_location_text}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400 mb-0.5">สถานที่รับของรางวัล</p>
+                    <p className="text-sm leading-relaxed text-stone-600">{item.delivery_location_text}</p>
                     {hasMapLink && (
                       <a
                         href={`https://www.google.com/maps?q=${item.delivery_lat},${item.delivery_lng}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-2 hover:underline"
+                        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                       >
                         ดูบนแผนที่
                       </a>
@@ -384,55 +378,115 @@ function AnsweredRequestCard({ item }: { item: WarehousePendingRequestItem }) {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2.5 text-sm text-stone-400">
-                  <MapPin className="h-4 w-4 shrink-0" />
-                  ยังไม่ได้ระบุสถานที่รับของ
-                </div>
+                <p className="flex items-center gap-1.5 text-xs text-stone-400">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  ไม่ได้ระบุสถานที่รับของ
+                </p>
               )}
-
-              {/* Reward description */}
-              {item.reward_description_th && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">รายละเอียดรางวัล</p>
-                  <p className="mt-0.5 text-sm leading-relaxed text-stone-500">{item.reward_description_th}</p>
-                </div>
-              )}
-
-              {/* Decision info */}
-              <div className={`flex items-start gap-2.5 rounded-xl px-3 py-2.5 ${
-                isApproved ? 'bg-emerald-50' : isRejected ? 'bg-red-50' : 'bg-stone-50'
-              }`}>
-                {isApproved ? (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                ) : isRejected ? (
-                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-                ) : (
-                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-stone-400" />
-                )}
-                <div className="min-w-0">
-                  <p className={`text-sm font-semibold ${
-                    isApproved ? 'text-emerald-700' : isRejected ? 'text-red-600' : 'text-stone-500'
-                  }`}>
-                    {isApproved ? 'อนุมัติแล้ว' : isRejected ? 'ปฏิเสธแล้ว' : 'รอดำเนินการ'}
-                  </p>
-                  {item.warehouse_decision_at && (
-                    <p className="mt-0.5 text-xs text-stone-400">
-                      ตัดสินใจเมื่อ {formatDateTime(item.warehouse_decision_at)}
-                    </p>
-                  )}
-                  {isRejected && item.rejection_reason && (
-                    <p className="mt-1 text-sm text-red-600">
-                      <span className="font-semibold">เหตุผล:</span> {item.rejection_reason}
-                    </p>
-                  )}
-                </div>
-              </div>
-
             </div>
           </motion.div>
         )}
       </AnimatePresence>
     </motion.article>
+  );
+}
+
+/* ── AnsweredTab with filter ── */
+type HistoryFilter = 'all' | 'approved' | 'rejected';
+
+function AnsweredTab({
+  answeredRequests,
+  isLoading,
+  reduceMotion,
+}: {
+  answeredRequests: WarehousePendingRequestItem[];
+  isLoading: boolean;
+  reduceMotion: boolean;
+}) {
+  const [filter, setFilter] = useState<HistoryFilter>('all');
+
+  const approvedCount = answeredRequests.filter((r) => r.status === 'warehouse_approved').length;
+  const rejectedCount = answeredRequests.filter((r) => r.status === 'warehouse_rejected').length;
+
+  const filtered = useMemo(() => {
+    if (filter === 'approved') return answeredRequests.filter((r) => r.status === 'warehouse_approved');
+    if (filter === 'rejected') return answeredRequests.filter((r) => r.status === 'warehouse_rejected');
+    return answeredRequests;
+  }, [answeredRequests, filter]);
+
+  const options: { value: HistoryFilter; label: string; count: number; color: string; activeColor: string }[] = [
+    { value: 'all', label: 'ทั้งหมด', count: answeredRequests.length, color: 'bg-stone-200 text-stone-500', activeColor: 'bg-stone-700 text-white' },
+    { value: 'approved', label: 'อนุมัติ', count: approvedCount, color: 'bg-stone-200 text-stone-500', activeColor: 'bg-emerald-600 text-white' },
+    { value: 'rejected', label: 'ปฏิเสธ', count: rejectedCount, color: 'bg-stone-200 text-stone-500', activeColor: 'bg-red-500 text-white' },
+  ];
+
+  return (
+    <motion.div
+      key="answered"
+      initial={reduceMotion ? {} : { opacity: 0, y: 6 }}
+      animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+      exit={reduceMotion ? {} : { opacity: 0, y: -6 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="space-y-3"
+    >
+      {/* Filter pills */}
+      {!isLoading && answeredRequests.length > 0 && (
+        <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-stone-100 bg-stone-50 p-1.5">
+          {options.map((opt) => {
+            const isActive = filter === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setFilter(opt.value)}
+                className={`flex min-h-[44px] flex-col items-center justify-center rounded-xl px-2 py-1.5 text-xs font-semibold transition-all ${
+                  isActive ? `${opt.activeColor} shadow-sm` : 'text-stone-400 hover:text-stone-600'
+                }`}
+              >
+                <span>{opt.label}</span>
+                <span className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  isActive ? 'bg-white/20 text-inherit' : 'bg-stone-200 text-stone-400'
+                }`}>
+                  {opt.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* List */}
+      {isLoading ? (
+        Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} className="h-20 rounded-2xl" />)
+      ) : answeredRequests.length === 0 ? (
+        <EmptyState
+          title="ยังไม่มีประวัติคำขอ"
+          description="คำขอที่อนุมัติหรือปฏิเสธแล้วจะแสดงที่นี่"
+          icon={CheckCircle2}
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title="ไม่มีรายการในกลุ่มนี้"
+          description="ลองเปลี่ยนตัวกรอง"
+          icon={CheckCircle2}
+        />
+      ) : (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={filter}
+            className="space-y-2.5"
+            initial={reduceMotion ? {} : { opacity: 0 }}
+            animate={reduceMotion ? {} : { opacity: 1 }}
+            exit={reduceMotion ? {} : { opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            {filtered.map((item) => (
+              <AnsweredRequestCard key={item.id} item={item} />
+            ))}
+          </motion.div>
+        </AnimatePresence>
+      )}
+    </motion.div>
   );
 }
 
@@ -450,10 +504,11 @@ export default function WarehouseApproval() {
   const reduceMotion = useReducedMotion();
 
   const summary = useMemo(() => {
-    const totalRequests = pendingRequests.length;
     const totalPoints = pendingRequests.reduce((sum, item) => sum + Number(item.requested_points || 0), 0);
-    return { totalRequests, totalPoints };
-  }, [pendingRequests]);
+    const approvedCount = answeredRequests.filter((r) => r.status === 'warehouse_approved').length;
+    const rejectedCount = answeredRequests.filter((r) => r.status === 'warehouse_rejected').length;
+    return { totalPoints, approvedCount, rejectedCount };
+  }, [pendingRequests, answeredRequests]);
 
   const loadPendingRequests = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
@@ -487,6 +542,11 @@ export default function WarehouseApproval() {
   };
 
   useEffect(() => {
+    void loadPendingRequests();
+    void loadAnsweredRequests();
+  }, []);
+
+  useEffect(() => {
     if (activeTab === 'pending') void loadPendingRequests();
     else void loadAnsweredRequests();
   }, [activeTab]);
@@ -508,7 +568,7 @@ export default function WarehouseApproval() {
   const handleReject = async (requestId: string) => {
     setProcessingRequestId(requestId);
     setMessage(null);
-    const reason = (reasons[requestId] || '').trim() || 'ข้อมูลไม่ครบถ้วน กรุณาตรวจสอบและยื่นใหม่';
+    const reason = (reasons[requestId] || '').trim();
     try {
       await warehouseApi.rejectRewardRequest(requestId, { reason });
       setMessage('ปฏิเสธคำขอสำเร็จแล้ว');
@@ -557,42 +617,30 @@ export default function WarehouseApproval() {
 
         {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
 
-        {/* Stats (pending tab only) */}
-        <AnimatePresence mode="wait">
-          {activeTab === 'pending' && (
-            <motion.div
-              key="stats"
-              initial={reduceMotion ? {} : { opacity: 0, y: 8 }}
-              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-              exit={reduceMotion ? {} : { opacity: 0, y: -8 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
-              className="grid grid-cols-2 gap-3 sm:grid-cols-3"
-            >
-              <StatCard
-                label="คำขอรอตรวจสอบ"
-                value={summary.totalRequests.toLocaleString('th-TH')}
-                detail="รายการรอตัดสินใจ"
-                icon={PackageSearch}
-                tone="amber"
-              />
-              <StatCard
-                label="PMUC Coin ในคิว"
-                value={summary.totalPoints.toLocaleString('th-TH')}
-                detail="รอการอนุมัติ"
-                icon={ShieldCheck}
-                tone="violet"
-              />
-              <StatCard
-                label="สถานะคลัง"
-                value="พร้อม"
-                detail="อนุมัติ/ปฏิเสธได้ทันที"
-                icon={CheckCircle2}
-                tone="emerald"
-                className="col-span-2 sm:col-span-1"
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Stats — always visible */}
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard
+            label="PMUC Coin ในคิว"
+            value={summary.totalPoints.toLocaleString('th-TH')}
+            detail="รอการอนุมัติ"
+            icon={ShieldCheck}
+            tone="violet"
+          />
+          <StatCard
+            label="อนุมัติแล้ว"
+            value={summary.approvedCount.toLocaleString('th-TH')}
+            detail="คำขอ"
+            icon={CheckCircle2}
+            tone="emerald"
+          />
+          <StatCard
+            label="ปฏิเสธแล้ว"
+            value={summary.rejectedCount.toLocaleString('th-TH')}
+            detail="คำขอ"
+            icon={PackageSearch}
+            tone="default"
+          />
+        </div>
 
         {/* Tab bar */}
         <motion.div
@@ -670,28 +718,11 @@ export default function WarehouseApproval() {
               )}
             </motion.div>
           ) : (
-            <motion.div
-              key="answered"
-              initial={reduceMotion ? {} : { opacity: 0, y: 6 }}
-              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-              exit={reduceMotion ? {} : { opacity: 0, y: -6 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="space-y-3"
-            >
-              {isLoading ? (
-                Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} className="h-20 rounded-2xl" />)
-              ) : answeredRequests.length === 0 ? (
-                <EmptyState
-                  title="ยังไม่มีประวัติคำขอ"
-                  description="คำขอที่อนุมัติหรือปฏิเสธแล้วจะแสดงที่นี่"
-                  icon={CheckCircle2}
-                />
-              ) : (
-                answeredRequests.map((item) => (
-                  <AnsweredRequestCard key={item.id} item={item} />
-                ))
-              )}
-            </motion.div>
+            <AnsweredTab
+              answeredRequests={answeredRequests}
+              isLoading={isLoading}
+              reduceMotion={!!reduceMotion}
+            />
           )}
         </AnimatePresence>
 

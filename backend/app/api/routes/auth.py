@@ -33,7 +33,10 @@ class RegisterFarmerRequest(RegisterBaseRequest):
 
 
 class RegisterLogisticsRequest(RegisterBaseRequest):
-    pass
+    name_th: str = Field(min_length=1, max_length=255)
+    location_text: str | None = Field(default=None, max_length=500)
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
 
 
 class RegisterFactoryRequest(RegisterBaseRequest):
@@ -134,6 +137,7 @@ def _register_user(
     payload: RegisterBaseRequest,
     role: Role,
     factory_payload: RegisterFactoryRequest | None = None,
+    logistics_payload: RegisterLogisticsRequest | None = None,
 ) -> dict[str, Any]:
     service_client = get_service_client()
     publishable_client = get_publishable_client()
@@ -256,6 +260,34 @@ def _register_user(
                     "active": True,
                 }
             ).execute()
+
+        if role == Role.LOGISTICS:
+            if logistics_payload is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Logistics registration payload is required",
+                )
+
+            if (logistics_payload.lat is None) != (logistics_payload.lng is None):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Logistics lat/lng must be provided together",
+                )
+
+            service_client.table("logistics_accounts").insert(
+                {
+                    "logistics_profile_id": created_user_id,
+                    "name_th": logistics_payload.name_th.strip(),
+                    "location_text": (
+                        logistics_payload.location_text.strip()
+                        if logistics_payload.location_text
+                        else None
+                    ),
+                    "lat": logistics_payload.lat,
+                    "lng": logistics_payload.lng,
+                    "active": True,
+                }
+            ).execute()
     except HTTPException:
         if created_user_id:
             try:
@@ -341,7 +373,7 @@ def register_farmer(payload: RegisterFarmerRequest) -> dict[str, Any]:
 
 @router.post("/register/logistics")
 def register_logistics(payload: RegisterLogisticsRequest) -> dict[str, Any]:
-    return _register_user(payload=payload, role=Role.LOGISTICS)
+    return _register_user(payload=payload, role=Role.LOGISTICS, logistics_payload=payload)
 
 
 @router.post("/register/factory")

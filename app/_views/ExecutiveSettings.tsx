@@ -114,12 +114,11 @@ function mergeMaterialRows(
   }));
 }
 
-export default function ExecutiveSettings() {
+export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'executive' | 'factory' }) {
   const [isLoading, setIsLoading] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const [formulaDescription, setFormulaDescription] = useState('');
   const [materialRows, setMaterialRows] = useState<MaterialDraftRow[]>([]);
   const [unitRows, setUnitRows] = useState<UnitDraftRow[]>([]);
 
@@ -145,12 +144,19 @@ export default function ExecutiveSettings() {
   const loadConfiguration = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      const [materialResponse, unitResponse, pointRuleResponse, rewardResponse] = await Promise.all([
+      const requests: Promise<unknown>[] = [
         executiveApi.listMaterialTypes({ forceRefresh }),
         executiveApi.listMeasurementUnits({ forceRefresh }),
         executiveApi.listMaterialPointRules({ forceRefresh }),
-        executiveApi.listRewards({ forceRefresh }),
-      ]);
+        ...(mode === 'executive' ? [executiveApi.listRewards({ forceRefresh })] : []),
+      ];
+      const [materialResponse, unitResponse, pointRuleResponse, rewardResponse] =
+        await Promise.all(requests) as [
+          Awaited<ReturnType<typeof executiveApi.listMaterialTypes>>,
+          Awaited<ReturnType<typeof executiveApi.listMeasurementUnits>>,
+          Awaited<ReturnType<typeof executiveApi.listMaterialPointRules>>,
+          Awaited<ReturnType<typeof executiveApi.listRewards>> | undefined,
+        ];
 
       setMaterialRows(mergeMaterialRows(materialResponse.material_types, pointRuleResponse.rules));
       setUnitRows(
@@ -162,17 +168,19 @@ export default function ExecutiveSettings() {
           active: item.active,
         })),
       );
-      setRewardRows(
-        rewardResponse.rewards.map((item: FarmerRewardItem) => ({
-          id: item.id,
-          name_th: item.name_th,
-          description_th: item.description_th || '',
-          points_cost: String(item.points_cost),
-          stock_qty: String(item.stock_qty),
-          active: item.active,
-        })),
-      );
-      setFormulaDescription(pointRuleResponse.formula);
+      if (rewardResponse) {
+        setRewardRows(
+          rewardResponse.rewards.map((item: FarmerRewardItem) => ({
+            id: item.id,
+            name_th: item.name_th,
+            description_th: item.description_th || '',
+            points_cost: String(item.points_cost),
+            stock_qty: String(item.stock_qty),
+            active: item.active,
+          })),
+        );
+      }
+
       setMessage(null);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -442,9 +450,13 @@ export default function ExecutiveSettings() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">ผู้บริหาร</p>
-          <h1 className="mt-0.5 text-4xl font-light tracking-tight text-on-surface">ตั้งค่าระบบ</h1>
-          <p className="mt-1 text-sm text-on-surface-variant">จัดการข้อมูลหลัก กฎแต้ม และแคตตาล็อกรางวัล</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
+            {mode === 'factory' ? 'โรงงาน' : 'ผู้บริหาร'}
+          </p>
+          <h1 className="mt-0.5 text-4xl font-light tracking-tight text-on-surface">ตั้งค่าวัสดุ</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            {mode === 'factory' ? 'จัดการประเภทวัสดุ หน่วยวัด และอัตราแต้มต่อกิโลกรัม' : 'จัดการข้อมูลหลัก กฎแต้ม และแคตตาล็อกรางวัล'}
+          </p>
         </div>
         <button
           type="button"
@@ -471,18 +483,20 @@ export default function ExecutiveSettings() {
           <span className="text-lg font-semibold text-stone-950">{activeUnitCount}</span>
           <span className="text-sm text-stone-600">หน่วยวัด</span>
         </div>
-        <div className="flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2">
-          <Gift className="h-4 w-4 text-amber-600" />
-          <span className="text-lg font-semibold text-stone-950">{rewardRows.filter((r) => r.active).length}</span>
-          <span className="text-sm text-stone-600">รางวัล</span>
-        </div>
+        {mode === 'executive' && (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2">
+            <Gift className="h-4 w-4 text-amber-600" />
+            <span className="text-lg font-semibold text-stone-950">{rewardRows.filter((r) => r.active).length}</span>
+            <span className="text-sm text-stone-600">รางวัล</span>
+          </div>
+        )}
       </div>
 
       {/* Materials + Units 2-col grid */}
       <div className="grid gap-5 xl:grid-cols-[1.18fr,0.82fr]">
         <SectionCard
-          title="ประเภทวัสดุและแต้มต่อกิโลกรัม"
-          description={formulaDescription ? `สูตรคำนวณ: ${formulaDescription}` : 'ตารางนี้รวมข้อมูล master ของวัสดุและอัตราแต้มไว้ในที่เดียว'}
+          title="ประเภทวัสดุและอัตราแต้ม"
+          description="วัสดุแต่ละชนิดได้แต้มต่างกัน — ยิ่งน้ำหนักมาก ยิ่งได้แต้มมาก ตัวเลขในช่อง &quot;แต้ม/กก.&quot; คือแต้มที่เกษตรกรได้ต่อวัสดุ 1 กิโลกรัม"
           className="h-full"
           actions={
             !isAddingMaterial ? (
@@ -507,112 +521,117 @@ export default function ExecutiveSettings() {
               transition={{ duration: 0.2, ease: 'easeOut' }}
               className="overflow-hidden"
             >
-            <div className="mb-4 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/45 p-4">
-              <p className="mb-2 text-xs text-stone-500">รหัสระบบ (ภาษาอังกฤษ/ตัวเลข ไม่มีช่องว่าง เช่น rice_straw)</p>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-[0.9fr,1.2fr,10rem,8.5rem,auto]">
-                <input
-                  value={newMaterial.code}
-                  onChange={(event) => setNewMaterial((prev) => ({ ...prev, code: event.target.value }))}
-                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none font-mono text-sm"
-                  placeholder="รหัสระบบ (en)"
-                />
-                <input
-                  value={newMaterial.name_th}
-                  onChange={(event) => setNewMaterial((prev) => ({ ...prev, name_th: event.target.value }))}
-                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
-                  placeholder="ชื่อวัสดุ (ภาษาไทย)"
-                />
-                <input
-                  value={newMaterial.points_per_kg}
-                  onChange={(event) => setNewMaterial((prev) => ({ ...prev, points_per_kg: event.target.value }))}
-                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
-                  placeholder="แต้ม/กก."
-                  type="number"
-                />
-                <label className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-stone-700">
+            <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">เพิ่มประเภทวัสดุใหม่</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">รหัสระบบ</label>
                   <input
-                    type="checkbox"
-                    checked={newMaterial.active}
-                    onChange={(event) => setNewMaterial((prev) => ({ ...prev, active: event.target.checked }))}
+                    value={newMaterial.code}
+                    onChange={(event) => setNewMaterial((prev) => ({ ...prev, code: event.target.value }))}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 font-mono text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    placeholder="เช่น rice_straw"
                   />
-                  เปิดใช้งาน
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleCreateMaterial()}
-                    disabled={savingKey === 'material:new'}
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    <Save className="h-4 w-4" />
-                    บันทึก
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddingMaterial(false);
-                      setNewMaterial(defaultNewMaterial);
-                    }}
-                    className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700"
-                  >
-                    <X className="h-4 w-4" />
-                    ยกเลิก
-                  </button>
+                  <p className="text-[11px] text-stone-400">ภาษาอังกฤษ/ตัวเลข ไม่มีช่องว่าง</p>
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">ชื่อวัสดุ</label>
+                  <input
+                    value={newMaterial.name_th}
+                    onChange={(event) => setNewMaterial((prev) => ({ ...prev, name_th: event.target.value }))}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    placeholder="เช่น ฟางข้าว"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">แต้มต่อกิโลกรัม</label>
+                  <input
+                    value={newMaterial.points_per_kg}
+                    onChange={(event) => setNewMaterial((prev) => ({ ...prev, points_per_kg: event.target.value }))}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    placeholder="เช่น 1.0"
+                    type="number"
+                  />
+                  <p className="text-[11px] text-stone-400">วัสดุ 1 กก. จะได้กี่แต้ม</p>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="block text-xs font-semibold uppercase tracking-wider text-transparent select-none">-</span>
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 w-full">
+                    <input
+                      type="checkbox"
+                      checked={newMaterial.active}
+                      onChange={(event) => setNewMaterial((prev) => ({ ...prev, active: event.target.checked }))}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span className="font-medium">เปิดใช้งาน</span>
+                  </label>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2 border-t border-emerald-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => void handleCreateMaterial()}
+                  disabled={savingKey === 'material:new'}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
+                >
+                  <Save className="h-4 w-4" />
+                  บันทึก
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsAddingMaterial(false); setNewMaterial(defaultNewMaterial); }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
+                >
+                  <X className="h-4 w-4" />
+                  ยกเลิก
+                </button>
               </div>
             </div>
             </motion.div>
           ) : null}
           </AnimatePresence>
 
-          <div className="space-y-2">
-            <div className="hidden md:flex md:items-center md:gap-2 px-3 pb-1 text-xs font-medium text-stone-400 uppercase tracking-wide">
-              <span className="w-20 shrink-0">รหัส</span>
-              <span className="flex-1">ชื่อวัสดุ</span>
+          <div>
+            <div className="hidden md:flex md:items-center md:gap-3 px-2 pb-2 border-b border-stone-100">
+              <span className="w-20 shrink-0 text-xs font-semibold text-stone-600">รหัส</span>
+              <span className="flex-1 text-xs font-semibold text-stone-600">ชื่อวัสดุ</span>
               <span className="w-24 shrink-0 flex flex-col gap-0.5">
-                <span>แต้ม/กก.</span>
-                <span className="text-[10px] font-normal normal-case text-stone-300">1 กก. ได้กี่แต้ม</span>
+                <span className="text-xs font-semibold text-stone-600">แต้ม / กก.</span>
+                <span className="text-[11px] text-stone-400">วัสดุ 1 กก. ได้กี่แต้ม</span>
               </span>
-              <span className="w-16 shrink-0">สถานะ</span>
-              <span className="w-16 shrink-0" />
+              <span className="w-14 shrink-0 text-xs font-semibold text-stone-600">เปิดใช้</span>
+              <span className="w-14 shrink-0" />
             </div>
             {materialRows.map((row, index) => {
               const requestKey = `material:${row.originalCode}`;
               return (
-                <div key={row.originalCode} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 md:flex-row md:items-center">
-                  <div className="flex flex-1 items-center gap-2">
-                    <span className="w-full sm:w-20 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-400 font-mono truncate" title={row.code}>
-                      {row.code}
-                    </span>
+                <div key={row.originalCode} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
+                  <div className="flex flex-1 items-center gap-3">
+                    <span className="w-20 shrink-0 font-mono text-xs text-stone-400 truncate" title={row.code}>{row.code}</span>
                     <input
                       value={row.name_th}
                       onChange={(event) => updateMaterialRow(index, { name_th: event.target.value })}
-                      className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
                       placeholder="ชื่อวัสดุ"
                     />
                     <input
                       value={row.points_per_kg}
                       onChange={(event) => updateMaterialRow(index, { points_per_kg: event.target.value })}
-                      className="w-full sm:w-24 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="w-24 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
                       placeholder="แต้ม/กก."
                       type="number"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-2 text-sm text-stone-600">
-                      <input
-                        type="checkbox"
-                        checked={row.active}
-                        onChange={(event) => updateMaterialRow(index, { active: event.target.checked })}
-                        className="h-4 w-4"
-                      />
-                      ใช้งาน
+                  <div className="flex items-center gap-3">
+                    <label className="flex w-14 shrink-0 cursor-pointer items-center gap-1.5 text-sm text-stone-500">
+                      <input type="checkbox" checked={row.active} onChange={(event) => updateMaterialRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
+                      <span className="text-xs">ใช้</span>
                     </label>
                     <button
                       type="button"
                       onClick={() => void saveMaterialRow(row)}
                       disabled={savingKey === requestKey}
-                      className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
+                      className="w-14 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
                     >
                       {savingKey === requestKey ? '...' : 'บันทึก'}
                     </button>
@@ -624,8 +643,8 @@ export default function ExecutiveSettings() {
         </SectionCard>
 
         <SectionCard
-          title="หน่วยวัดและตัวแปลงเป็นกิโลกรัม"
-          description="ส่วนนี้รวมหน่วยที่เปิดใช้จริงและตัวแปลงน้ำหนักไว้ในกรอบเดียว"
+          title="หน่วยวัด"
+          description="หน่วยที่เกษตรกรใช้แจ้งปริมาณ เช่น กิโลกรัม ตัน หรือก้อน — ระบบแปลงเป็นกิโลกรัมอัตโนมัติเพื่อคำนวณแต้ม"
           className="h-full"
           actions={
             !isAddingUnit ? (
@@ -650,109 +669,117 @@ export default function ExecutiveSettings() {
               transition={{ duration: 0.2, ease: 'easeOut' }}
               className="overflow-hidden"
             >
-            <div className="mb-4 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/45 p-4">
-              <p className="mb-2 text-xs text-stone-500">รหัสระบบ (ภาษาอังกฤษ/ตัวเลข ไม่มีช่องว่าง เช่น kilogram)</p>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-[0.8fr,1fr,10rem,8.5rem,auto]">
-                <input
-                  value={newUnit.code}
-                  onChange={(event) => setNewUnit((prev) => ({ ...prev, code: event.target.value }))}
-                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none font-mono text-sm"
-                  placeholder="รหัสระบบ (en)"
-                />
-                <input
-                  value={newUnit.name_th}
-                  onChange={(event) => setNewUnit((prev) => ({ ...prev, name_th: event.target.value }))}
-                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
-                  placeholder="ชื่อหน่วย (ภาษาไทย)"
-                />
-                <input
-                  value={newUnit.to_kg_factor}
-                  onChange={(event) => setNewUnit((prev) => ({ ...prev, to_kg_factor: event.target.value }))}
-                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
-                  placeholder="ตัวแปลงเป็นกก."
-                  type="number"
-                />
-                <label className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-stone-700">
+            <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">เพิ่มหน่วยวัดใหม่</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">รหัสระบบ</label>
                   <input
-                    type="checkbox"
-                    checked={newUnit.active}
-                    onChange={(event) => setNewUnit((prev) => ({ ...prev, active: event.target.checked }))}
+                    value={newUnit.code}
+                    onChange={(event) => setNewUnit((prev) => ({ ...prev, code: event.target.value }))}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 font-mono text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    placeholder="เช่น kilogram"
                   />
-                  เปิดใช้งาน
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleCreateUnit()}
-                    disabled={savingKey === 'unit:new'}
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    <Save className="h-4 w-4" />
-                    บันทึก
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddingUnit(false);
-                      setNewUnit(defaultNewUnit);
-                    }}
-                    className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700"
-                  >
-                    <X className="h-4 w-4" />
-                    ยกเลิก
-                  </button>
+                  <p className="text-[11px] text-stone-400">ภาษาอังกฤษ/ตัวเลข ไม่มีช่องว่าง</p>
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">ชื่อหน่วย</label>
+                  <input
+                    value={newUnit.name_th}
+                    onChange={(event) => setNewUnit((prev) => ({ ...prev, name_th: event.target.value }))}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    placeholder="เช่น กิโลกรัม"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">เท่ากับกี่ กก.</label>
+                  <input
+                    value={newUnit.to_kg_factor}
+                    onChange={(event) => setNewUnit((prev) => ({ ...prev, to_kg_factor: event.target.value }))}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    placeholder="เช่น 1000 (สำหรับตัน)"
+                    type="number"
+                  />
+                  <p className="text-[11px] text-stone-400">1 หน่วยนี้ = กี่กิโลกรัม (เว้นว่างได้)</p>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="block text-xs font-semibold uppercase tracking-wider text-transparent select-none">-</span>
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 w-full">
+                    <input
+                      type="checkbox"
+                      checked={newUnit.active}
+                      onChange={(event) => setNewUnit((prev) => ({ ...prev, active: event.target.checked }))}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span className="font-medium">เปิดใช้งาน</span>
+                  </label>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2 border-t border-emerald-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => void handleCreateUnit()}
+                  disabled={savingKey === 'unit:new'}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
+                >
+                  <Save className="h-4 w-4" />
+                  บันทึก
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsAddingUnit(false); setNewUnit(defaultNewUnit); }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
+                >
+                  <X className="h-4 w-4" />
+                  ยกเลิก
+                </button>
               </div>
             </div>
             </motion.div>
           ) : null}
           </AnimatePresence>
 
-          <div className="space-y-2">
-            <div className="hidden md:flex md:items-center md:gap-2 px-3 pb-1 text-xs font-medium text-stone-400 uppercase tracking-wide">
-              <span className="w-20 shrink-0">รหัส</span>
-              <span className="flex-1">ชื่อหน่วย</span>
-              <span className="w-24 shrink-0">ตัวแปลงกก.</span>
-              <span className="w-16 shrink-0">สถานะ</span>
-              <span className="w-16 shrink-0" />
+          <div>
+            <div className="hidden md:flex md:items-center md:gap-3 px-2 pb-2 border-b border-stone-100">
+              <span className="w-20 shrink-0 text-xs font-semibold text-stone-600">รหัส</span>
+              <span className="flex-1 text-xs font-semibold text-stone-600">ชื่อหน่วย</span>
+              <span className="w-24 shrink-0 flex flex-col gap-0.5">
+                <span className="text-xs font-semibold text-stone-600">เท่ากับกี่ กก.</span>
+                <span className="text-[11px] text-stone-400">1 หน่วย = ? กก.</span>
+              </span>
+              <span className="w-14 shrink-0 text-xs font-semibold text-stone-600">เปิดใช้</span>
+              <span className="w-14 shrink-0" />
             </div>
             {unitRows.map((row, index) => {
               const requestKey = `unit:${row.originalCode}`;
               return (
-                <div key={row.originalCode} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 md:flex-row md:items-center">
-                  <div className="flex flex-1 items-center gap-2">
-                    <span className="w-full sm:w-20 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-400 font-mono truncate" title={row.code}>
-                      {row.code}
-                    </span>
+                <div key={row.originalCode} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
+                  <div className="flex flex-1 items-center gap-3">
+                    <span className="w-20 shrink-0 font-mono text-xs text-stone-400 truncate" title={row.code}>{row.code}</span>
                     <input
                       value={row.name_th}
                       onChange={(event) => updateUnitRow(index, { name_th: event.target.value })}
-                      className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
                       placeholder="ชื่อหน่วย"
                     />
                     <input
                       value={row.to_kg_factor}
                       onChange={(event) => updateUnitRow(index, { to_kg_factor: event.target.value })}
-                      className="w-full sm:w-24 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                      placeholder="ตัวแปลง"
+                      className="w-24 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      placeholder="กก."
                       type="number"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-2 text-sm text-stone-600">
-                      <input
-                        type="checkbox"
-                        checked={row.active}
-                        onChange={(event) => updateUnitRow(index, { active: event.target.checked })}
-                        className="h-4 w-4"
-                      />
-                      ใช้งาน
+                  <div className="flex items-center gap-3">
+                    <label className="flex w-14 shrink-0 cursor-pointer items-center gap-1.5 text-sm text-stone-500">
+                      <input type="checkbox" checked={row.active} onChange={(event) => updateUnitRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
+                      <span className="text-xs">ใช้</span>
                     </label>
                     <button
                       type="button"
                       onClick={() => void saveUnitRow(row)}
                       disabled={savingKey === requestKey}
-                      className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
+                      className="w-14 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
                     >
                       {savingKey === requestKey ? '...' : 'บันทึก'}
                     </button>
@@ -764,8 +791,8 @@ export default function ExecutiveSettings() {
         </SectionCard>
       </div>
 
-      {/* Rewards — full width */}
-      <SectionCard
+      {/* Rewards — full width (executive only) */}
+      {mode === 'executive' && <SectionCard
           title="จัดการรางวัล"
           description="เพิ่ม แก้ไข และเปิด/ปิดใช้งานรางวัลที่เกษตรกรเห็น"
           actions={
@@ -778,19 +805,7 @@ export default function ExecutiveSettings() {
                 <Plus className="h-4 w-4" />
                 เพิ่มรางวัล
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsAddingReward(false);
-                  setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true });
-                }}
-                className="flex items-center gap-1.5 rounded-full border border-stone-300 px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
-              >
-                <X className="h-4 w-4" />
-                ยกเลิก
-              </button>
-            )
+            ) : null
           }
         >
           <AnimatePresence initial={false}>
@@ -803,116 +818,135 @@ export default function ExecutiveSettings() {
               transition={{ duration: 0.2, ease: 'easeOut' }}
               className="overflow-hidden"
             >
-            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <input
-                  value={newReward.name_th}
-                  onChange={(event) => setNewReward((prev) => ({ ...prev, name_th: event.target.value }))}
-                  placeholder="ชื่อรางวัล"
-                  className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                />
-                <input
-                  value={newReward.description_th}
-                  onChange={(event) => setNewReward((prev) => ({ ...prev, description_th: event.target.value }))}
-                  placeholder="รายละเอียด"
-                  className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                />
-                <input
-                  value={newReward.points_cost}
-                  onChange={(event) => setNewReward((prev) => ({ ...prev, points_cost: event.target.value }))}
-                  placeholder="แต้มที่ใช้"
-                  type="number"
-                  className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                />
-                <input
-                  value={newReward.stock_qty}
-                  onChange={(event) => setNewReward((prev) => ({ ...prev, stock_qty: event.target.value }))}
-                  placeholder="จำนวนในสต็อก"
-                  type="number"
-                  className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                />
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 text-sm text-stone-700">
+            <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">เพิ่มรางวัลใหม่</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">ชื่อรางวัล</label>
+                  <input
+                    value={newReward.name_th}
+                    onChange={(event) => setNewReward((prev) => ({ ...prev, name_th: event.target.value }))}
+                    placeholder="เช่น ปุ๋ยอินทรีย์ 25 กก."
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">รายละเอียด</label>
+                  <input
+                    value={newReward.description_th}
+                    onChange={(event) => setNewReward((prev) => ({ ...prev, description_th: event.target.value }))}
+                    placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)"
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">แต้มที่ใช้แลก</label>
+                  <input
+                    value={newReward.points_cost}
+                    onChange={(event) => setNewReward((prev) => ({ ...prev, points_cost: event.target.value }))}
+                    placeholder="เช่น 500"
+                    type="number"
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  />
+                  <p className="text-[11px] text-stone-400">จำนวนแต้มที่เกษตรกรต้องใช้เพื่อรับรางวัลนี้</p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">จำนวนในสต็อก</label>
+                  <input
+                    value={newReward.stock_qty}
+                    onChange={(event) => setNewReward((prev) => ({ ...prev, stock_qty: event.target.value }))}
+                    placeholder="เช่น 100"
+                    type="number"
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  />
+                </div>
+                <div className="flex items-end pb-0.5 sm:col-span-2">
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700">
                     <input
                       type="checkbox"
                       checked={newReward.active}
                       onChange={(event) => setNewReward((prev) => ({ ...prev, active: event.target.checked }))}
-                      className="h-4 w-4"
+                      className="h-4 w-4 accent-primary"
                     />
-                    ใช้งาน
+                    <span className="font-medium">เปิดให้เกษตรกรเห็นและแลก</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => void handleCreateReward()}
-                    disabled={savingKey === 'new-reward'}
-                    className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:opacity-60"
-                  >
-                    <Save className="h-4 w-4" />
-                    บันทึก
-                  </button>
                 </div>
+              </div>
+              <div className="mt-4 flex gap-2 border-t border-emerald-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => void handleCreateReward()}
+                  disabled={savingKey === 'new-reward'}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
+                >
+                  <Save className="h-4 w-4" />
+                  บันทึก
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsAddingReward(false); setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true }); }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
+                >
+                  <X className="h-4 w-4" />
+                  ยกเลิก
+                </button>
               </div>
             </div>
             </motion.div>
           ) : null}
           </AnimatePresence>
 
-          <div className="space-y-2">
-            <div className="hidden md:flex md:items-center md:gap-2 px-3 pb-1 text-xs font-medium text-stone-400 uppercase tracking-wide">
-              <span className="flex-1">ชื่อรางวัล</span>
-              <span className="flex-1">รายละเอียด</span>
-              <span className="w-20 shrink-0">แต้มที่ใช้</span>
-              <span className="w-20 shrink-0">สต็อก</span>
-              <span className="w-14 shrink-0">สถานะ</span>
-              <span className="w-16 shrink-0" />
+          <div>
+            <div className="hidden md:flex md:items-center md:gap-3 px-2 pb-2 border-b border-stone-100">
+              <span className="flex-1 text-xs font-semibold text-stone-600">ชื่อรางวัล</span>
+              <span className="flex-1 text-xs font-semibold text-stone-600">รายละเอียด</span>
+              <span className="w-20 shrink-0 text-xs font-semibold text-stone-600">แต้มที่ใช้</span>
+              <span className="w-20 shrink-0 text-xs font-semibold text-stone-600">สต็อก</span>
+              <span className="w-14 shrink-0 text-xs font-semibold text-stone-600">เปิดใช้</span>
+              <span className="w-14 shrink-0" />
             </div>
             {rewardRows.map((row, index) => {
               const requestKey = `reward:${row.id}`;
               return (
-                <div key={row.id} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 md:flex-row md:items-center">
-                  <div className="flex flex-1 items-center gap-2">
+                <div key={row.id} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
+                  <div className="flex flex-1 items-center gap-3">
                     <input
                       value={row.name_th}
                       onChange={(event) => updateRewardRow(index, { name_th: event.target.value })}
-                      className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
                       placeholder="ชื่อรางวัล"
                     />
                     <input
                       value={row.description_th}
                       onChange={(event) => updateRewardRow(index, { description_th: event.target.value })}
-                      className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
                       placeholder="รายละเอียด"
                     />
                     <input
                       value={row.points_cost}
                       onChange={(event) => updateRewardRow(index, { points_cost: event.target.value })}
-                      className="w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="w-20 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
                       type="number"
                       placeholder="แต้ม"
                     />
                     <input
                       value={row.stock_qty}
                       onChange={(event) => updateRewardRow(index, { stock_qty: event.target.value })}
-                      className="w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                      className="w-20 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
                       type="number"
                       placeholder="สต็อก"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-2 text-sm text-stone-600">
-                      <input
-                        type="checkbox"
-                        checked={row.active}
-                        onChange={(event) => updateRewardRow(index, { active: event.target.checked })}
-                        className="h-4 w-4"
-                      />
-                      ใช้งาน
+                  <div className="flex items-center gap-3">
+                    <label className="flex w-14 shrink-0 cursor-pointer items-center gap-1.5 text-stone-500">
+                      <input type="checkbox" checked={row.active} onChange={(event) => updateRewardRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
+                      <span className="text-xs">ใช้</span>
                     </label>
                     <button
                       type="button"
                       onClick={() => void saveRewardRow(row)}
                       disabled={savingKey === requestKey}
-                      className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
+                      className="w-14 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
                     >
                       {savingKey === requestKey ? '...' : 'บันทึก'}
                     </button>
@@ -921,7 +955,7 @@ export default function ExecutiveSettings() {
               );
             })}
           </div>
-        </SectionCard>
+        </SectionCard>}
     </div>
     </ErrorBoundary>
   );

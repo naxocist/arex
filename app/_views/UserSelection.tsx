@@ -113,14 +113,14 @@ export default function UserSelection() {
       return;
     }
 
-    if (registerRole === 'factory') {
+    if (registerRole === 'factory' || registerRole === 'logistics') {
       if (!registerForm.name_th.trim()) {
-        setRegisterMessage('ระบุชื่อโรงงาน');
+        setRegisterMessage(registerRole === 'factory' ? 'ระบุชื่อโรงงาน' : 'ระบุชื่อบริษัทขนส่ง');
         setIsRegistering(false);
         return;
       }
       if ((registerForm.lat === null) !== (registerForm.lng === null)) {
-        setRegisterMessage('พิกัดโรงงานไม่ครบ');
+        setRegisterMessage('พิกัดไม่ครบ');
         setIsRegistering(false);
         return;
       }
@@ -135,18 +135,20 @@ export default function UserSelection() {
         province: registerForm.province.trim(),
       };
 
+      const companyPayload = {
+        ...basePayload,
+        name_th: registerForm.name_th.trim(),
+        location_text: registerForm.location_text.trim() || null,
+        lat: registerForm.lat,
+        lng: registerForm.lng,
+      };
+
       const response =
         registerRole === 'farmer'
           ? await authApi.registerFarmer(basePayload)
           : registerRole === 'logistics'
-            ? await authApi.registerLogistics(basePayload)
-            : await authApi.registerFactory({
-                ...basePayload,
-                name_th: registerForm.name_th.trim(),
-                location_text: registerForm.location_text.trim() || null,
-                lat: registerForm.lat,
-                lng: registerForm.lng,
-              });
+            ? await authApi.registerLogistics(companyPayload)
+            : await authApi.registerFactory(companyPayload);
 
       setAuthSession({
         accessToken: response.access_token,
@@ -211,29 +213,28 @@ export default function UserSelection() {
 
           <div className="flex flex-col gap-3 w-full">
             <div className="flex flex-col gap-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-stone-400">เจ้าของระบบ</span>
-              <div className="flex items-center gap-3 rounded-xl border border-outline-variant/20 bg-white px-4 py-2.5 shadow-sm">
-                <img src="/assets/pmuc_logo.png" alt="บพข (PMUC) Logo" className="h-7 object-contain" />
-                <div className="text-left">
-                  <p className="text-[10px] font-bold leading-tight text-stone-700">บพข.</p>
-                  <p className="text-[8px] leading-tight text-stone-400">ภายใต้ อว.</p>
+              <span className="text-xs font-bold uppercase tracking-wider text-stone-400">เจ้าของระบบ</span>
+              <div className="flex items-center gap-3 rounded-xl border border-outline-variant/20 bg-white px-4 py-3 shadow-sm">
+                <img src="/assets/pmuc_logo.png" alt="บพข (PMUC) Logo" className="h-8 w-auto object-contain shrink-0" />
+                <div className="text-left min-w-0">
+                  <p className="text-xs font-bold leading-tight text-stone-700">บพข.</p>
+                  <p className="text-[11px] leading-tight text-stone-400">ภายใต้ อว.</p>
                 </div>
-                <div className="h-6 w-px bg-stone-200" />
-                <img src="/assets/อว_logo.png" alt="อว. Logo" className="h-5 object-contain opacity-60" />
-                <div className="h-6 w-px bg-stone-200" />
-                <div className="text-left">
-                  <p className="text-[10px] font-bold leading-tight text-stone-700">LAWDEE CO., LTD.</p>
-                  <p className="text-[8px] leading-tight text-stone-400">ผู้ร่วมพัฒนาระบบ</p>
+                <div className="h-6 w-px bg-stone-200 shrink-0" />
+                <img src="/assets/อว_logo.png" alt="อว. Logo" className="h-8 w-8 object-contain shrink-0" />
+                <div className="text-left min-w-0">
+                  <p className="text-xs font-bold leading-tight text-stone-700">LAWDEE CO., LTD.</p>
+                  <p className="text-[11px] leading-tight text-stone-400">ผู้ร่วมพัฒนาระบบ</p>
                 </div>
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-stone-400">พัฒนาโดย</span>
-              <div className="flex items-center gap-2 rounded-xl border border-outline-variant/20 bg-white px-4 py-2 shadow-sm self-start">
-                <img src="/assets/cedt_logo.png" alt="CEDT Logo" className="h-7 object-contain" />
-                <div className="text-left">
-                  <p className="text-[10px] font-bold leading-tight text-stone-700">CEDT</p>
-                  <p className="text-[8px] leading-tight text-stone-400">Chulalongkorn University</p>
+              <span className="text-xs font-bold uppercase tracking-wider text-stone-400">พัฒนาโดย</span>
+              <div className="flex items-center gap-3 rounded-xl border border-outline-variant/20 bg-white px-4 py-3 shadow-sm self-start">
+                <img src="/assets/cedt_logo.png" alt="CEDT Logo" className="h-8 w-20 object-contain shrink-0" />
+                <div className="text-left min-w-0">
+                  <p className="text-xs font-bold leading-tight text-stone-700">CEDT</p>
+                  <p className="text-[11px] leading-tight text-stone-400">Chulalongkorn University</p>
                 </div>
               </div>
             </div>
@@ -408,7 +409,7 @@ export default function UserSelection() {
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="block space-y-2">
-                      <span className="text-base font-semibold text-stone-800">อีเมล</span>
+                      <span className="text-base font-semibold text-stone-800">อีเมล <span className="text-rose-500">*</span></span>
                       <input
                         type="email"
                         value={registerForm.email}
@@ -421,7 +422,7 @@ export default function UserSelection() {
                     </label>
 
                     <label className="block space-y-2">
-                      <span className="text-base font-semibold text-stone-800">รหัสผ่าน</span>
+                      <span className="text-base font-semibold text-stone-800">รหัสผ่าน <span className="text-rose-500">*</span></span>
                       <div className="relative">
                         <input
                           type={showRegisterPassword ? 'text' : 'password'}
@@ -446,33 +447,33 @@ export default function UserSelection() {
                     </label>
 
                     <label className="block space-y-2">
-                      <span className="text-base font-semibold text-stone-800">ชื่อผู้ใช้งาน</span>
+                      <span className="text-base font-semibold text-stone-800">ชื่อผู้ใช้งาน <span className="text-rose-500">*</span></span>
                       <input
                         type="text"
                         value={registerForm.display_name}
                         onChange={(e) => setRegisterForm((prev) => ({ ...prev, display_name: e.target.value }))}
                         autoComplete="name"
-                        placeholder="นายสมชาย ใจดี"
+                        placeholder="เช่น นายสมชาย ใจดี"
                         className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
                         required
                       />
                     </label>
 
                     <label className="block space-y-2">
-                      <span className="text-base font-semibold text-stone-800">เบอร์โทร</span>
+                      <span className="text-base font-semibold text-stone-800">เบอร์โทร <span className="text-rose-500">*</span></span>
                       <input
                         type="tel"
                         value={registerForm.phone}
                         onChange={(e) => setRegisterForm((prev) => ({ ...prev, phone: e.target.value }))}
                         autoComplete="tel"
-                        placeholder="0xx-xxx-xxxx"
+                        placeholder="เช่น 08xxxxxxxx"
                         className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
                         required
                       />
                     </label>
 
                     <div className="block space-y-2 md:col-span-2">
-                      <span className="text-base font-semibold text-stone-800">จังหวัด</span>
+                      <span className="text-base font-semibold text-stone-800">จังหวัด <span className="text-rose-500">*</span></span>
                       <div className="relative">
                         <input
                           type="text"
@@ -515,30 +516,38 @@ export default function UserSelection() {
                   </div>
                 </div>
 
-                {/* Factory-only fields */}
-                {registerRole === 'factory' ? (
+                {/* Factory / Logistics fields */}
+                {(registerRole === 'factory' || registerRole === 'logistics') ? (
                   <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 space-y-4">
                     <div>
-                      <h3 className="text-base font-semibold text-stone-900">ข้อมูลโรงงาน</h3>
+                      <h3 className="text-base font-semibold text-stone-900">
+                        {registerRole === 'factory' ? 'ข้อมูลโรงงาน' : 'ข้อมูลบริษัทขนส่ง'}
+                      </h3>
                       <p className="mt-1 text-sm leading-relaxed text-stone-600">
-                        ระบุชื่อโรงงาน และเลือกตำแหน่งบนแผนที่ได้เลย
+                        {registerRole === 'factory'
+                          ? 'ระบุชื่อโรงงาน และเลือกตำแหน่งบนแผนที่ได้เลย'
+                          : 'ระบุชื่อบริษัท และเลือกตำแหน่งบนแผนที่ได้เลย'}
                       </p>
                     </div>
 
                     <label className="block space-y-2">
-                      <span className="text-base font-semibold text-stone-800">ชื่อโรงงาน</span>
+                      <span className="text-base font-semibold text-stone-800">
+                        {registerRole === 'factory' ? 'ชื่อโรงงาน' : 'ชื่อบริษัทขนส่ง'} <span className="text-rose-500">*</span>
+                      </span>
                       <input
                         type="text"
                         value={registerForm.name_th}
                         onChange={(e) => setRegisterForm((prev) => ({ ...prev, name_th: e.target.value }))}
-                        placeholder="โรงงานชีวมวลเชียงใหม่"
+                        placeholder={registerRole === 'factory' ? 'โรงงานชีวมวลเชียงใหม่' : 'บริษัทขนส่งเชียงใหม่'}
                         className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
                         required
                       />
                     </label>
 
                     <label className="block space-y-2">
-                      <span className="text-base font-semibold text-stone-800">ที่อยู่โรงงาน</span>
+                      <span className="text-base font-semibold text-stone-800">
+                        {registerRole === 'factory' ? 'ที่อยู่โรงงาน' : 'ที่อยู่บริษัท'}
+                      </span>
                       <input
                         type="text"
                         value={registerForm.location_text}
@@ -553,8 +562,7 @@ export default function UserSelection() {
                       lng={registerForm.lng}
                       onChange={({ lat, lng }) => setRegisterForm((prev) => ({ ...prev, lat, lng }))}
                       onAddressResolved={(address) => setRegisterForm((prev) => ({ ...prev, location_text: address }))}
-                      currentLocationButtonLabel="ใช้ตำแหน่งโรงงานปัจจุบัน"
-                      mapHintText="คลิกบนแผนที่เพื่อปักหมุดตำแหน่งโรงงาน"
+                      mapHintText={registerRole === 'factory' ? 'คลิกบนแผนที่เพื่อปักหมุดตำแหน่งโรงงาน' : 'คลิกบนแผนที่เพื่อปักหมุดตำแหน่งบริษัท'}
                       mapHeightClassName="h-[220px] w-full overflow-hidden rounded-2xl sm:h-[260px]"
                     />
                   </div>
@@ -577,7 +585,7 @@ export default function UserSelection() {
 
         {/* Footer — mobile only */}
         <p className="lg:hidden text-center text-xs text-stone-400">
-          © 2025 AREX Platform • บพข. &amp; LAWDEE CO., LTD. • CEDT
+          © 2026 AREX Platform • บพข. &amp; LAWDEE CO., LTD. • CEDT
         </p>
 
         </div>{/* end form column */}
