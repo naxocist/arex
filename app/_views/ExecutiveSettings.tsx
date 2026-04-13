@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Coins, Gift, Plus, RefreshCw, Ruler, Save, Shapes, X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { Gift, Plus, RefreshCw, Ruler, Save, Shapes, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
+import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import SectionCard from '@/app/_components/SectionCard';
 import {
   ApiError,
@@ -432,23 +434,32 @@ export default function ExecutiveSettings() {
     }
   };
 
+  const reduceMotion = useReducedMotion();
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-stone-900">ตั้งค่าระบบ</h1>
+    <ErrorBoundary>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">ผู้บริหาร</p>
+          <h1 className="mt-0.5 text-4xl font-light tracking-tight text-on-surface">ตั้งค่าระบบ</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">จัดการข้อมูลหลัก กฎแต้ม และแคตตาล็อกรางวัล</p>
+        </div>
         <button
           type="button"
           onClick={() => void loadConfiguration(true)}
           disabled={isLoading}
-          className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+          aria-label="รีเฟรชข้อมูล"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 transition hover:bg-stone-50 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          {isLoading ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล'}
         </button>
       </div>
 
       {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
 
+      {/* Summary pills */}
       <div className="flex flex-wrap gap-2">
         <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
           <Shapes className="h-4 w-4 text-emerald-600" />
@@ -460,12 +471,18 @@ export default function ExecutiveSettings() {
           <span className="text-lg font-semibold text-stone-950">{activeUnitCount}</span>
           <span className="text-sm text-stone-600">หน่วยวัด</span>
         </div>
+        <div className="flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2">
+          <Gift className="h-4 w-4 text-amber-600" />
+          <span className="text-lg font-semibold text-stone-950">{rewardRows.filter((r) => r.active).length}</span>
+          <span className="text-sm text-stone-600">รางวัล</span>
+        </div>
       </div>
 
+      {/* Materials + Units 2-col grid */}
       <div className="grid gap-5 xl:grid-cols-[1.18fr,0.82fr]">
         <SectionCard
           title="ประเภทวัสดุและแต้มต่อกิโลกรัม"
-          description="ตารางนี้รวมข้อมูล master ของวัสดุและอัตราแต้มไว้ในที่เดียว เพื่อไม่ต้องเลื่อนสลับไปอีกส่วน"
+          description={formulaDescription ? `สูตรคำนวณ: ${formulaDescription}` : 'ตารางนี้รวมข้อมูล master ของวัสดุและอัตราแต้มไว้ในที่เดียว'}
           className="h-full"
           actions={
             !isAddingMaterial ? (
@@ -480,71 +497,93 @@ export default function ExecutiveSettings() {
             ) : null
           }
         >
+          <AnimatePresence initial={false}>
           {isAddingMaterial ? (
-            <div className="mb-4 grid grid-cols-1 gap-3 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/45 p-4 md:grid-cols-[0.9fr,1.2fr,10rem,8.5rem,auto]">
-              <input
-                value={newMaterial.code}
-                onChange={(event) => setNewMaterial((prev) => ({ ...prev, code: event.target.value }))}
-                className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
-                placeholder="Code"
-              />
-              <input
-                value={newMaterial.name_th}
-                onChange={(event) => setNewMaterial((prev) => ({ ...prev, name_th: event.target.value }))}
-                className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
-                placeholder="ชื่อวัสดุ"
-              />
-              <input
-                value={newMaterial.points_per_kg}
-                onChange={(event) => setNewMaterial((prev) => ({ ...prev, points_per_kg: event.target.value }))}
-                className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
-                placeholder="แต้ม/กก."
-              />
-              <label className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-stone-700">
+            <motion.div
+              key="add-material-form"
+              initial={reduceMotion ? undefined : { opacity: 0, height: 0 }}
+              animate={reduceMotion ? undefined : { opacity: 1, height: 'auto' }}
+              exit={reduceMotion ? undefined : { opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="overflow-hidden"
+            >
+            <div className="mb-4 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/45 p-4">
+              <p className="mb-2 text-xs text-stone-500">รหัสระบบ (ภาษาอังกฤษ/ตัวเลข ไม่มีช่องว่าง เช่น rice_straw)</p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[0.9fr,1.2fr,10rem,8.5rem,auto]">
                 <input
-                  type="checkbox"
-                  checked={newMaterial.active}
-                  onChange={(event) => setNewMaterial((prev) => ({ ...prev, active: event.target.checked }))}
+                  value={newMaterial.code}
+                  onChange={(event) => setNewMaterial((prev) => ({ ...prev, code: event.target.value }))}
+                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none font-mono text-sm"
+                  placeholder="รหัสระบบ (en)"
                 />
-                เปิดใช้งาน
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleCreateMaterial()}
-                  disabled={savingKey === 'material:new'}
-                  className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  <Save className="h-4 w-4" />
-                  บันทึก
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddingMaterial(false);
-                    setNewMaterial(defaultNewMaterial);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700"
-                >
-                  <X className="h-4 w-4" />
-                  ยกเลิก
-                </button>
+                <input
+                  value={newMaterial.name_th}
+                  onChange={(event) => setNewMaterial((prev) => ({ ...prev, name_th: event.target.value }))}
+                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
+                  placeholder="ชื่อวัสดุ (ภาษาไทย)"
+                />
+                <input
+                  value={newMaterial.points_per_kg}
+                  onChange={(event) => setNewMaterial((prev) => ({ ...prev, points_per_kg: event.target.value }))}
+                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
+                  placeholder="แต้ม/กก."
+                  type="number"
+                />
+                <label className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-stone-700">
+                  <input
+                    type="checkbox"
+                    checked={newMaterial.active}
+                    onChange={(event) => setNewMaterial((prev) => ({ ...prev, active: event.target.checked }))}
+                  />
+                  เปิดใช้งาน
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateMaterial()}
+                    disabled={savingKey === 'material:new'}
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    <Save className="h-4 w-4" />
+                    บันทึก
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingMaterial(false);
+                      setNewMaterial(defaultNewMaterial);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700"
+                  >
+                    <X className="h-4 w-4" />
+                    ยกเลิก
+                  </button>
+                </div>
               </div>
             </div>
+            </motion.div>
           ) : null}
+          </AnimatePresence>
 
           <div className="space-y-2">
+            <div className="hidden md:flex md:items-center md:gap-2 px-3 pb-1 text-xs font-medium text-stone-400 uppercase tracking-wide">
+              <span className="w-20 shrink-0">รหัส</span>
+              <span className="flex-1">ชื่อวัสดุ</span>
+              <span className="w-24 shrink-0 flex flex-col gap-0.5">
+                <span>แต้ม/กก.</span>
+                <span className="text-[10px] font-normal normal-case text-stone-300">1 กก. ได้กี่แต้ม</span>
+              </span>
+              <span className="w-16 shrink-0">สถานะ</span>
+              <span className="w-16 shrink-0" />
+            </div>
             {materialRows.map((row, index) => {
               const requestKey = `material:${row.originalCode}`;
               return (
                 <div key={row.originalCode} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 md:flex-row md:items-center">
                   <div className="flex flex-1 items-center gap-2">
-                    <input
-                      value={row.code}
-                      onChange={(event) => updateMaterialRow(index, { code: event.target.value })}
-                      className="w-full sm:w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                      placeholder="รหัส"
-                    />
+                    <span className="w-full sm:w-20 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-400 font-mono truncate" title={row.code}>
+                      {row.code}
+                    </span>
                     <input
                       value={row.name_th}
                       onChange={(event) => updateMaterialRow(index, { name_th: event.target.value })}
@@ -556,6 +595,7 @@ export default function ExecutiveSettings() {
                       onChange={(event) => updateMaterialRow(index, { points_per_kg: event.target.value })}
                       className="w-full sm:w-24 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                       placeholder="แต้ม/กก."
+                      type="number"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -600,71 +640,90 @@ export default function ExecutiveSettings() {
             ) : null
           }
         >
+          <AnimatePresence initial={false}>
           {isAddingUnit ? (
-            <div className="mb-4 grid grid-cols-1 gap-3 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/45 p-4 md:grid-cols-[0.8fr,1fr,10rem,8.5rem,auto]">
-              <input
-                value={newUnit.code}
-                onChange={(event) => setNewUnit((prev) => ({ ...prev, code: event.target.value }))}
-                className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
-                placeholder="Code"
-              />
-              <input
-                value={newUnit.name_th}
-                onChange={(event) => setNewUnit((prev) => ({ ...prev, name_th: event.target.value }))}
-                className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
-                placeholder="ชื่อหน่วย"
-              />
-              <input
-                value={newUnit.to_kg_factor}
-                onChange={(event) => setNewUnit((prev) => ({ ...prev, to_kg_factor: event.target.value }))}
-                className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
-                placeholder="ตัวแปลงเป็นกก."
-              />
-              <label className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-stone-700">
+            <motion.div
+              key="add-unit-form"
+              initial={reduceMotion ? undefined : { opacity: 0, height: 0 }}
+              animate={reduceMotion ? undefined : { opacity: 1, height: 'auto' }}
+              exit={reduceMotion ? undefined : { opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="overflow-hidden"
+            >
+            <div className="mb-4 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/45 p-4">
+              <p className="mb-2 text-xs text-stone-500">รหัสระบบ (ภาษาอังกฤษ/ตัวเลข ไม่มีช่องว่าง เช่น kilogram)</p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[0.8fr,1fr,10rem,8.5rem,auto]">
                 <input
-                  type="checkbox"
-                  checked={newUnit.active}
-                  onChange={(event) => setNewUnit((prev) => ({ ...prev, active: event.target.checked }))}
+                  value={newUnit.code}
+                  onChange={(event) => setNewUnit((prev) => ({ ...prev, code: event.target.value }))}
+                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none font-mono text-sm"
+                  placeholder="รหัสระบบ (en)"
                 />
-                เปิดใช้งาน
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleCreateUnit()}
-                  disabled={savingKey === 'unit:new'}
-                  className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  <Save className="h-4 w-4" />
-                  บันทึก
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddingUnit(false);
-                    setNewUnit(defaultNewUnit);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700"
-                >
-                  <X className="h-4 w-4" />
-                  ยกเลิก
-                </button>
+                <input
+                  value={newUnit.name_th}
+                  onChange={(event) => setNewUnit((prev) => ({ ...prev, name_th: event.target.value }))}
+                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
+                  placeholder="ชื่อหน่วย (ภาษาไทย)"
+                />
+                <input
+                  value={newUnit.to_kg_factor}
+                  onChange={(event) => setNewUnit((prev) => ({ ...prev, to_kg_factor: event.target.value }))}
+                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 outline-none"
+                  placeholder="ตัวแปลงเป็นกก."
+                  type="number"
+                />
+                <label className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-stone-700">
+                  <input
+                    type="checkbox"
+                    checked={newUnit.active}
+                    onChange={(event) => setNewUnit((prev) => ({ ...prev, active: event.target.checked }))}
+                  />
+                  เปิดใช้งาน
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateUnit()}
+                    disabled={savingKey === 'unit:new'}
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    <Save className="h-4 w-4" />
+                    บันทึก
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingUnit(false);
+                      setNewUnit(defaultNewUnit);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700"
+                  >
+                    <X className="h-4 w-4" />
+                    ยกเลิก
+                  </button>
+                </div>
               </div>
             </div>
+            </motion.div>
           ) : null}
+          </AnimatePresence>
 
           <div className="space-y-2">
+            <div className="hidden md:flex md:items-center md:gap-2 px-3 pb-1 text-xs font-medium text-stone-400 uppercase tracking-wide">
+              <span className="w-20 shrink-0">รหัส</span>
+              <span className="flex-1">ชื่อหน่วย</span>
+              <span className="w-24 shrink-0">ตัวแปลงกก.</span>
+              <span className="w-16 shrink-0">สถานะ</span>
+              <span className="w-16 shrink-0" />
+            </div>
             {unitRows.map((row, index) => {
               const requestKey = `unit:${row.originalCode}`;
               return (
                 <div key={row.originalCode} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 md:flex-row md:items-center">
                   <div className="flex flex-1 items-center gap-2">
-                    <input
-                      value={row.code}
-                      onChange={(event) => updateUnitRow(index, { code: event.target.value })}
-                      className="w-full sm:w-20 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                      placeholder="รหัส"
-                    />
+                    <span className="w-full sm:w-20 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-400 font-mono truncate" title={row.code}>
+                      {row.code}
+                    </span>
                     <input
                       value={row.name_th}
                       onChange={(event) => updateUnitRow(index, { name_th: event.target.value })}
@@ -676,6 +735,7 @@ export default function ExecutiveSettings() {
                       onChange={(event) => updateUnitRow(index, { to_kg_factor: event.target.value })}
                       className="w-full sm:w-24 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                       placeholder="ตัวแปลง"
+                      type="number"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -702,8 +762,10 @@ export default function ExecutiveSettings() {
             })}
           </div>
         </SectionCard>
+      </div>
 
-        <SectionCard
+      {/* Rewards — full width */}
+      <SectionCard
           title="จัดการรางวัล"
           description="เพิ่ม แก้ไข และเปิด/ปิดใช้งานรางวัลที่เกษตรกรเห็น"
           actions={
@@ -711,7 +773,7 @@ export default function ExecutiveSettings() {
               <button
                 type="button"
                 onClick={() => setIsAddingReward(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-primary/90"
+                className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-container"
               >
                 <Plus className="h-4 w-4" />
                 เพิ่มรางวัล
@@ -723,7 +785,7 @@ export default function ExecutiveSettings() {
                   setIsAddingReward(false);
                   setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true });
                 }}
-                className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-1.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
+                className="flex items-center gap-1.5 rounded-full border border-stone-300 px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
               >
                 <X className="h-4 w-4" />
                 ยกเลิก
@@ -731,7 +793,16 @@ export default function ExecutiveSettings() {
             )
           }
         >
-          {isAddingReward && (
+          <AnimatePresence initial={false}>
+          {isAddingReward ? (
+            <motion.div
+              key="add-reward-form"
+              initial={reduceMotion ? undefined : { opacity: 0, height: 0 }}
+              animate={reduceMotion ? undefined : { opacity: 1, height: 'auto' }}
+              exit={reduceMotion ? undefined : { opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="overflow-hidden"
+            >
             <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <input
@@ -782,9 +853,19 @@ export default function ExecutiveSettings() {
                 </div>
               </div>
             </div>
-          )}
+            </motion.div>
+          ) : null}
+          </AnimatePresence>
 
           <div className="space-y-2">
+            <div className="hidden md:flex md:items-center md:gap-2 px-3 pb-1 text-xs font-medium text-stone-400 uppercase tracking-wide">
+              <span className="flex-1">ชื่อรางวัล</span>
+              <span className="flex-1">รายละเอียด</span>
+              <span className="w-20 shrink-0">แต้มที่ใช้</span>
+              <span className="w-20 shrink-0">สต็อก</span>
+              <span className="w-14 shrink-0">สถานะ</span>
+              <span className="w-16 shrink-0" />
+            </div>
             {rewardRows.map((row, index) => {
               const requestKey = `reward:${row.id}`;
               return (
@@ -841,7 +922,7 @@ export default function ExecutiveSettings() {
             })}
           </div>
         </SectionCard>
-      </div>
     </div>
+    </ErrorBoundary>
   );
 }

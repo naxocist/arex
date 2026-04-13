@@ -12,6 +12,7 @@ from app.models.workflow import (
     SchedulePickupRequest,
     ScheduleRewardDeliveryRequest,
     UpsertFactoryInfoRequest,
+    UpsertLogisticsInfoRequest,
     UpsertMaterialPointRuleRequest,
     UpsertMaterialTypeRequest,
     UpsertMeasurementUnitRequest,
@@ -640,6 +641,7 @@ class WorkflowService:
                 self.client.table("reward_requests")
                 .select(
                     "id, reward_id, quantity, requested_points, status, requested_at, warehouse_decision_at, rejection_reason, "
+                    "delivery_location_text, delivery_lat, delivery_lng, "
                     "reward_delivery_jobs(id, status, planned_delivery_at, delivery_window_end_at, out_for_delivery_at, delivered_at)"
                 )
                 .eq("farmer_profile_id", farmer_profile_id)
@@ -697,6 +699,9 @@ class WorkflowService:
                     "p_farmer_profile_id": farmer_profile_id,
                     "p_reward_id": payload.reward_id,
                     "p_quantity": payload.quantity,
+                    "p_delivery_location_text": payload.delivery_location_text,
+                    "p_delivery_lat": payload.delivery_lat,
+                    "p_delivery_lng": payload.delivery_lng,
                 },
             ).execute()
             return _first_row(response.data)
@@ -730,7 +735,46 @@ class WorkflowService:
                 .order("created_at", desc=False)
                 .execute()
             )
-            return response.data or []
+            submissions = response.data or []
+            if not submissions:
+                return []
+
+            material_codes = list(
+                {s.get("material_type") for s in submissions if s.get("material_type")}
+            )
+            material_types_by_code: dict[str, str] = {}
+            if material_codes:
+                mt_response = (
+                    self.client.table("material_types")
+                    .select("code, name_th")
+                    .in_("code", material_codes)
+                    .execute()
+                )
+                for row in mt_response.data or []:
+                    if row.get("code"):
+                        material_types_by_code[str(row["code"])] = row.get(
+                            "name_th", ""
+                        )
+
+            result = []
+            for s in submissions:
+                code = s.get("material_type", "")
+                result.append(
+                    {
+                        "id": str(s["id"]),
+                        "farmer_profile_id": str(s.get("farmer_profile_id", "")),
+                        "material_type": code,
+                        "material_name_th": material_types_by_code.get(code, code),
+                        "quantity_value": s.get("quantity_value"),
+                        "quantity_unit": s.get("quantity_unit"),
+                        "pickup_location_text": s.get("pickup_location_text"),
+                        "pickup_lat": s.get("pickup_lat"),
+                        "pickup_lng": s.get("pickup_lng"),
+                        "status": s.get("status"),
+                        "created_at": s.get("created_at"),
+                    }
+                )
+            return result
         except Exception as exc:
             raise WorkflowError(f"Failed to fetch pickup queue: {exc}") from exc
 
@@ -738,7 +782,7 @@ class WorkflowService:
         try:
             response = (
                 self.client.table("factories")
-                .select("id, name_th, location_text, active")
+                .select("id, name_th, location_text, lat, lng, active, is_focal_point")
                 .eq("active", True)
                 .order("name_th", desc=False)
                 .execute()
@@ -787,6 +831,23 @@ class WorkflowService:
                 str(row["id"]): row for row in submissions if row.get("id")
             }
 
+            material_codes = list(
+                {s.get("material_type") for s in submissions if s.get("material_type")}
+            )
+            material_types_by_code: dict[str, str] = {}
+            if material_codes:
+                mt_response = (
+                    self.client.table("material_types")
+                    .select("code, name_th")
+                    .in_("code", material_codes)
+                    .execute()
+                )
+                for row in mt_response.data or []:
+                    if row.get("code"):
+                        material_types_by_code[str(row["code"])] = row.get(
+                            "name_th", ""
+                        )
+
             destination_factory_ids = [
                 str(job["destination_factory_id"])
                 for job in jobs
@@ -796,7 +857,7 @@ class WorkflowService:
             if destination_factory_ids:
                 factories_response = (
                     self.client.table("factories")
-                    .select("id, name_th, location_text")
+                    .select("id, name_th, location_text, lat, lng, is_focal_point")
                     .in_("id", list(set(destination_factory_ids)))
                     .execute()
                 )
@@ -832,6 +893,21 @@ class WorkflowService:
                                 str(job.get("destination_factory_id") or ""), {}
                             ).get("location_text")
                         ),
+                        "destination_factory_is_focal_point": bool(
+                            destination_factory_by_id.get(
+                                str(job.get("destination_factory_id") or ""), {}
+                            ).get("is_focal_point", False)
+                        ),
+                        "destination_factory_lat": (
+                            destination_factory_by_id.get(
+                                str(job.get("destination_factory_id") or ""), {}
+                            ).get("lat")
+                        ),
+                        "destination_factory_lng": (
+                            destination_factory_by_id.get(
+                                str(job.get("destination_factory_id") or ""), {}
+                            ).get("lng")
+                        ),
                         "status": job.get("status"),
                         "planned_pickup_at": job.get("planned_pickup_at"),
                         "pickup_window_end_at": job.get("pickup_window_end_at"),
@@ -839,6 +915,10 @@ class WorkflowService:
                         "delivered_factory_at": job.get("delivered_factory_at"),
                         "created_at": job.get("created_at"),
                         "material_type": submission.get("material_type"),
+                        "material_name_th": material_types_by_code.get(
+                            submission.get("material_type", ""),
+                            submission.get("material_type", ""),
+                        ),
                         "quantity_value": submission.get("quantity_value"),
                         "quantity_unit": submission.get("quantity_unit"),
                         "pickup_location_text": submission.get("pickup_location_text"),
@@ -964,7 +1044,8 @@ class WorkflowService:
             response = (
                 self.client.table("reward_requests")
                 .select(
-                    "id, farmer_profile_id, reward_id, quantity, requested_points, status, requested_at"
+                    "id, farmer_profile_id, reward_id, quantity, requested_points, status, "
+                    "requested_at, delivery_location_text, delivery_lat, delivery_lng"
                 )
                 .eq("status", "warehouse_approved")
                 .order("requested_at", desc=False)
@@ -1013,43 +1094,37 @@ class WorkflowService:
                     str(row["id"]): row for row in rewards if row.get("id")
                 }
 
-            farmer_profile_ids = list(
-                {
-                    str(item["farmer_profile_id"])
-                    for item in approved_requests
-                    if item.get("farmer_profile_id") is not None
-                }
+            farmer_ids = list(
+                {str(item["farmer_profile_id"]) for item in approved_requests if item.get("farmer_profile_id")}
             )
-            latest_pickup_location_by_farmer = (
-                self._get_latest_pickup_location_by_farmer(farmer_profile_ids)
-            )
+            profiles_by_id: dict[str, dict[str, Any]] = {}
+            if farmer_ids:
+                prof_rows = (
+                    self.client.table("profiles")
+                    .select("id, display_name, phone, province")
+                    .in_("id", farmer_ids)
+                    .execute()
+                ).data or []
+                profiles_by_id = {str(r["id"]): r for r in prof_rows if r.get("id")}
 
             result: list[dict[str, Any]] = []
             for item in approved_requests:
                 if str(item.get("id")) in request_ids_with_jobs:
                     continue
 
-                reward_id = (
-                    str(item.get("reward_id"))
-                    if item.get("reward_id") is not None
-                    else None
-                )
-                reward = rewards_by_id.get(reward_id or "", {})
-                farmer_profile_id = str(item.get("farmer_profile_id") or "")
-                pickup_location = latest_pickup_location_by_farmer.get(
-                    farmer_profile_id, {}
-                )
+                reward = rewards_by_id.get(str(item.get("reward_id") or ""), {})
+                profile = profiles_by_id.get(str(item.get("farmer_profile_id") or ""), {})
                 result.append(
                     {
                         **item,
                         "reward_name_th": reward.get("name_th"),
                         "reward_description_th": reward.get("description_th"),
                         "reward_points_cost": reward.get("points_cost"),
-                        "pickup_location_text": pickup_location.get(
-                            "pickup_location_text"
-                        ),
-                        "pickup_lat": pickup_location.get("pickup_lat"),
-                        "pickup_lng": pickup_location.get("pickup_lng"),
+                        "farmer_display_name": profile.get("display_name"),
+                        "farmer_phone": profile.get("phone"),
+                        "pickup_location_text": item.get("delivery_location_text"),
+                        "pickup_lat": item.get("delivery_lat"),
+                        "pickup_lng": item.get("delivery_lng"),
                     }
                 )
 
@@ -1088,7 +1163,10 @@ class WorkflowService:
 
             requests_response = (
                 self.client.table("reward_requests")
-                .select("id, farmer_profile_id, reward_id, quantity, requested_points")
+                .select(
+                    "id, farmer_profile_id, reward_id, quantity, requested_points, "
+                    "delivery_location_text, delivery_lat, delivery_lng"
+                )
                 .in_("id", request_ids)
                 .execute()
             )
@@ -1111,16 +1189,18 @@ class WorkflowService:
                     str(row["id"]): row for row in rewards if row.get("id")
                 }
 
-            farmer_profile_ids = list(
-                {
-                    str(row["farmer_profile_id"])
-                    for row in requests
-                    if row.get("farmer_profile_id") is not None
-                }
+            farmer_ids = list(
+                {str(row["farmer_profile_id"]) for row in requests if row.get("farmer_profile_id")}
             )
-            latest_pickup_location_by_farmer = (
-                self._get_latest_pickup_location_by_farmer(farmer_profile_ids)
-            )
+            profiles_by_id: dict[str, dict[str, Any]] = {}
+            if farmer_ids:
+                prof_rows = (
+                    self.client.table("profiles")
+                    .select("id, display_name, phone")
+                    .in_("id", farmer_ids)
+                    .execute()
+                ).data or []
+                profiles_by_id = {str(r["id"]): r for r in prof_rows if r.get("id")}
 
             result: list[dict[str, Any]] = []
             for job in jobs:
@@ -1139,10 +1219,7 @@ class WorkflowService:
                     if reward_id is not None
                     else None
                 )
-                farmer_profile_id = str(request.get("farmer_profile_id") or "")
-                pickup_location = latest_pickup_location_by_farmer.get(
-                    farmer_profile_id, {}
-                )
+                profile = profiles_by_id.get(str(request.get("farmer_profile_id") or ""), {})
 
                 result.append(
                     {
@@ -1156,15 +1233,15 @@ class WorkflowService:
                         "delivered_at": job.get("delivered_at"),
                         "created_at": job.get("created_at"),
                         "farmer_profile_id": str(request.get("farmer_profile_id")),
+                        "farmer_display_name": profile.get("display_name"),
+                        "farmer_phone": profile.get("phone"),
                         "reward_id": reward_id,
                         "reward_name_th": reward_name,
                         "quantity": request.get("quantity"),
                         "requested_points": request.get("requested_points"),
-                        "pickup_location_text": pickup_location.get(
-                            "pickup_location_text"
-                        ),
-                        "pickup_lat": pickup_location.get("pickup_lat"),
-                        "pickup_lng": pickup_location.get("pickup_lng"),
+                        "pickup_location_text": request.get("delivery_location_text"),
+                        "pickup_lat": request.get("delivery_lat"),
+                        "pickup_lng": request.get("delivery_lng"),
                     }
                 )
 
@@ -1603,56 +1680,156 @@ class WorkflowService:
         except Exception as exc:
             raise WorkflowError(f"Failed to update factory info: {exc}") from exc
 
+    def get_or_create_logistics_for_profile(
+        self, logistics_profile_id: str
+    ) -> dict[str, Any]:
+        try:
+            existing_response = (
+                self.client.table("logistics_accounts")
+                .select(
+                    "id, logistics_profile_id, name_th, location_text, lat, lng, active, created_at"
+                )
+                .eq("logistics_profile_id", logistics_profile_id)
+                .limit(1)
+                .execute()
+            )
+            existing_rows = existing_response.data or []
+            if existing_rows:
+                return _first_row(existing_rows)
+
+            profile_response = (
+                self.client.table("profiles")
+                .select("display_name")
+                .eq("id", logistics_profile_id)
+                .limit(1)
+                .execute()
+            )
+            profile_rows = profile_response.data or []
+            if not profile_rows:
+                raise WorkflowError("Logistics profile not found")
+
+            display_name = str(profile_rows[0].get("display_name") or "").strip()
+            default_name = display_name or f"ทีมขนส่ง {logistics_profile_id[:8]}"
+            create_response = (
+                self.client.table("logistics_accounts")
+                .insert(
+                    {
+                        "logistics_profile_id": logistics_profile_id,
+                        "name_th": default_name,
+                        "active": True,
+                    }
+                )
+                .execute()
+            )
+            return _first_row(create_response.data)
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to load logistics info: {exc}") from exc
+
+    def update_logistics_for_profile(
+        self,
+        logistics_profile_id: str,
+        payload: UpsertLogisticsInfoRequest,
+    ) -> dict[str, Any]:
+        try:
+            if (payload.lat is None) != (payload.lng is None):
+                raise WorkflowError("lat and lng must be provided together")
+
+            account = self.get_or_create_logistics_for_profile(logistics_profile_id)
+            account_id = str(account.get("id") or "")
+            if not account_id:
+                raise WorkflowError("Logistics account record not found")
+
+            name_th = payload.name_th.strip()
+            if not name_th:
+                raise WorkflowError("Logistics name is required")
+
+            location_text = (
+                payload.location_text.strip() if payload.location_text else None
+            )
+
+            update_response = (
+                self.client.table("logistics_accounts")
+                .update(
+                    {
+                        "name_th": name_th,
+                        "location_text": location_text,
+                        "lat": payload.lat,
+                        "lng": payload.lng,
+                    }
+                )
+                .eq("id", account_id)
+                .eq("logistics_profile_id", logistics_profile_id)
+                .execute()
+            )
+            return _first_row(update_response.data)
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to update logistics info: {exc}") from exc
+
+    def _enrich_reward_requests(
+        self, requests: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Join rewards_catalog and profiles onto a list of reward_request rows."""
+        if not requests:
+            return []
+
+        reward_ids = [str(r["reward_id"]) for r in requests if r.get("reward_id")]
+        rewards_by_id: dict[str, dict[str, Any]] = {}
+        if reward_ids:
+            rows = (
+                self.client.table("rewards_catalog")
+                .select("id, name_th, description_th, points_cost")
+                .in_("id", reward_ids)
+                .execute()
+            ).data or []
+            rewards_by_id = {str(r["id"]): r for r in rows if r.get("id")}
+
+        farmer_ids = list(
+            {str(r["farmer_profile_id"]) for r in requests if r.get("farmer_profile_id")}
+        )
+        profiles_by_id: dict[str, dict[str, Any]] = {}
+        if farmer_ids:
+            rows = (
+                self.client.table("profiles")
+                .select("id, display_name, phone, province")
+                .in_("id", farmer_ids)
+                .execute()
+            ).data or []
+            profiles_by_id = {str(r["id"]): r for r in rows if r.get("id")}
+
+        result: list[dict[str, Any]] = []
+        for item in requests:
+            reward = rewards_by_id.get(str(item.get("reward_id") or ""), {})
+            profile = profiles_by_id.get(str(item.get("farmer_profile_id") or ""), {})
+            result.append(
+                {
+                    **item,
+                    "reward_name_th": reward.get("name_th"),
+                    "reward_description_th": reward.get("description_th"),
+                    "reward_points_cost": reward.get("points_cost"),
+                    "farmer_display_name": profile.get("display_name"),
+                    "farmer_phone": profile.get("phone"),
+                    "farmer_province": profile.get("province"),
+                }
+            )
+        return result
+
     def list_pending_reward_requests(self) -> list[dict[str, Any]]:
         try:
             response = (
                 self.client.table("reward_requests")
                 .select(
-                    "id, farmer_profile_id, reward_id, quantity, requested_points, status, requested_at"
+                    "id, farmer_profile_id, reward_id, quantity, requested_points, status, "
+                    "requested_at, delivery_location_text, delivery_lat, delivery_lng"
                 )
                 .eq("status", "requested")
                 .order("requested_at", desc=False)
                 .execute()
             )
-
-            requests = response.data or []
-            if not requests:
-                return []
-
-            reward_ids = [
-                str(item["reward_id"]) for item in requests if item.get("reward_id")
-            ]
-            rewards_by_id: dict[str, dict[str, Any]] = {}
-            if reward_ids:
-                rewards_response = (
-                    self.client.table("rewards_catalog")
-                    .select("id, name_th, description_th, points_cost")
-                    .in_("id", reward_ids)
-                    .execute()
-                )
-                rewards = rewards_response.data or []
-                rewards_by_id = {
-                    str(row["id"]): row for row in rewards if row.get("id")
-                }
-
-            result: list[dict[str, Any]] = []
-            for item in requests:
-                reward_id = (
-                    str(item.get("reward_id"))
-                    if item.get("reward_id") is not None
-                    else None
-                )
-                reward = rewards_by_id.get(reward_id or "", {})
-                result.append(
-                    {
-                        **item,
-                        "reward_name_th": reward.get("name_th"),
-                        "reward_description_th": reward.get("description_th"),
-                        "reward_points_cost": reward.get("points_cost"),
-                    }
-                )
-
-            return result
+            return self._enrich_reward_requests(response.data or [])
         except Exception as exc:
             raise WorkflowError(
                 f"Failed to fetch pending reward requests: {exc}"
@@ -1663,51 +1840,15 @@ class WorkflowService:
             response = (
                 self.client.table("reward_requests")
                 .select(
-                    "id, farmer_profile_id, reward_id, quantity, requested_points, status, requested_at"
+                    "id, farmer_profile_id, reward_id, quantity, requested_points, status, "
+                    "requested_at, delivery_location_text, delivery_lat, delivery_lng, "
+                    "warehouse_decision_at, rejection_reason"
                 )
                 .in_("status", ["warehouse_approved", "warehouse_rejected"])
                 .order("requested_at", desc=True)
                 .execute()
             )
-
-            requests = response.data or []
-            if not requests:
-                return []
-
-            reward_ids = [
-                str(item["reward_id"]) for item in requests if item.get("reward_id")
-            ]
-            rewards_by_id: dict[str, dict[str, Any]] = {}
-            if reward_ids:
-                rewards_response = (
-                    self.client.table("rewards_catalog")
-                    .select("id, name_th, description_th, points_cost")
-                    .in_("id", reward_ids)
-                    .execute()
-                )
-                rewards = rewards_response.data or []
-                rewards_by_id = {
-                    str(row["id"]): row for row in rewards if row.get("id")
-                }
-
-            result: list[dict[str, Any]] = []
-            for item in requests:
-                reward_id = (
-                    str(item.get("reward_id"))
-                    if item.get("reward_id") is not None
-                    else None
-                )
-                reward = rewards_by_id.get(reward_id or "", {})
-                result.append(
-                    {
-                        **item,
-                        "reward_name_th": reward.get("name_th"),
-                        "reward_description_th": reward.get("description_th"),
-                        "reward_points_cost": reward.get("points_cost"),
-                    }
-                )
-
-            return result
+            return self._enrich_reward_requests(response.data or [])
         except Exception as exc:
             raise WorkflowError(
                 f"Failed to fetch answered reward requests: {exc}"
@@ -1967,6 +2108,54 @@ class WorkflowService:
             }
         except Exception as exc:
             raise WorkflowError(f"Failed to fetch executive overview: {exc}") from exc
+
+    def get_impact_kpis(self) -> dict[str, Any]:
+        try:
+            baseline_response = (
+                self.client.table("impact_baselines")
+                .select(
+                    "pilot_area, hotspot_count_baseline, co2_kg_baseline, avg_income_baht_per_household, recorded_by, recorded_at"
+                )
+                .order("recorded_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            baseline_rows = baseline_response.data or []
+            baseline = baseline_rows[0] if baseline_rows else None
+            return {
+                "has_baseline": baseline is not None,
+                "pilot_area": baseline.get("pilot_area") if baseline else None,
+                "hotspot_count_baseline": baseline.get("hotspot_count_baseline")
+                if baseline
+                else None,
+                "co2_kg_baseline": baseline.get("co2_kg_baseline")
+                if baseline
+                else None,
+                "avg_income_baht_per_household": baseline.get(
+                    "avg_income_baht_per_household"
+                )
+                if baseline
+                else None,
+                "recorded_by": baseline.get("recorded_by") if baseline else None,
+                "recorded_at": baseline.get("recorded_at") if baseline else None,
+            }
+        except Exception as exc:
+            raise WorkflowError(f"Failed to fetch impact KPIs: {exc}") from exc
+
+    def list_value_chain(self) -> list[dict[str, Any]]:
+        try:
+            response = (
+                self.client.table("value_chain_mappings")
+                .select(
+                    "id, product_name_th, producer_org, buyer_org, buyer_use_th, active"
+                )
+                .eq("active", True)
+                .order("created_at", desc=False)
+                .execute()
+            )
+            return response.data or []
+        except Exception as exc:
+            raise WorkflowError(f"Failed to fetch value chain: {exc}") from exc
 
 
 def get_workflow_service() -> WorkflowService:

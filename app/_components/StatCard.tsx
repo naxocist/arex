@@ -40,18 +40,18 @@ export default function StatCard({
       whileInView={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true, amount: 0.25 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      whileHover={reduceMotion ? undefined : { y: -3, scale: 1.01 }}
-      className={cn('rounded-xl border px-4 py-4 shadow-sm', toneClassName[tone], className)}
+      whileHover={reduceMotion ? undefined : { y: -2 }}
+      className={cn('group rounded-2xl border px-5 py-5 shadow-sm transition-colors hover:bg-primary/5', toneClassName[tone], className)}
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] opacity-70">{label}</p>
         {Icon ? (
-          <div className="rounded-lg bg-white/70 p-2">
+          <div className="rounded-xl bg-white/70 p-2.5 shadow-sm transition-colors group-hover:bg-primary group-hover:text-white">
             <Icon className="h-4 w-4" />
           </div>
         ) : null}
       </div>
-      <p className="mt-3 text-3xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-4 text-3xl font-light tracking-tight">{value}</p>
       {detail ? <p className="mt-1 text-sm leading-6 opacity-80">{detail}</p> : null}
     </motion.article>
   );

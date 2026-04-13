@@ -36,6 +36,9 @@ class UpsertFactoryInfoRequest(BaseModel):
 class CreateRewardRequest(BaseModel):
     reward_id: str
     quantity: int = Field(gt=0, le=10)
+    delivery_location_text: str | None = Field(default=None, max_length=500)
+    delivery_lat: float | None = None
+    delivery_lng: float | None = None
 
 
 class ScheduleRewardDeliveryRequest(BaseModel):
@@ -59,6 +62,13 @@ class UpsertMeasurementUnitRequest(BaseModel):
     name_th: str = Field(min_length=1, max_length=255)
     to_kg_factor: float | None = Field(default=None, gt=0)
     active: bool = True
+
+
+class UpsertLogisticsInfoRequest(BaseModel):
+    name_th: str = Field(min_length=1, max_length=255)
+    location_text: str | None = Field(default=None, max_length=500)
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
 
 
 class UpsertMaterialPointRuleRequest(BaseModel):

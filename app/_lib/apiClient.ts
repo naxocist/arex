@@ -442,6 +442,9 @@ export interface FarmerSubmissionItem {
 export interface CreateRewardRequestPayload {
   reward_id: string;
   quantity: number;
+  delivery_location_text?: string | null;
+  delivery_lat?: number | null;
+  delivery_lng?: number | null;
 }
 
 export interface FarmerRewardItem {
@@ -471,6 +474,9 @@ export interface FarmerRewardRequestItem {
   requested_at: string;
   warehouse_decision_at: string | null;
   rejection_reason: string | null;
+  delivery_location_text: string | null;
+  delivery_lat: number | null;
+  delivery_lng: number | null;
   reward_delivery_jobs: FarmerRewardDeliveryJobItem[];
 }
 
@@ -481,17 +487,40 @@ export interface SchedulePickupPayload {
   notes?: string;
 }
 
+export interface ImpactKpis {
+  has_baseline: boolean;
+  pilot_area: string | null;
+  hotspot_count_baseline: number | null;
+  co2_kg_baseline: number | null;
+  avg_income_baht_per_household: number | null;
+  recorded_by: string | null;
+  recorded_at: string | null;
+}
+
+export interface ValueChainItem {
+  id: string;
+  product_name_th: string;
+  producer_org: string | null;
+  buyer_org: string | null;
+  buyer_use_th: string | null;
+  active: boolean;
+}
+
 export interface LogisticsFactoryOptionItem {
   id: string;
   name_th: string;
   location_text?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   active: boolean;
+  is_focal_point?: boolean;
 }
 
 export interface LogisticsPickupQueueItem {
   id: string;
   farmer_profile_id: string;
   material_type: 'rice_straw' | 'cassava_root' | 'sugarcane_bagasse' | 'corn_stover' | string;
+  material_name_th?: string;
   quantity_value: number;
   quantity_unit: string;
   pickup_location_text: string;
@@ -508,6 +537,9 @@ export interface LogisticsPickupJobItem {
   destination_factory_id?: string | null;
   destination_factory_name_th?: string | null;
   destination_factory_location_text?: string | null;
+  destination_factory_is_focal_point?: boolean;
+  destination_factory_lat?: number | null;
+  destination_factory_lng?: number | null;
   status: 'pickup_scheduled' | 'picked_up' | 'delivered_to_factory' | string;
   planned_pickup_at: string;
   pickup_window_end_at?: string | null;
@@ -515,6 +547,7 @@ export interface LogisticsPickupJobItem {
   delivered_factory_at: string | null;
   created_at: string;
   material_type: string;
+  material_name_th?: string;
   quantity_value: number;
   quantity_unit: string;
   pickup_location_text: string;
@@ -565,6 +598,8 @@ export interface LogisticsRewardDeliveryJobItem {
   delivered_at: string | null;
   created_at: string;
   farmer_profile_id: string;
+  farmer_display_name?: string | null;
+  farmer_phone?: string | null;
   reward_id: string | null;
   reward_name_th: string | null;
   pickup_location_text?: string | null;
@@ -650,6 +685,24 @@ export interface UpsertFactoryInfoPayload {
   lng?: number | null;
 }
 
+export interface LogisticsInfoItem {
+  id: string;
+  logistics_profile_id: string;
+  name_th: string;
+  location_text: string | null;
+  lat: number | null;
+  lng: number | null;
+  active: boolean;
+  created_at: string;
+}
+
+export interface UpsertLogisticsInfoPayload {
+  name_th: string;
+  location_text?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+}
+
 export interface RejectRewardRequestPayload {
   reason: string;
 }
@@ -665,6 +718,14 @@ export interface WarehousePendingRequestItem {
   requested_points: number;
   status: string;
   requested_at: string;
+  delivery_location_text?: string | null;
+  delivery_lat?: number | null;
+  delivery_lng?: number | null;
+  farmer_display_name?: string | null;
+  farmer_phone?: string | null;
+  farmer_province?: string | null;
+  rejection_reason?: string | null;
+  warehouse_decision_at?: string | null;
 }
 
 export interface LoginPayload {
@@ -804,6 +865,12 @@ export const logisticsApi = {
     apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/delivered`, {
       method: 'POST',
     }),
+  getMyInfo: (options?: RequestBehaviorOptions) => apiRequest<LogisticsInfoItem>('/logistics/me', options),
+  updateMyInfo: (payload: UpsertLogisticsInfoPayload) =>
+    apiRequest<LogisticsInfoItem>('/logistics/me', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const factoryApi = {
@@ -889,6 +956,10 @@ export const executiveApi = {
         body: JSON.stringify(payload),
       },
     ),
+  getImpactKpis: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ impact_kpis: ImpactKpis; actor: string }>('/executive/impact-kpis', options),
+  listValueChain: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ value_chain: ValueChainItem[]; actor: string }>('/executive/value-chain', options),
   listRewards: (options?: RequestBehaviorOptions) =>
     apiRequest<{ rewards: FarmerRewardItem[]; actor: string }>('/executive/rewards', options),
   createReward: (payload: { name_th: string; description_th?: string; points_cost: number; stock_qty: number; active?: boolean }) =>

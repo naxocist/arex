@@ -16,8 +16,7 @@ create table if not exists measurement_units (
 insert into measurement_units (code, name_th, to_kg_factor, sort_order, active)
 values
   ('กิโลกรัม', 'กิโลกรัม', 1.000000, 10, true),
-  ('ตัน', 'ตัน', 1000.000000, 20, true),
-  ('ลูกบาศก์เมตร', 'ลูกบาศก์เมตร', null, 30, true)
+  ('ตัน', 'ตัน', 1000.000000, 20, true)
 on conflict (code) do update
 set name_th = excluded.name_th,
     to_kg_factor = excluded.to_kg_factor,
@@ -35,7 +34,6 @@ update material_submissions
 set quantity_unit = case
   when quantity_unit = 'kg' then 'กิโลกรัม'
   when quantity_unit = 'ton' then 'ตัน'
-  when quantity_unit = 'm3' then 'ลูกบาศก์เมตร'
   else quantity_unit
 end;
 

@@ -240,6 +240,38 @@ def create_reward(
         ) from exc
 
 
+@router.get("/impact-kpis")
+def get_impact_kpis(
+    current_user: AuthenticatedUser = Depends(
+        require_roles(Role.EXECUTIVE, Role.ADMIN)
+    ),
+    workflow_service: WorkflowService = Depends(get_workflow_service),
+) -> dict[str, Any]:
+    try:
+        kpis = workflow_service.get_impact_kpis()
+        return {"impact_kpis": kpis, "actor": current_user.role.value}
+    except WorkflowError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+
+
+@router.get("/value-chain")
+def list_value_chain(
+    current_user: AuthenticatedUser = Depends(
+        require_roles(Role.EXECUTIVE, Role.ADMIN)
+    ),
+    workflow_service: WorkflowService = Depends(get_workflow_service),
+) -> dict[str, Any]:
+    try:
+        mappings = workflow_service.list_value_chain()
+        return {"value_chain": mappings, "actor": current_user.role.value}
+    except WorkflowError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+
+
 @router.put("/rewards/{reward_id}")
 def update_reward(
     reward_id: str,

@@ -27,12 +27,11 @@ export default function SectionCard({
       whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.18 }}
       transition={{ duration: 0.46, ease: 'easeOut' }}
-      whileHover={reduceMotion ? undefined : { y: -2 }}
-      className={cn('rounded-2xl bg-white px-5 py-5 shadow-sm', className)}
+      className={cn('rounded-2xl border border-outline-variant/10 bg-white p-8 shadow-sm', className)}
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-on-surface">{title}</h2>
+          <h2 className="text-xl font-medium text-on-surface">{title}</h2>
           {description ? <p className="mt-1 text-sm leading-6 text-on-surface-variant">{description}</p> : null}
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}

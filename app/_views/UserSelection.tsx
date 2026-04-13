@@ -2,8 +2,11 @@
 
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'motion/react';
 import {
   ArrowRight,
+  Eye,
+  EyeOff,
   Leaf,
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
@@ -21,6 +24,7 @@ export default function UserSelection() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginMessage, setLoginMessage] = useState<string | null>(null);
 
@@ -36,6 +40,9 @@ export default function UserSelection() {
     lat: null as number | null,
     lng: null as number | null,
   });
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [provinceSearch, setProvinceSearch] = useState('');
+  const [provinceOpen, setProvinceOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [registerMessage, setRegisterMessage] = useState<string | null>(null);
 
@@ -50,7 +57,7 @@ export default function UserSelection() {
     [],
   );
 
-  const handleApiLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleApiLogin = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoggingIn(true);
     setLoginMessage(null);
@@ -82,19 +89,38 @@ export default function UserSelection() {
     }
   };
 
-  const handleApiRegister = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleApiRegister = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsRegistering(true);
     setRegisterMessage(null);
 
+    if (!THAI_PROVINCES.includes(registerForm.province as typeof THAI_PROVINCES[number])) {
+      setRegisterMessage('เลือกจังหวัดจากรายการ');
+      setIsRegistering(false);
+      return;
+    }
+
+    if (registerForm.password.length < 6) {
+      setRegisterMessage('รหัสผ่านสั้นเกินไป (ต่ำกว่า 6 ตัว)');
+      setIsRegistering(false);
+      return;
+    }
+
+    const digitsOnly = registerForm.phone.replace(/\D/g, '');
+    if (digitsOnly.length !== 10) {
+      setRegisterMessage('เบอร์โทรต้องมี 10 หลัก');
+      setIsRegistering(false);
+      return;
+    }
+
     if (registerRole === 'factory') {
       if (!registerForm.name_th.trim()) {
-        setRegisterMessage('กรุณาระบุชื่อโรงงาน');
+        setRegisterMessage('ระบุชื่อโรงงาน');
         setIsRegistering(false);
         return;
       }
       if ((registerForm.lat === null) !== (registerForm.lng === null)) {
-        setRegisterMessage('กรุณาเลือกพิกัดโรงงานให้ครบทั้งละติจูดและลองจิจูด');
+        setRegisterMessage('พิกัดโรงงานไม่ครบ');
         setIsRegistering(false);
         return;
       }
@@ -105,7 +131,7 @@ export default function UserSelection() {
         email: registerForm.email.trim(),
         password: registerForm.password,
         display_name: registerForm.display_name.trim(),
-        phone: registerForm.phone.trim(),
+        phone: registerForm.phone.replace(/\D/g, ''),
         province: registerForm.province.trim(),
       };
 
@@ -141,12 +167,12 @@ export default function UserSelection() {
         return;
       }
 
-      setRegisterMessage('สมัครสมาชิกสำเร็จ แต่บทบาทนี้ยังไม่มีหน้าใช้งานในระบบ');
+      setRegisterMessage('สมัครสำเร็จ แต่บทบาทนี้ยังไม่รองรับ');
     } catch (error) {
       if (error instanceof ApiError) {
         setRegisterMessage(`สมัครสมาชิกไม่สำเร็จ: ${error.message}`);
       } else {
-        setRegisterMessage('สมัครสมาชิกไม่สำเร็จ กรุณาลองใหม่');
+        setRegisterMessage('สมัครไม่สำเร็จ ลองใหม่');
       }
     } finally {
       setIsRegistering(false);
@@ -154,104 +180,207 @@ export default function UserSelection() {
   };
 
   return (
-    <div className="min-h-screen bg-surface px-4 py-5 md:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-6xl flex-col gap-5">
-        <section className="overflow-hidden rounded-[2rem] border border-blue-100 bg-gradient-to-r from-white via-blue-50/50 to-green-50/30 px-5 py-7 shadow-sm md:px-10 md:py-10">
-          <div className="max-w-5xl">
-            <div className="inline-flex items-center gap-4 rounded-full border border-blue-100 bg-white/95 px-4 py-3 shadow-sm">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-container text-white">
-                <Leaf className="h-5 w-5 fill-current" />
-              </span>
-              <div>
-                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-green-700">AREX Platform</p>
-                <p className="text-xl font-semibold text-stone-700 md:text-2xl">Agricultural Residue Exchange</p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-surface flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-center lg:gap-16">
 
-            <h1 className="mt-6 max-w-5xl text-2xl font-semibold tracking-tight text-stone-950 md:text-4xl">
-              แพลตฟอร์มแลกเปลี่ยนวัสดุเหลือใช้ทางการเกษตร
-            </h1>
+        {/* ——— Desktop branding column (hidden on mobile) ——— */}
+        <motion.div
+          initial={{ x: -24, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="hidden lg:flex flex-col items-start gap-6 w-[360px] shrink-0 sticky top-8 self-start"
+        >
+          {/* AREX icon + pmuc badge */}
+          <div className="relative">
+            <div className="primary-gradient inline-flex h-20 w-20 items-center justify-center rounded-3xl text-white shadow-xl">
+              <Leaf className="h-10 w-10 fill-current" />
+            </div>
+            <div className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-stone-200 bg-white p-0.5 shadow-md">
+              <img src="/assets/pmuc_logo.png" alt="บพข Logo" className="h-full w-full object-contain" />
+            </div>
           </div>
-        </section>
 
-        <div className="flex justify-center">
-          <section className="w-full max-w-3xl overflow-hidden rounded-[1.8rem] border border-blue-100 bg-white shadow-sm">
-            <div className="border-b border-blue-100 bg-gradient-to-r from-white via-blue-50/50 to-green-50/30 px-5 py-4 md:px-6">
-              <div>
-                <h2 className="mt-2 text-2xl font-semibold text-stone-950">
-                  {mode === 'login' ? 'เข้าสู่ระบบเพื่อเริ่มใช้งาน' : 'สมัครสมาชิกในไม่กี่ขั้นตอน'}
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-stone-600">
-                  {mode === 'login'
-                    ? 'กรอกอีเมลและรหัสผ่าน แล้วระบบจะพาไปยังหน้าระบบตามบทบาทของคุณ'
-                    : 'กรอกข้อมูลพื้นฐานก่อน แล้วข้อมูลโรงงานจะเปิดเพิ่มเฉพาะเมื่อเลือกสมัครเป็นฝ่ายโรงงาน'}
-                </p>
+          <div>
+            <p className="text-[0.7rem] font-bold uppercase tracking-[0.28em] text-primary">AREX Platform</p>
+            <h1 className="mt-1 text-4xl font-light tracking-tight text-primary">ยินดีต้อนรับ</h1>
+            <p className="mt-2 text-base leading-relaxed text-on-surface-variant">
+              แพลตฟอร์มแลกเปลี่ยนวัสดุเหลือใช้ทางการเกษตร<br />
+              ส่งวัสดุ รับ PMUC Coin และแลกรับรางวัล
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 w-full">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-stone-400">เจ้าของระบบ</span>
+              <div className="flex items-center gap-3 rounded-xl border border-outline-variant/20 bg-white px-4 py-2.5 shadow-sm">
+                <img src="/assets/pmuc_logo.png" alt="บพข (PMUC) Logo" className="h-7 object-contain" />
+                <div className="text-left">
+                  <p className="text-[10px] font-bold leading-tight text-stone-700">บพข.</p>
+                  <p className="text-[8px] leading-tight text-stone-400">ภายใต้ อว.</p>
+                </div>
+                <div className="h-6 w-px bg-stone-200" />
+                <img src="/assets/อว_logo.png" alt="อว. Logo" className="h-5 object-contain opacity-60" />
+                <div className="h-6 w-px bg-stone-200" />
+                <div className="text-left">
+                  <p className="text-[10px] font-bold leading-tight text-stone-700">LAWDEE CO., LTD.</p>
+                  <p className="text-[8px] leading-tight text-stone-400">ผู้ร่วมพัฒนาระบบ</p>
+                </div>
               </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-stone-400">พัฒนาโดย</span>
+              <div className="flex items-center gap-2 rounded-xl border border-outline-variant/20 bg-white px-4 py-2 shadow-sm self-start">
+                <img src="/assets/cedt_logo.png" alt="CEDT Logo" className="h-7 object-contain" />
+                <div className="text-left">
+                  <p className="text-[10px] font-bold leading-tight text-stone-700">CEDT</p>
+                  <p className="text-[8px] leading-tight text-stone-400">Chulalongkorn University</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-              <div className="mt-4 flex items-center justify-between gap-3 rounded-[1.3rem] bg-white p-1.5 shadow-sm ring-1 ring-blue-100">
-                <button
-                  type="button"
-                  onClick={() => setMode('login')}
-                  className={`flex-1 rounded-[1rem] px-4 py-3 text-sm font-semibold transition ${
-                    mode === 'login' ? 'bg-primary text-white shadow-sm' : 'text-stone-600'
-                  }`}
-                >
-                  เข้าสู่ระบบ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('register')}
-                  className={`flex-1 rounded-[1rem] px-4 py-3 text-sm font-semibold transition ${
-                    mode === 'register' ? 'bg-primary text-white shadow-sm' : 'text-stone-600'
-                  }`}
-                >
-                  สมัครสมาชิก
-                </button>
+          <p className="text-xs font-medium uppercase tracking-widest text-stone-400 mt-auto">
+            © 2026 AREX Platform
+          </p>
+        </motion.div>
+
+        {/* ——— Form column ——— */}
+        <div className="flex-1 min-w-0 flex flex-col gap-5">
+
+          {/* Mobile-only compact header */}
+          <motion.div
+            initial={{ y: -12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className="lg:hidden flex flex-col gap-3"
+          >
+            {/* Icon + title row */}
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0">
+                <div className="primary-gradient inline-flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg">
+                  <Leaf className="h-7 w-7 fill-current" />
+                </div>
+                <div className="absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full border border-stone-200 bg-white p-0.5 shadow-md">
+                  <img src="/assets/pmuc_logo.png" alt="บพข Logo" className="h-full w-full object-contain" />
+                </div>
+              </div>
+              <div>
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.24em] text-primary">AREX Platform</p>
+                <h1 className="text-2xl font-light tracking-tight text-primary">ยินดีต้อนรับ</h1>
               </div>
             </div>
 
-            <div className="px-5 py-5 md:max-h-[calc(100vh-15rem)] md:overflow-y-auto md:px-6">
-              {mode === 'login' ? (
-                <form onSubmit={handleApiLogin} className="space-y-5">
-                  <div className="grid gap-4">
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium text-stone-700">อีเมล</span>
+            {/* Org badges — single compact row */}
+            <div className="flex items-center gap-2 rounded-xl border border-outline-variant/20 bg-white px-3 py-2 shadow-sm self-start">
+              <img src="/assets/pmuc_logo.png" alt="บพข" className="h-5 object-contain" />
+              <span className="text-[9px] font-bold text-stone-600">บพข.</span>
+              <div className="h-4 w-px bg-stone-200" />
+              <img src="/assets/อว_logo.png" alt="อว." className="h-4 object-contain opacity-60" />
+              <div className="h-4 w-px bg-stone-200" />
+              <span className="text-[9px] font-bold text-stone-600">LAWDEE</span>
+              <div className="h-4 w-px bg-stone-200" />
+              <img src="/assets/cedt_logo.png" alt="CEDT" className="h-5 object-contain" />
+              <span className="text-[9px] font-bold text-stone-600">CEDT</span>
+            </div>
+          </motion.div>
+
+        {/* ——— Login / Register card ——— */}
+        <motion.div
+          initial={{ y: 24, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.15, duration: 0.4, ease: 'easeOut' }}
+          className="overflow-hidden rounded-3xl border border-outline-variant/20 bg-white shadow-sm"
+        >
+          {/* Tab switcher */}
+          <div className="border-b border-outline-variant/10 bg-surface-container-low px-5 py-4 md:px-6">
+            <div className="flex items-center gap-2 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-emerald-100">
+              <button
+                type="button"
+                onClick={() => setMode('login')}
+                className={`min-h-[52px] flex-1 rounded-xl px-4 py-3 text-lg font-semibold transition ${
+                  mode === 'login' ? 'bg-primary text-white shadow-sm' : 'text-stone-600 hover:bg-surface-container-low'
+                }`}
+              >
+                เข้าสู่ระบบ
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('register')}
+                className={`min-h-[52px] flex-1 rounded-xl px-4 py-3 text-lg font-semibold transition ${
+                  mode === 'register' ? 'bg-primary text-white shadow-sm' : 'text-stone-600 hover:bg-surface-container-low'
+                }`}
+              >
+                สมัครสมาชิก
+              </button>
+            </div>
+
+            <p className="mt-3 text-base leading-relaxed text-stone-600">
+              {mode === 'login'
+                ? 'กรอกอีเมลและรหัสผ่าน ระบบจะพาไปยังหน้าของคุณโดยอัตโนมัติ'
+                : 'กรอกข้อมูลพื้นฐาน แล้วกด "สมัครสมาชิก" เพื่อเริ่มใช้งาน'}
+            </p>
+          </div>
+
+          <div className="px-5 py-6 md:px-6">
+            {mode === 'login' ? (
+              <form onSubmit={handleApiLogin} className="space-y-5">
+                <div className="space-y-4">
+                  {/* Email */}
+                  <label className="block space-y-2">
+                    <span className="text-base font-semibold text-stone-800">อีเมล</span>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      autoComplete="email"
+                      className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-high px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
+                      required
+                    />
+                  </label>
+
+                  {/* Password */}
+                  <label className="block space-y-2">
+                    <span className="text-base font-semibold text-stone-800">รหัสผ่าน</span>
+                    <div className="relative">
                       <input
-                        type="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        placeholder="name@example.com"
-                        className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
-                        required
-                      />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium text-stone-700">รหัสผ่าน</span>
-                      <input
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         value={password}
-                        onChange={(event) => setPassword(event.target.value)}
+                        onChange={(e) => setPassword(e.target.value)}
                         placeholder="กรอกรหัสผ่าน"
-                        className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
+                        autoComplete="current-password"
+                        className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-high px-4 py-4 pr-14 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
                         required
                       />
-                    </label>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-stone-500 hover:bg-surface-container hover:text-stone-800 transition"
+                        aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </label>
+                </div>
 
-                  {loginMessage ? <AlertBanner message={loginMessage} tone="error" /> : null}
+                {loginMessage ? <AlertBanner message={loginMessage} tone="error" /> : null}
 
-                  <button
-                    type="submit"
-                    disabled={isLoggingIn}
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-container disabled:opacity-60"
-                  >
-                    <span>{isLoggingIn ? 'กำลังเชื่อมต่อ...' : 'เข้าสู่ระบบ'}</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleApiRegister} className="space-y-5">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="flex w-full min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-4 text-lg font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
+                >
+                  <span>{isLoggingIn ? 'กำลังเชื่อมต่อ...' : 'เข้าสู่ระบบ'}</span>
+                  {!isLoggingIn && <ArrowRight className="h-5 w-5" />}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleApiRegister} className="space-y-5">
+                {/* Role selector */}
+                <div className="space-y-2">
+                  <span className="text-base font-semibold text-stone-800">ฉันเป็น...</span>
+                  <div className="grid grid-cols-3 gap-2">
                     {[
                       { value: 'farmer', label: 'เกษตรกร' },
                       { value: 'logistics', label: 'ฝ่ายขนส่ง' },
@@ -261,149 +390,197 @@ export default function UserSelection() {
                         key={option.value}
                         type="button"
                         onClick={() => setRegisterRole(option.value as 'farmer' | 'logistics' | 'factory')}
-                        className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                        className={`min-h-[52px] rounded-2xl border px-3 py-3 text-base font-semibold transition ${
                           registerRole === option.value
-                            ? 'border-primary bg-primary text-white'
-                            : 'border-blue-100 bg-blue-50/45 text-stone-700'
+                            ? 'border-primary bg-primary text-white shadow-sm'
+                            : 'border-outline-variant/30 bg-surface-container-low text-on-surface-variant hover:border-primary/40'
                         }`}
                       >
                         {option.label}
                       </button>
                     ))}
                   </div>
+                </div>
 
-                  <div className="rounded-[1.5rem] border border-blue-100 bg-white p-4">
-                    <div className="mb-3">
-                      <h3 className="text-base font-semibold text-stone-900">ข้อมูลบัญชีและข้อมูลติดต่อ</h3>
-                    </div>
+                {/* Account fields */}
+                <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4 space-y-4">
+                  <h3 className="text-base font-semibold text-stone-900">ข้อมูลบัญชีและข้อมูลติดต่อ</h3>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <label className="space-y-2">
-                        <span className="text-sm font-medium text-stone-700">อีเมล</span>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block space-y-2">
+                      <span className="text-base font-semibold text-stone-800">อีเมล</span>
+                      <input
+                        type="email"
+                        value={registerForm.email}
+                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))}
+                        autoComplete="email"
+                        placeholder="name@example.com"
+                        className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
+                        required
+                      />
+                    </label>
+
+                    <label className="block space-y-2">
+                      <span className="text-base font-semibold text-stone-800">รหัสผ่าน</span>
+                      <div className="relative">
                         <input
-                          type="email"
-                          value={registerForm.email}
-                          onChange={(event) => setRegisterForm((prev) => ({ ...prev, email: event.target.value }))}
-                          className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
-                          required
-                        />
-                      </label>
-                      <label className="space-y-2">
-                        <span className="text-sm font-medium text-stone-700">รหัสผ่าน</span>
-                        <input
-                          type="password"
+                          type={showRegisterPassword ? 'text' : 'password'}
                           value={registerForm.password}
-                          onChange={(event) => setRegisterForm((prev) => ({ ...prev, password: event.target.value }))}
-                          className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
+                          onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))}
+                          autoComplete="new-password"
+                          placeholder="รหัสผ่านของคุณ"
+                          className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 pr-14 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
                           required
                           minLength={6}
                         />
-                      </label>
-                      <label className="space-y-2">
-                        <span className="text-sm font-medium text-stone-700">ชื่อผู้ใช้งาน</span>
-                        <input
-                          type="text"
-                          value={registerForm.display_name}
-                          onChange={(event) => setRegisterForm((prev) => ({ ...prev, display_name: event.target.value }))}
-                          className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
-                          required
-                        />
-                      </label>
-                      <label className="space-y-2">
-                        <span className="text-sm font-medium text-stone-700">เบอร์โทร</span>
-                        <input
-                          type="text"
-                          value={registerForm.phone}
-                          onChange={(event) => setRegisterForm((prev) => ({ ...prev, phone: event.target.value }))}
-                          className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
-                          required
-                        />
-                      </label>
-                      <label className="space-y-2 md:col-span-2">
-                        <span className="text-sm font-medium text-stone-700">จังหวัด</span>
-                        <select
-                          value={registerForm.province}
-                          onChange={(event) => setRegisterForm((prev) => ({ ...prev, province: event.target.value }))}
-                          className="w-full rounded-2xl border border-blue-100 bg-blue-50/45 px-4 py-3 outline-none"
-                          required
+                        <button
+                          type="button"
+                          onClick={() => setShowRegisterPassword((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-stone-500 hover:bg-surface-container hover:text-stone-800 transition"
+                          aria-label={showRegisterPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
                         >
-                          <option value="" disabled>
-                            เลือกจังหวัด
-                          </option>
-                          {THAI_PROVINCES.map((province) => (
-                            <option key={province} value={province}>
-                              {province}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                          {showRegisterPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
+                      <p className="text-sm text-stone-500">อย่างน้อย 6 ตัวอักษร</p>
+                    </label>
+
+                    <label className="block space-y-2">
+                      <span className="text-base font-semibold text-stone-800">ชื่อผู้ใช้งาน</span>
+                      <input
+                        type="text"
+                        value={registerForm.display_name}
+                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, display_name: e.target.value }))}
+                        autoComplete="name"
+                        placeholder="นายสมชาย ใจดี"
+                        className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
+                        required
+                      />
+                    </label>
+
+                    <label className="block space-y-2">
+                      <span className="text-base font-semibold text-stone-800">เบอร์โทร</span>
+                      <input
+                        type="tel"
+                        value={registerForm.phone}
+                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, phone: e.target.value }))}
+                        autoComplete="tel"
+                        placeholder="0xx-xxx-xxxx"
+                        className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
+                        required
+                      />
+                    </label>
+
+                    <div className="block space-y-2 md:col-span-2">
+                      <span className="text-base font-semibold text-stone-800">จังหวัด</span>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={provinceSearch !== '' ? provinceSearch : registerForm.province}
+                          onChange={(e) => {
+                            setProvinceSearch(e.target.value);
+                            setProvinceOpen(true);
+                            setRegisterForm((prev) => ({ ...prev, province: '' }));
+                          }}
+                          onFocus={() => { setProvinceSearch(registerForm.province); setProvinceOpen(true); }}
+                          onBlur={() => setTimeout(() => setProvinceOpen(false), 150)}
+                          placeholder="พิมพ์เพื่อค้นหาจังหวัด"
+                          className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
+                          required={!registerForm.province}
+                        />
+                        {provinceOpen && (
+                          <ul className="absolute z-50 bottom-full mb-1 max-h-56 w-full overflow-y-auto rounded-xl border border-outline-variant/20 bg-white shadow-lg">
+                            {THAI_PROVINCES.filter((p) =>
+                              !provinceSearch || p.includes(provinceSearch)
+                            ).map((p) => (
+                              <li
+                                key={p}
+                                onMouseDown={() => {
+                                  setRegisterForm((prev) => ({ ...prev, province: p }));
+                                  setProvinceSearch('');
+                                  setProvinceOpen(false);
+                                }}
+                                className="cursor-pointer px-4 py-3 text-base hover:bg-emerald-50 hover:text-emerald-900"
+                              >
+                                {p}
+                              </li>
+                            ))}
+                            {THAI_PROVINCES.filter((p) => !provinceSearch || p.includes(provinceSearch)).length === 0 && (
+                              <li className="px-4 py-3 text-base text-stone-400">ไม่พบจังหวัด</li>
+                            )}
+                          </ul>
+                        )}
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  {registerRole === 'factory' ? (
-                    <div className="rounded-[1.5rem] border border-green-100 bg-green-50/50 p-4">
-                      <div className="mb-4">
-                        <h3 className="text-base font-semibold text-stone-900">ข้อมูลโรงงาน</h3>
-                        <p className="mt-1 text-sm leading-6 text-stone-600">
-                          เลือกตำแหน่งโรงงานเพิ่มได้ในกล่องนี้ โดยไม่ทำให้ฟอร์มหลักยาวเกินไป
-                        </p>
-                      </div>
-
-                      <div className="space-y-4">
-                        <label className="space-y-2">
-                          <span className="text-sm font-medium text-stone-700">ชื่อโรงงาน</span>
-                          <input
-                            type="text"
-                            value={registerForm.name_th}
-                            onChange={(event) => setRegisterForm((prev) => ({ ...prev, name_th: event.target.value }))}
-                            className="w-full rounded-2xl border border-green-100 bg-white px-4 py-3 outline-none"
-                            required
-                          />
-                        </label>
-
-                        <label className="space-y-2">
-                          <span className="text-sm font-medium text-stone-700">ที่อยู่โรงงาน</span>
-                          <input
-                            type="text"
-                            value={registerForm.location_text}
-                            onChange={(event) => setRegisterForm((prev) => ({ ...prev, location_text: event.target.value }))}
-                            className="w-full rounded-2xl border border-green-100 bg-white px-4 py-3 outline-none"
-                          />
-                        </label>
-
-                        <PickupLocationMapPicker
-                          lat={registerForm.lat}
-                          lng={registerForm.lng}
-                          onChange={({ lat, lng }) => setRegisterForm((prev) => ({ ...prev, lat, lng }))}
-                          onAddressResolved={(address) => {
-                            setRegisterForm((prev) => ({
-                              ...prev,
-                              location_text: address,
-                            }));
-                          }}
-                          currentLocationButtonLabel="ใช้ตำแหน่งโรงงานปัจจุบัน"
-                          mapHintText="คลิกบนแผนที่เพื่อปักหมุดตำแหน่งโรงงาน"
-                          mapHeightClassName="h-[220px] w-full overflow-hidden rounded-[1.5rem] sm:h-[260px]"
-                        />
-                      </div>
+                {/* Factory-only fields */}
+                {registerRole === 'factory' ? (
+                  <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 space-y-4">
+                    <div>
+                      <h3 className="text-base font-semibold text-stone-900">ข้อมูลโรงงาน</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-stone-600">
+                        ระบุชื่อโรงงาน และเลือกตำแหน่งบนแผนที่ได้เลย
+                      </p>
                     </div>
-                  ) : null}
 
-                  {registerMessage ? <AlertBanner message={registerMessage} tone="error" /> : null}
+                    <label className="block space-y-2">
+                      <span className="text-base font-semibold text-stone-800">ชื่อโรงงาน</span>
+                      <input
+                        type="text"
+                        value={registerForm.name_th}
+                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, name_th: e.target.value }))}
+                        placeholder="โรงงานชีวมวลเชียงใหม่"
+                        className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
+                        required
+                      />
+                    </label>
 
-                  <button
-                    type="submit"
-                    disabled={isRegistering}
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-container disabled:opacity-60"
-                  >
-                    <span>{isRegistering ? 'กำลังสมัครสมาชิก...' : 'สมัครสมาชิกและเข้าสู่ระบบ'}</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </form>
-              )}
-            </div>
-          </section>
-        </div>
+                    <label className="block space-y-2">
+                      <span className="text-base font-semibold text-stone-800">ที่อยู่โรงงาน</span>
+                      <input
+                        type="text"
+                        value={registerForm.location_text}
+                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, location_text: e.target.value }))}
+                        placeholder="123 ถ.นิมมาน อ.เมือง เชียงใหม่"
+                        className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
+                      />
+                    </label>
+
+                    <PickupLocationMapPicker
+                      lat={registerForm.lat}
+                      lng={registerForm.lng}
+                      onChange={({ lat, lng }) => setRegisterForm((prev) => ({ ...prev, lat, lng }))}
+                      onAddressResolved={(address) => setRegisterForm((prev) => ({ ...prev, location_text: address }))}
+                      currentLocationButtonLabel="ใช้ตำแหน่งโรงงานปัจจุบัน"
+                      mapHintText="คลิกบนแผนที่เพื่อปักหมุดตำแหน่งโรงงาน"
+                      mapHeightClassName="h-[220px] w-full overflow-hidden rounded-2xl sm:h-[260px]"
+                    />
+                  </div>
+                ) : null}
+
+                {registerMessage ? <AlertBanner message={registerMessage} tone="error" /> : null}
+
+                <button
+                  type="submit"
+                  disabled={isRegistering}
+                  className="flex w-full min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-4 text-lg font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
+                >
+                  <span>{isRegistering ? 'กำลังสมัครสมาชิก...' : 'สมัครสมาชิกและเข้าสู่ระบบ'}</span>
+                  {!isRegistering && <ArrowRight className="h-5 w-5" />}
+                </button>
+              </form>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Footer — mobile only */}
+        <p className="lg:hidden text-center text-xs text-stone-400">
+          © 2025 AREX Platform • บพข. &amp; LAWDEE CO., LTD. • CEDT
+        </p>
+
+        </div>{/* end form column */}
       </div>
     </div>
   );

@@ -83,7 +83,7 @@ create table if not exists material_submissions (
   farm_id uuid references farms(id) on delete set null,
   material_type text not null,
   quantity_value numeric(12,3) not null check (quantity_value > 0),
-  quantity_unit text not null check (quantity_unit in ('kg', 'ton', 'm3')),
+  quantity_unit text not null check (quantity_unit in ('kg', 'ton')),
   pickup_location_text text not null,
   pickup_lat double precision,
   pickup_lng double precision,

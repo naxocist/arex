@@ -1,4 +1,13 @@
 import React from 'react';
+import {
+  CheckCircle2,
+  Clock,
+  Coins,
+  Factory,
+  Package,
+  Truck,
+  XCircle,
+} from 'lucide-react';
 import { cn } from '@/app/_lib/utils';
 
 const BASE_BADGE_CLASS =
@@ -11,7 +20,12 @@ export function getStatusBadgeClass(status: string): string {
     return 'border-red-200 bg-red-100 text-red-800';
   }
 
-  if (normalized === 'warehouse_approved' || normalized === 'reward_delivered' || normalized === 'points_credited' || normalized === 'ready') {
+  if (
+    normalized === 'warehouse_approved' ||
+    normalized === 'reward_delivered' ||
+    normalized === 'points_credited' ||
+    normalized === 'ready'
+  ) {
     return 'border-emerald-200 bg-emerald-100 text-emerald-800';
   }
 
@@ -23,12 +37,34 @@ export function getStatusBadgeClass(status: string): string {
     return 'border-cyan-200 bg-cyan-100 text-cyan-800';
   }
 
-  if (normalized === 'submitted' || normalized === 'requested' || normalized === 'pickup_scheduled' || normalized === 'reward_delivery_scheduled') {
+  if (
+    normalized === 'submitted' ||
+    normalized === 'requested' ||
+    normalized === 'pickup_scheduled' ||
+    normalized === 'reward_delivery_scheduled'
+  ) {
     return 'border-amber-200 bg-amber-100 text-amber-800';
   }
 
   return 'border-stone-200 bg-stone-100 text-stone-700';
 }
+
+const STATUS_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  submitted: Clock,
+  requested: Clock,
+  pickup_scheduled: Clock,
+  reward_delivery_scheduled: Clock,
+  picked_up: Truck,
+  out_for_delivery: Truck,
+  delivered_to_factory: Package,
+  factory_confirmed: Factory,
+  warehouse_approved: CheckCircle2,
+  reward_delivered: CheckCircle2,
+  points_credited: Coins,
+  ready: CheckCircle2,
+  warehouse_rejected: XCircle,
+  cancelled: XCircle,
+};
 
 interface StatusBadgeProps {
   status: string;
@@ -38,6 +74,9 @@ interface StatusBadgeProps {
 }
 
 export default function StatusBadge({ status, label, className, size = 'md' }: StatusBadgeProps) {
+  const normalized = status.trim().toLowerCase();
+  const Icon = STATUS_ICON_MAP[normalized];
+
   return (
     <span
       className={cn(
@@ -47,6 +86,7 @@ export default function StatusBadge({ status, label, className, size = 'md' }: S
         className,
       )}
     >
+      {Icon ? <Icon className={cn('mr-1 shrink-0', size === 'sm' ? 'h-3 w-3' : 'h-3.5 w-3.5')} /> : null}
       {label ?? status}
     </span>
   );

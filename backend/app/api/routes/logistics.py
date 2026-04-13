@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.api.deps import require_roles
 from app.core.errors import WorkflowError
 from app.models.auth import AuthenticatedUser, Role
-from app.models.workflow import SchedulePickupRequest, ScheduleRewardDeliveryRequest
+from app.models.workflow import SchedulePickupRequest, ScheduleRewardDeliveryRequest, UpsertLogisticsInfoRequest
 from app.services.workflow_service import WorkflowService, get_workflow_service
 
 router = APIRouter(prefix="/logistics", tags=["logistics"])
@@ -180,5 +180,28 @@ def mark_reward_delivered(
             "message": "Reward delivered to farmer",
             "result": result,
         }
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/me")
+def get_my_logistics(
+    current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
+    workflow_service: WorkflowService = Depends(get_workflow_service),
+) -> dict[str, Any]:
+    try:
+        return workflow_service.get_or_create_logistics_for_profile(current_user.user_id)
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.put("/me")
+def update_my_logistics(
+    payload: UpsertLogisticsInfoRequest,
+    current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
+    workflow_service: WorkflowService = Depends(get_workflow_service),
+) -> dict[str, Any]:
+    try:
+        return workflow_service.update_logistics_for_profile(current_user.user_id, payload)
     except WorkflowError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

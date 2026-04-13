@@ -79,6 +79,7 @@ export const roleNavItems: RoleNavItem[] = [
   { icon: Home, label: 'งานวัสดุ', shortLabel: 'ส่งวัสดุ', path: '/farmer', roles: ['farmer'] },
   { icon: Gift, label: 'แลกของรางวัล', shortLabel: 'รางวัล', path: '/farmer/rewards', roles: ['farmer'] },
   { icon: Truck, label: 'ขนส่ง', shortLabel: 'คิวขนส่ง', path: '/logistics', roles: ['logistics'] },
+  { icon: SlidersHorizontal, label: 'ตั้งค่าทีมขนส่ง', shortLabel: 'ตั้งค่า', path: '/logistics/settings', roles: ['logistics'] },
   { icon: Factory, label: 'โรงงาน', shortLabel: 'ตรวจรับเข้า', path: '/factory', roles: ['factory'] },
   { icon: SlidersHorizontal, label: 'ตั้งค่าโรงงาน', shortLabel: 'ตั้งค่า', path: '/factory/settings', roles: ['factory'] },
   { icon: PackageCheck, label: 'คลังสินค้า', shortLabel: 'อนุมัติ', path: '/warehouse', roles: ['warehouse'] },
@@ -98,6 +99,10 @@ const routeMetaByPath: Record<string, RouteMeta> = {
   '/logistics': {
     title: 'ศูนย์ปฏิบัติการขนส่ง',
     description: 'บริหารคิวรับวัสดุ งานขนส่งไปโรงงาน และงานส่งมอบรางวัล',
+  },
+  '/logistics/settings': {
+    title: 'ตั้งค่าข้อมูลทีมขนส่ง',
+    description: 'จัดการชื่อทีมขนส่ง ที่อยู่ และตำแหน่งสำหรับการวางแผนขนส่ง',
   },
   '/factory': {
     title: 'คิวตรวจรับโรงงาน',

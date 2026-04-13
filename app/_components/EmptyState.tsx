@@ -31,10 +31,10 @@ export default function EmptyState({
         className,
       )}
     >
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-muted text-stone-600">
-        <Icon className="h-5 w-5" />
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-muted text-stone-600">
+        <Icon className="h-7 w-7" />
       </div>
-      <h3 className="mt-4 text-base font-semibold text-stone-900">{title}</h3>
+      <h3 className="mt-4 text-lg font-semibold text-stone-900">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">{description}</p>
       {action ? <div className="mt-4">{action}</div> : null}
     </motion.div>

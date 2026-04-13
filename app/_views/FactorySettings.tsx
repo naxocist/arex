@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { MapPinned, RefreshCw, Save } from "lucide-react";
 import AlertBanner from "@/app/_components/AlertBanner";
+import ErrorBoundary from "@/app/_components/ErrorBoundary";
 import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
 import SectionCard from "@/app/_components/SectionCard";
@@ -119,9 +120,13 @@ export default function FactorySettings() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-stone-900">ตั้งค่าโรงงาน</h1>
+    <ErrorBoundary>
+    <div className="space-y-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-light tracking-tight text-on-surface">ตั้งค่าโรงงาน</h1>
+          <p className="mt-1 text-on-surface-variant">แก้ไขข้อมูลโรงงานและจุดรับวัสดุ</p>
+        </div>
         <button
           type="button"
           onClick={() => void loadFactory(true)}
@@ -156,7 +161,7 @@ export default function FactorySettings() {
                     name_th: event.target.value,
                   }))
                 }
-                className="w-full rounded-2xl border border-line bg-surface-muted px-4 py-3 outline-none"
+                className="w-full rounded-xl border-none bg-surface-container-high px-4 py-3.5 text-base outline-none focus:ring-2 focus:ring-primary/20"
                 placeholder="เช่น โรงงานแปรรูปชีวมวลลำพูน"
               />
             </label>
@@ -174,7 +179,7 @@ export default function FactorySettings() {
                     location_text: event.target.value,
                   }))
                 }
-                className="w-full rounded-2xl border border-line bg-surface-muted px-4 py-3 outline-none"
+                className="w-full rounded-xl border-none bg-surface-container-high px-4 py-3.5 text-base outline-none focus:ring-2 focus:ring-primary/20"
                 placeholder="เช่น อ.เมือง จ.ลำพูน"
               />
             </label>
@@ -184,7 +189,7 @@ export default function FactorySettings() {
                 type="button"
                 onClick={() => void handleSave()}
                 disabled={isSaving}
-                className="inline-flex items-center gap-2 rounded-full bg-stone-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-60"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
               >
                 <Save className="h-4 w-4" />
                 <span>
@@ -244,5 +249,6 @@ export default function FactorySettings() {
         </div>
       </SectionCard>
     </div>
+    </ErrorBoundary>
   );
 }

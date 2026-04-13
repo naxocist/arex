@@ -1,20 +1,33 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, PackageSearch, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion, useSpring, useTransform } from 'motion/react';
+import {
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Coins,
+  Gift,
+  MapPin,
+  Package,
+  PackageSearch,
+  Phone,
+  RefreshCw,
+  ShieldCheck,
+  User,
+  XCircle,
+} from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import EmptyState from '@/app/_components/EmptyState';
-import SectionCard from '@/app/_components/SectionCard';
+import ErrorBoundary from '@/app/_components/ErrorBoundary';
+import { SkeletonCard } from '@/app/_components/Skeleton';
 import StatCard from '@/app/_components/StatCard';
 import StatusBadge from '@/app/_components/StatusBadge';
 import { ApiError, warehouseApi, type WarehousePendingRequestItem } from '@/app/_lib/apiClient';
 
-type WarehouseTab = 'pending' | 'answered';
-
+/* ── helpers ── */
 function hasAccessToken(): boolean {
-  if (typeof window === 'undefined') {
-    return false;
-  }
+  if (typeof window === 'undefined') return false;
   return Boolean(localStorage.getItem('AREX_ACCESS_TOKEN'));
 }
 
@@ -23,13 +36,20 @@ function formatRewardRequestStatus(status: string): string {
     requested: 'รอคลังตรวจสอบ',
     warehouse_approved: 'คลังอนุมัติแล้ว',
     warehouse_rejected: 'คลังปฏิเสธ',
+    cancelled: 'ยกเลิกแล้ว',
   };
   return map[status] ?? status;
 }
 
 function formatDateTime(dateTime: string | null | undefined): string {
   if (!dateTime) return '-';
-  return new Date(dateTime).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(dateTime).toLocaleString('th-TH', {
+    day: '2-digit',
+    month: 'short',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
@@ -39,9 +59,31 @@ function inferMessageTone(message: string | null): 'info' | 'success' | 'error' 
   return 'info';
 }
 
-function RequestCard({
+/* ── AnimatedNumber ── */
+function AnimatedNumber({ value }: { value: number }) {
+  const spring = useSpring(0, { stiffness: 60, damping: 18 });
+  const display = useTransform(spring, (v) => Math.round(v).toLocaleString('th-TH'));
+  const hasMounted = useRef(false);
+  useEffect(() => {
+    if (!hasMounted.current) { spring.set(0); hasMounted.current = true; }
+    spring.set(value);
+  }, [value, spring]);
+  return <motion.span>{display}</motion.span>;
+}
+
+/* ── listItem variants ── */
+const listItem = {
+  hidden: { opacity: 0, y: 10 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.28, ease: [0.25, 0, 0, 1] as [number, number, number, number] },
+  },
+};
+
+/* ── PendingRequestCard ── */
+function PendingRequestCard({
   item,
-  isPending,
   processingRequestId,
   reasons,
   onReasonChange,
@@ -49,117 +91,353 @@ function RequestCard({
   onReject,
 }: {
   item: WarehousePendingRequestItem;
-  isPending: boolean;
   processingRequestId: string | null;
   reasons: Record<string, string>;
   onReasonChange: (id: string, value: string) => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const reduceMotion = useReducedMotion();
   const isProcessing = processingRequestId === item.id;
 
+  const hasLocation = Boolean(item.delivery_location_text);
+  const hasMapLink = item.delivery_lat != null && item.delivery_lng != null;
+
   return (
-    <div className="group rounded-2xl border border-stone-200 bg-white p-4 transition hover:border-emerald-200 hover:shadow-md">
-      <div className="flex items-start gap-4">
-        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-50">
-          <Gift className="h-6 w-6 text-emerald-600" />
+    <motion.article
+      variants={listItem}
+      initial="hidden"
+      animate="show"
+      layout
+      className="overflow-hidden rounded-2xl border border-outline-variant/10 bg-white shadow-sm"
+    >
+      {/* Accent bar */}
+      <div className="h-1 w-full bg-amber-400" />
+
+      <div className="p-5">
+        {/* Header row */}
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50">
+            <Gift className="h-5 w-5 text-amber-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-semibold leading-tight text-on-surface">
+              {item.reward_name_th ?? 'รางวัลที่เลือก'}
+            </p>
+            <p className="mt-0.5 text-xs text-stone-400">ยื่นเมื่อ {formatDateTime(item.requested_at)}</p>
+          </div>
+          <StatusBadge status={item.status} label={formatRewardRequestStatus(item.status)} size="sm" className="shrink-0" />
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-base font-semibold text-stone-900">
-                {item.reward_name_th ?? 'รางวัล'}
-              </p>
-              <p className="mt-1 truncate text-sm text-stone-500">
-                {item.reward_description_th || 'ไม่มีรายละเอียด'}
-              </p>
-            </div>
-            <StatusBadge status={item.status} label={formatRewardRequestStatus(item.status)} size="sm" />
-          </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-            <span className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2.5 py-1 font-medium text-stone-700">
-              <Package className="h-3.5 w-3.5" />
-              {Number(item.quantity)} ชิ้น
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2.5 py-1 font-medium text-violet-700">
-              <Coins className="h-3.5 w-3.5" />
-              {Number(item.requested_points).toLocaleString('th-TH')} แต้ม
-            </span>
-            {item.requested_at && (
-              <span className="text-xs text-stone-400">
-                ยื่นเมื่อ {formatDateTime(item.requested_at)}
-              </span>
-            )}
-          </div>
+        {/* Points + qty row */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/8 px-3 py-1 text-sm font-semibold text-primary">
+            <Coins className="h-3.5 w-3.5" />
+            {Number(item.requested_points).toLocaleString('th-TH')} PMUC Coin
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-3 py-1 text-sm font-medium text-stone-600">
+            <Package className="h-3.5 w-3.5" />
+            {Number(item.quantity)} ชิ้น
+          </span>
+        </div>
 
-          {isPending && (
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <textarea
-                value={reasons[item.id] || ''}
-                onChange={(event) => onReasonChange(item.id, event.target.value)}
-                placeholder="เหตุผล (ถ้าปฏิเสธ)"
-                className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-300 focus:bg-white"
-                rows={1}
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => onApprove(item.id)}
-                  disabled={isProcessing}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  อนุมัติ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onReject(item.id)}
-                  disabled={isProcessing}
-                  className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <XCircle className="h-4 w-4" />
-                  ปฏิเสธ
-                </button>
-              </div>
-            </div>
+        {/* Farmer info — always visible */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          {item.farmer_display_name && (
+            <span className="flex items-center gap-1.5 text-sm text-on-surface">
+              <User className="h-4 w-4 shrink-0 text-stone-400" />
+              {item.farmer_display_name}
+            </span>
+          )}
+          {item.farmer_phone && (
+            <a
+              href={`tel:${item.farmer_phone}`}
+              className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+            >
+              <Phone className="h-4 w-4 shrink-0" />
+              {item.farmer_phone}
+            </a>
+          )}
+          {item.farmer_province && (
+            <span className="text-sm text-stone-400">{item.farmer_province}</span>
           )}
         </div>
+
+        {/* Location — always visible */}
+        {hasLocation ? (
+          <div className="mt-2.5 flex items-start gap-1.5">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">สถานที่รับของรางวัล</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-on-surface">{item.delivery_location_text}</p>
+              {hasMapLink && (
+                <a
+                  href={`https://www.google.com/maps?q=${item.delivery_lat},${item.delivery_lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  ดูบนแผนที่
+                </a>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-2.5 flex items-center gap-1.5 text-sm text-stone-400">
+            <MapPin className="h-4 w-4 shrink-0" />
+            <span>ยังไม่ได้ระบุสถานที่รับของ</span>
+          </div>
+        )}
+
+        {/* Toggle extra details */}
+        {item.reward_description_th && (
+          <>
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="mt-3 flex items-center gap-1 text-xs font-medium text-stone-400 hover:text-stone-600"
+            >
+              <motion.span
+                animate={reduceMotion ? {} : { rotate: expanded ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+                style={{ display: 'inline-flex' }}
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </motion.span>
+              {expanded ? 'ซ่อนรายละเอียด' : 'ดูรายละเอียดรางวัล'}
+            </button>
+            <AnimatePresence initial={false}>
+              {expanded && (
+                <motion.div
+                  key="desc"
+                  initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
+                  animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
+                  exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
+                  transition={{ duration: 0.24, ease: 'easeInOut' }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <p className="mt-2 rounded-xl bg-stone-50 px-3 py-2.5 text-sm leading-relaxed text-stone-500">
+                    {item.reward_description_th}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
+
+        {/* Action area */}
+        <div className="mt-4 space-y-3">
+          <textarea
+            value={reasons[item.id] || ''}
+            onChange={(e) => onReasonChange(item.id, e.target.value)}
+            placeholder="เหตุผลในการปฏิเสธ (ถ้ามี)"
+            className="w-full resize-none rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none transition focus:border-amber-300 focus:bg-white"
+            rows={2}
+          />
+          <div className="flex gap-3">
+            <motion.button
+              type="button"
+              onClick={() => onApprove(item.id)}
+              disabled={isProcessing}
+              whileTap={reduceMotion ? {} : { scale: 0.97 }}
+              className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              อนุมัติคำขอ
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={() => onReject(item.id)}
+              disabled={isProcessing}
+              whileTap={reduceMotion ? {} : { scale: 0.97 }}
+              className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-5 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <XCircle className="h-4 w-4" />
+              ปฏิเสธ
+            </motion.button>
+          </div>
+        </div>
       </div>
-    </div>
+    </motion.article>
   );
 }
 
-function Gift({ className }: { className?: string }) {
+/* ── AnsweredRequestCard ── */
+function AnsweredRequestCard({ item }: { item: WarehousePendingRequestItem }) {
+  const [expanded, setExpanded] = useState(false);
+  const reduceMotion = useReducedMotion();
+
+  const isApproved = item.status === 'warehouse_approved';
+  const isRejected = item.status === 'warehouse_rejected';
+  const hasLocation = Boolean(item.delivery_location_text);
+  const hasMapLink = item.delivery_lat != null && item.delivery_lng != null;
+
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M20 12v10H4V12" />
-      <path d="M2 7h20v5H2z" />
-      <path d="M12 22V7" />
-      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
-      <path d="M12 7h5.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
-    </svg>
+    <motion.article
+      variants={listItem}
+      initial="hidden"
+      animate="show"
+      layout
+      className="overflow-hidden rounded-2xl border border-outline-variant/10 bg-white shadow-sm"
+    >
+      {/* Accent bar */}
+      <div className={`h-1 w-full ${isApproved ? 'bg-emerald-400' : isRejected ? 'bg-red-300' : 'bg-stone-200'}`} />
+
+      {/* Compact row */}
+      <motion.button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-start gap-3 px-5 py-4 text-left"
+        whileHover={reduceMotion ? {} : { backgroundColor: 'rgba(245,245,244,0.5)' }}
+        whileTap={reduceMotion ? {} : { scale: 0.995 }}
+        transition={{ duration: 0.12 }}
+      >
+        {/* Status dot */}
+        <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+          isApproved ? 'bg-emerald-400' : isRejected ? 'bg-red-300' : 'bg-stone-300'
+        }`} />
+
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-on-surface">{item.reward_name_th ?? 'รางวัลที่เลือก'}</p>
+          <p className="mt-0.5 text-sm text-on-surface-variant">
+            {Number(item.requested_points).toLocaleString('th-TH')} แต้ม · {Number(item.quantity)} ชิ้น
+          </p>
+          {item.farmer_display_name && (
+            <p className="mt-0.5 text-xs text-stone-400">{item.farmer_display_name}</p>
+          )}
+        </div>
+
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <StatusBadge status={item.status} label={formatRewardRequestStatus(item.status)} size="sm" />
+          <span className="flex items-center gap-1 text-xs text-stone-400">
+            {expanded ? 'ซ่อน' : 'รายละเอียด'}
+            <motion.span
+              animate={reduceMotion ? {} : { rotate: expanded ? 180 : 0 }}
+              transition={{ duration: 0.22, ease: 'easeInOut' }}
+              style={{ display: 'inline-flex' }}
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </motion.span>
+          </span>
+        </div>
+      </motion.button>
+
+      {/* Expanded details */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="detail"
+            initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
+            animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
+            exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: 'easeInOut' }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="space-y-3 border-t border-outline-variant/8 px-5 pb-5 pt-3">
+
+              {/* Farmer info */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {item.farmer_display_name && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">ชื่อเกษตรกร</p>
+                    <p className="mt-0.5 text-sm text-on-surface">{item.farmer_display_name}</p>
+                  </div>
+                )}
+                {item.farmer_phone && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">เบอร์โทรศัพท์</p>
+                    <a href={`tel:${item.farmer_phone}`} className="mt-0.5 block text-sm font-medium text-primary hover:underline">
+                      {item.farmer_phone}
+                    </a>
+                  </div>
+                )}
+                {item.farmer_province && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">จังหวัด</p>
+                    <p className="mt-0.5 text-sm text-on-surface">{item.farmer_province}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">วันที่ยื่นคำขอ</p>
+                  <p className="mt-0.5 text-sm text-on-surface">{formatDateTime(item.requested_at)}</p>
+                </div>
+              </div>
+
+              {/* Location */}
+              {hasLocation ? (
+                <div className="flex items-start gap-2 rounded-xl bg-stone-50 px-3 py-2.5">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">สถานที่รับของรางวัล</p>
+                    <p className="mt-0.5 text-sm leading-relaxed text-on-surface">{item.delivery_location_text}</p>
+                    {hasMapLink && (
+                      <a
+                        href={`https://www.google.com/maps?q=${item.delivery_lat},${item.delivery_lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-2 hover:underline"
+                      >
+                        ดูบนแผนที่
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2.5 text-sm text-stone-400">
+                  <MapPin className="h-4 w-4 shrink-0" />
+                  ยังไม่ได้ระบุสถานที่รับของ
+                </div>
+              )}
+
+              {/* Reward description */}
+              {item.reward_description_th && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">รายละเอียดรางวัล</p>
+                  <p className="mt-0.5 text-sm leading-relaxed text-stone-500">{item.reward_description_th}</p>
+                </div>
+              )}
+
+              {/* Decision info */}
+              <div className={`flex items-start gap-2.5 rounded-xl px-3 py-2.5 ${
+                isApproved ? 'bg-emerald-50' : isRejected ? 'bg-red-50' : 'bg-stone-50'
+              }`}>
+                {isApproved ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                ) : isRejected ? (
+                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                ) : (
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-stone-400" />
+                )}
+                <div className="min-w-0">
+                  <p className={`text-sm font-semibold ${
+                    isApproved ? 'text-emerald-700' : isRejected ? 'text-red-600' : 'text-stone-500'
+                  }`}>
+                    {isApproved ? 'อนุมัติแล้ว' : isRejected ? 'ปฏิเสธแล้ว' : 'รอดำเนินการ'}
+                  </p>
+                  {item.warehouse_decision_at && (
+                    <p className="mt-0.5 text-xs text-stone-400">
+                      ตัดสินใจเมื่อ {formatDateTime(item.warehouse_decision_at)}
+                    </p>
+                  )}
+                  {isRejected && item.rejection_reason && (
+                    <p className="mt-1 text-sm text-red-600">
+                      <span className="font-semibold">เหตุผล:</span> {item.rejection_reason}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.article>
   );
 }
 
-function Package({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12" />
-    </svg>
-  );
-}
-
-function Coins({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
-      <path d="M12 18V6" />
-    </svg>
-  );
-}
+/* ── Main ── */
+type WarehouseTab = 'pending' | 'answered';
 
 export default function WarehouseApproval() {
   const [activeTab, setActiveTab] = useState<WarehouseTab>('pending');
@@ -169,6 +447,7 @@ export default function WarehouseApproval() {
   const [message, setMessage] = useState<string | null>(null);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const reduceMotion = useReducedMotion();
 
   const summary = useMemo(() => {
     const totalRequests = pendingRequests.length;
@@ -181,66 +460,46 @@ export default function WarehouseApproval() {
       setMessage('ยังไม่พบโทเคนสำหรับเรียก API กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
       return;
     }
-
     setIsLoading(true);
     try {
       const response = await warehouseApi.listPendingRewardRequests({ forceRefresh });
       setPendingRequests(response.requests);
       setMessage(null);
     } catch (error) {
-      if (error instanceof ApiError) {
-        setMessage(`โหลดรายการรออนุมัติไม่สำเร็จ: ${error.message}`);
-      } else {
-        setMessage('โหลดรายการรออนุมัติไม่สำเร็จ');
-      }
+      setMessage(error instanceof ApiError ? `โหลดรายการรออนุมัติไม่สำเร็จ: ${error.message}` : 'โหลดรายการรออนุมัติไม่สำเร็จ');
     } finally {
       setIsLoading(false);
     }
   };
 
   const loadAnsweredRequests = async (forceRefresh = false) => {
-    if (!hasAccessToken()) {
-      return;
-    }
-
+    if (!hasAccessToken()) return;
     setIsLoading(true);
     try {
       const response = await warehouseApi.listAnsweredRewardRequests({ forceRefresh });
       setAnsweredRequests(response.requests);
       setMessage(null);
     } catch (error) {
-      if (error instanceof ApiError) {
-        setMessage(`โหลดประวัติคำขอไม่สำเร็จ: ${error.message}`);
-      } else {
-        setMessage('โหลดประวัติคำขอไม่สำเร็จ');
-      }
+      setMessage(error instanceof ApiError ? `โหลดประวัติคำขอไม่สำเร็จ: ${error.message}` : 'โหลดประวัติคำขอไม่สำเร็จ');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (activeTab === 'pending') {
-      void loadPendingRequests();
-    } else {
-      void loadAnsweredRequests();
-    }
+    if (activeTab === 'pending') void loadPendingRequests();
+    else void loadAnsweredRequests();
   }, [activeTab]);
 
   const handleApprove = async (requestId: string) => {
     setProcessingRequestId(requestId);
     setMessage(null);
-
     try {
       await warehouseApi.approveRewardRequest(requestId);
       setMessage('อนุมัติคำขอสำเร็จแล้ว');
       await loadPendingRequests(true);
     } catch (error) {
-      if (error instanceof ApiError) {
-        setMessage(`อนุมัติคำขอไม่สำเร็จ: ${error.message}`);
-      } else {
-        setMessage('อนุมัติคำขอไม่สำเร็จ');
-      }
+      setMessage(error instanceof ApiError ? `อนุมัติคำขอไม่สำเร็จ: ${error.message}` : 'อนุมัติคำขอไม่สำเร็จ');
     } finally {
       setProcessingRequestId(null);
     }
@@ -249,123 +508,194 @@ export default function WarehouseApproval() {
   const handleReject = async (requestId: string) => {
     setProcessingRequestId(requestId);
     setMessage(null);
-
     const reason = (reasons[requestId] || '').trim() || 'ข้อมูลไม่ครบถ้วน กรุณาตรวจสอบและยื่นใหม่';
-
     try {
       await warehouseApi.rejectRewardRequest(requestId, { reason });
       setMessage('ปฏิเสธคำขอสำเร็จแล้ว');
       await loadPendingRequests(true);
     } catch (error) {
-      if (error instanceof ApiError) {
-        setMessage(`ปฏิเสธคำขอไม่สำเร็จ: ${error.message}`);
-      } else {
-        setMessage('ปฏิเสธคำขอไม่สำเร็จ');
-      }
+      setMessage(error instanceof ApiError ? `ปฏิเสธคำขอไม่สำเร็จ: ${error.message}` : 'ปฏิเสธคำขอไม่สำเร็จ');
     } finally {
       setProcessingRequestId(null);
     }
   };
 
+  const tabs: { id: WarehouseTab; label: string; count: number }[] = [
+    { id: 'pending', label: 'รอตรวจสอบ', count: pendingRequests.length },
+    { id: 'answered', label: 'ประวัติ', count: answeredRequests.length },
+  ];
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-stone-900">อนุมัติรางวัล</h1>
-        <div className="flex gap-2">
-          <button onClick={() => setActiveTab(activeTab === 'pending' ? 'answered' : 'pending')} disabled={isLoading} className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-700">
-            {isLoading ? '...' : 'รีเฟรช'}
-          </button>
-        </div>
-      </div>
+    <ErrorBoundary>
+      <div className="space-y-6">
 
-      {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
-
-      <div className="flex gap-1 rounded-xl bg-stone-100 p-1">
-        <button
-          type="button"
-          onClick={() => setActiveTab('pending')}
-          className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-            activeTab === 'pending' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'
-          }`}
+        {/* Header */}
+        <motion.div
+          initial={reduceMotion ? {} : { opacity: 0, y: -8 }}
+          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+          className="flex items-start justify-between gap-4"
         >
-          รอตรวจสอบ ({pendingRequests.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('answered')}
-          className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-            activeTab === 'answered' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'
-          }`}
-        >
-          ประวัติ ({answeredRequests.length})
-        </button>
-      </div>
-
-      {activeTab === 'pending' ? (
-        <>
-          <section className="grid gap-4 md:grid-cols-3">
-            <StatCard label="คำขอรอตรวจสอบ" value={summary.totalRequests.toLocaleString('th-TH')} detail="รายการในสถานะ requested ที่รอการตัดสินใจ" icon={PackageSearch} tone="amber" />
-            <StatCard label="PMUC Coin รวมในคิว" value={summary.totalPoints.toLocaleString('th-TH')} detail="ภาระแต้มที่กำลังรอการอนุมัติจากคลัง" icon={ShieldCheck} tone="violet" />
-            <StatCard label="สถานะระบบคลัง" value="พร้อมตรวจสอบ" detail="การอนุมัติและปฏิเสธจะส่งต่อสถานะให้ workflow ทันที" icon={CheckCircle2} tone="emerald" />
-          </section>
-
-          <SectionCard
-            title="คำขอที่รอการตัดสินใจ"
-            description="จัดแต่ละคำขอเป็นการ์ดเดียวพร้อมข้อมูลรางวัล จำนวนแต้ม และพื้นที่ระบุเหตุผลปฏิเสธ เพื่อให้ตรวจง่ายกว่าตารางแบบเดิม"
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">คลังพัสดุ</p>
+            <h1 className="mt-1 text-3xl font-light tracking-tight text-on-surface sm:text-4xl">อนุมัติรางวัล</h1>
+            <p className="mt-1 text-sm text-on-surface-variant">ตรวจสอบและอนุมัติคำขอแลกรางวัลของเกษตรกร</p>
+          </div>
+          <motion.button
+            type="button"
+            onClick={() => {
+              if (activeTab === 'pending') void loadPendingRequests(true);
+              else void loadAnsweredRequests(true);
+            }}
+            disabled={isLoading}
+            whileTap={reduceMotion ? {} : { scale: 0.94 }}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm transition hover:border-stone-300 hover:bg-stone-50 disabled:opacity-50"
           >
-            {pendingRequests.length === 0 ? (
-              <EmptyState
-                title="ยังไม่มีคำขอที่อยู่ในสถานะ requested"
-                description="เมื่อมีคำขอรออนุมัติจากเกษตรกร ระบบจะนำเข้ากล่องงานนี้ให้โดยอัตโนมัติ"
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </motion.button>
+        </motion.div>
+
+        {message ? <AlertBanner message={message} tone={inferMessageTone(message)} /> : null}
+
+        {/* Stats (pending tab only) */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'pending' && (
+            <motion.div
+              key="stats"
+              initial={reduceMotion ? {} : { opacity: 0, y: 8 }}
+              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+              exit={reduceMotion ? {} : { opacity: 0, y: -8 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+            >
+              <StatCard
+                label="คำขอรอตรวจสอบ"
+                value={summary.totalRequests.toLocaleString('th-TH')}
+                detail="รายการรอตัดสินใจ"
                 icon={PackageSearch}
+                tone="amber"
               />
-            ) : (
-              <div className="grid gap-3">
-                {pendingRequests.map((item) => (
-                  <RequestCard
+              <StatCard
+                label="PMUC Coin ในคิว"
+                value={summary.totalPoints.toLocaleString('th-TH')}
+                detail="รอการอนุมัติ"
+                icon={ShieldCheck}
+                tone="violet"
+              />
+              <StatCard
+                label="สถานะคลัง"
+                value="พร้อม"
+                detail="อนุมัติ/ปฏิเสธได้ทันที"
+                icon={CheckCircle2}
+                tone="emerald"
+                className="col-span-2 sm:col-span-1"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Tab bar */}
+        <motion.div
+          initial={reduceMotion ? {} : { opacity: 0 }}
+          animate={reduceMotion ? {} : { opacity: 1 }}
+          transition={{ duration: 0.25, delay: 0.05 }}
+          className="relative border-b border-outline-variant/10"
+        >
+          <div className="flex gap-1">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`relative flex items-center gap-1.5 px-3 pb-2.5 pt-1 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'text-primary'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  {tab.label}
+                  <motion.span
+                    layout
+                    className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
+                      isActive ? 'bg-primary/10 text-primary' : 'bg-stone-100 text-stone-500'
+                    }`}
+                  >
+                    {tab.count}
+                  </motion.span>
+                  {isActive && (
+                    <motion.span
+                      layoutId="tab-indicator-warehouse"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-primary"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        {/* Content */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'pending' ? (
+            <motion.div
+              key="pending"
+              initial={reduceMotion ? {} : { opacity: 0, y: 6 }}
+              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+              exit={reduceMotion ? {} : { opacity: 0, y: -6 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="space-y-4"
+            >
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} className="h-64 rounded-2xl" />)
+              ) : pendingRequests.length === 0 ? (
+                <EmptyState
+                  title="ยังไม่มีคำขอที่รอตรวจสอบ"
+                  description="เมื่อมีคำขอรออนุมัติจากเกษตรกร ระบบจะนำเข้ากล่องงานนี้ให้โดยอัตโนมัติ"
+                  icon={PackageSearch}
+                />
+              ) : (
+                pendingRequests.map((item) => (
+                  <PendingRequestCard
                     key={item.id}
                     item={item}
-                    isPending={true}
                     processingRequestId={processingRequestId}
                     reasons={reasons}
                     onReasonChange={(id, value) => setReasons((prev) => ({ ...prev, [id]: value }))}
                     onApprove={handleApprove}
                     onReject={handleReject}
                   />
-                ))}
-              </div>
-            )}
-          </SectionCard>
-        </>
-      ) : (
-        <SectionCard
-          title="ประวัติคำขอที่ตอบแล้ว"
-          description="คำขอที่คลังอนุมัติหรือปฏิเสธแล้ว เพื่อตรวจสอบย้อนหลัง"
-        >
-          {answeredRequests.length === 0 ? (
-            <EmptyState
-              title="ยังไม่มีประวัติคำขอ"
-              description="คำขอที่อนุมัติหรือปฏิเสธแล้วจะแสดงที่นี่"
-              icon={CheckCircle2}
-            />
+                ))
+              )}
+            </motion.div>
           ) : (
-            <div className="grid gap-3">
-              {answeredRequests.map((item) => (
-                <RequestCard
-                  key={item.id}
-                  item={item}
-                  isPending={false}
-                  processingRequestId={processingRequestId}
-                  reasons={reasons}
-                  onReasonChange={() => {}}
-                  onApprove={() => {}}
-                  onReject={() => {}}
+            <motion.div
+              key="answered"
+              initial={reduceMotion ? {} : { opacity: 0, y: 6 }}
+              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+              exit={reduceMotion ? {} : { opacity: 0, y: -6 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="space-y-3"
+            >
+              {isLoading ? (
+                Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} className="h-20 rounded-2xl" />)
+              ) : answeredRequests.length === 0 ? (
+                <EmptyState
+                  title="ยังไม่มีประวัติคำขอ"
+                  description="คำขอที่อนุมัติหรือปฏิเสธแล้วจะแสดงที่นี่"
+                  icon={CheckCircle2}
                 />
-              ))}
-            </div>
+              ) : (
+                answeredRequests.map((item) => (
+                  <AnsweredRequestCard key={item.id} item={item} />
+                ))
+              )}
+            </motion.div>
           )}
-        </SectionCard>
-      )}
-    </div>
+        </AnimatePresence>
+
+      </div>
+    </ErrorBoundary>
   );
 }
