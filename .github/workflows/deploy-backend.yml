@@ -1,27 +1,245 @@
-name: Deploy backend to GCP VM
+name: Backend CI/CD (production)
 
 on:
   push:
     branches: [main]
     paths:
       - 'backend/**'
-      - 'backend/docker-compose.prod.yml'
       - '.github/workflows/deploy-backend.yml'
+
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or SHA to build and deploy
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: backend-cicd-prod
+  cancel-in-progress: false
+
+env:
+  BACKEND_PATH: backend
+  ARTIFACT_REPOSITORY: arex-backend
+  IMAGE_NAME: arex-backend
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION || secrets.GCP_REGION }}
 
 jobs:
   deploy:
+    name: Build, Push, and Deploy (production)
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Resolve deployment settings
+        id: config
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ref="${{ inputs.ref }}"
+            trigger_reason="manual"
+          else
+            ref="main"
+            trigger_reason="push"
+          fi
+
+          project_id="$(echo "${GCP_PROJECT_ID}" | xargs)"
+          region="$(echo "${GCP_REGION}" | xargs)"
+
+          if [[ -z "${project_id}" ]]; then
+            echo "::error::Missing GCP_PROJECT_ID repository variable or secret."
+            exit 1
+          fi
+
+          if [[ -z "${region}" ]]; then
+            echo "::error::Missing GCP_REGION repository variable or secret."
+            exit 1
+          fi
+
+          image_uri="${region}-docker.pkg.dev/${project_id}/${ARTIFACT_REPOSITORY}/${IMAGE_NAME}"
+
+          echo "ref=${ref}"                   >> "$GITHUB_OUTPUT"
+          echo "project_id=${project_id}"     >> "$GITHUB_OUTPUT"
+          echo "region=${region}"             >> "$GITHUB_OUTPUT"
+          echo "image_uri=${image_uri}"       >> "$GITHUB_OUTPUT"
+          echo "trigger_reason=${trigger_reason}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          host: ${{ secrets.GCP_VM_HOST }}
-          username: ${{ secrets.GCP_VM_USER }}
-          key: ${{ secrets.GCP_VM_SSH_KEY }}
-          script: |
-            set -e
-            cd ~/arex-platform-prod
-            git pull origin main
-            cd backend
-            docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d backend
-            docker image prune -f
+          ref: ${{ steps.config.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Validate prerequisites
+        run: |
+          set -euo pipefail
+
+          if [[ ! -d "${BACKEND_PATH}" ]]; then
+            echo "::error::Backend directory '${BACKEND_PATH}' not found."
+            exit 1
+          fi
+
+          if [[ -z "${{ secrets.GCP_SA_KEY }}" ]]; then
+            echo "::error::Missing secret: GCP_SA_KEY."
+            exit 1
+          fi
+
+          mkdir -p deploy-report
+
+      - name: Capture run metadata
+        id: meta
+        run: |
+          set -euo pipefail
+
+          source_sha="$(git rev-parse HEAD)"
+          short_sha="$(git rev-parse --short HEAD)"
+          image_sha_tag="${{ steps.config.outputs.image_uri }}:${source_sha}"
+          image_latest_tag="${{ steps.config.outputs.image_uri }}:latest"
+
+          echo "source_sha=${source_sha}"         >> "$GITHUB_OUTPUT"
+          echo "short_sha=${short_sha}"           >> "$GITHUB_OUTPUT"
+          echo "image_sha_tag=${image_sha_tag}"   >> "$GITHUB_OUTPUT"
+          echo "image_latest_tag=${image_latest_tag}" >> "$GITHUB_OUTPUT"
+
+          jq -n \
+            --arg workflow    "${{ github.workflow }}" \
+            --arg actor       "${{ github.actor }}" \
+            --arg event_name  "${{ github.event_name }}" \
+            --arg trigger     "${{ steps.config.outputs.trigger_reason }}" \
+            --arg ref         "${{ steps.config.outputs.ref }}" \
+            --arg sha         "${source_sha}" \
+            --arg environment "production" \
+            --arg service     "arex-backend-prod" \
+            --arg region      "${{ steps.config.outputs.region }}" \
+            --arg project_id  "${{ steps.config.outputs.project_id }}" \
+            --arg image       "${image_sha_tag}" \
+            '{workflow: $workflow, actor: $actor, event_name: $event_name, trigger: $trigger, ref: $ref, source_sha: $sha, environment: $environment, service: $service, region: $region, project_id: $project_id, image: $image}' \
+            > deploy-report/run-context.json
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ steps.config.outputs.project_id }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure Artifact Registry auth
+        run: |
+          gcloud auth configure-docker "${{ steps.config.outputs.region }}-docker.pkg.dev" --quiet
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          {
+            echo "Building ${BACKEND_PATH}"
+            echo "SHA: ${{ steps.meta.outputs.source_sha }}"
+            echo "Image: ${{ steps.meta.outputs.image_sha_tag }}"
+            docker buildx build \
+              --platform linux/amd64 \
+              --target prod \
+              --provenance=false \
+              --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+              --label org.opencontainers.image.revision="${{ steps.meta.outputs.source_sha }}" \
+              --label org.opencontainers.image.created="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              --tag "${{ steps.meta.outputs.image_sha_tag }}" \
+              --tag "${{ steps.meta.outputs.image_latest_tag }}" \
+              --push \
+              "${BACKEND_PATH}"
+          } 2>&1 | tee deploy-report/build.log
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        run: |
+          set -euo pipefail
+          {
+            gcloud run deploy arex-backend-prod \
+              --image "${{ steps.meta.outputs.image_sha_tag }}" \
+              --region "${{ steps.config.outputs.region }}" \
+              --project "${{ steps.config.outputs.project_id }}" \
+              --platform managed \
+              --allow-unauthenticated \
+              --set-secrets "SUPABASE_URL=AREX_PROD_SUPABASE_URL:latest,SUPABASE_PUBLISHABLE_KEY=AREX_PROD_SUPABASE_PUBLISHABLE_KEY:latest,SUPABASE_SECRET_KEY=AREX_PROD_SUPABASE_SECRET_KEY:latest,CORS_ORIGINS=AREX_PROD_CORS_ORIGINS:latest" \
+              --quiet \
+              --format=json
+          } 2>&1 | tee deploy-report/deploy.log
+
+          gcloud run services describe arex-backend-prod \
+            --region "${{ steps.config.outputs.region }}" \
+            --project "${{ steps.config.outputs.project_id }}" \
+            --format=json > deploy-report/service.json
+
+          service_url="$(jq -r '.status.url // .uri // empty' deploy-report/service.json)"
+          revision_name="$(jq -r '.status.latestReadyRevisionName // .latestReadyRevision // empty' deploy-report/service.json)"
+
+          echo "service_url=${service_url}"     >> "$GITHUB_OUTPUT"
+          echo "revision_name=${revision_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke check
+        if: steps.deploy.outputs.service_url != ''
+        run: |
+          set -euo pipefail
+          health_url="${{ steps.deploy.outputs.service_url }}/api/v1/health"
+          {
+            echo "Checking ${health_url}"
+            curl --fail --silent --show-error \
+              --retry 5 \
+              --retry-all-errors \
+              --retry-delay 10 \
+              "${health_url}"
+          } 2>&1 | tee deploy-report/healthcheck.log
+
+      - name: Publish summary
+        if: always()
+        run: |
+          set -euo pipefail
+          status="${{ job.status }}"
+
+          jq -n \
+            --arg status        "${status}" \
+            --arg run_url       "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg environment   "production" \
+            --arg service       "arex-backend-prod" \
+            --arg image         "${{ steps.meta.outputs.image_sha_tag }}" \
+            --arg revision      "${{ steps.deploy.outputs.revision_name }}" \
+            --arg service_url   "${{ steps.deploy.outputs.service_url }}" \
+            --arg source_sha    "${{ steps.meta.outputs.source_sha }}" \
+            '{status: $status, run_url: $run_url, environment: $environment, service: $service, image: $image, revision: $revision, service_url: $service_url, source_sha: $source_sha}' \
+            > deploy-report/deployment-summary.json
+
+          {
+            echo "## Backend CI/CD — Production"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Status | ${status} |"
+            echo "| Environment | production |"
+            echo "| Service | arex-backend-prod |"
+            echo "| Ref | ${{ steps.config.outputs.ref }} |"
+            echo "| Commit | ${{ steps.meta.outputs.source_sha }} |"
+            echo "| Image | ${{ steps.meta.outputs.image_sha_tag }} |"
+            echo "| Revision | ${{ steps.deploy.outputs.revision_name || 'n/a' }} |"
+            echo "| Service URL | ${{ steps.deploy.outputs.service_url || 'n/a' }} |"
+            echo "| Run | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |"
+            echo ""
+            echo "Full logs attached as artifact \`backend-cicd-report-prod\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deploy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-cicd-report-prod
+          path: deploy-report
+          if-no-files-found: error
