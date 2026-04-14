@@ -358,31 +358,29 @@ export default function FarmerHome() {
               <p className="mt-1.5 text-sm text-white/60">ใช้แลกรางวัลได้ทันที</p>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleOpenProfile}
-                  aria-label="แก้ไขโปรไฟล์"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
-                >
-                  <User className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void loadDashboard(true)}
-                  disabled={isLoading}
-                  aria-label="รีเฟรช"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => void loadDashboard(true)}
+                disabled={isLoading}
+                aria-label="รีเฟรช"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenProfile}
+                className="flex items-center gap-2 rounded-full bg-white/20 border border-white/40 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/30 active:scale-95"
+              >
+                <User className="h-4 w-4" />
+                ข้อมูลส่วนตัว
+              </button>
               <Link
                 href="/farmer/rewards"
-                className="flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/25"
+                className="flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-emerald-800 shadow-md transition hover:bg-emerald-50 active:scale-95"
               >
-                <Gift className="h-4 w-4" />
-                แลกรางวัล
+                <Gift className="h-5 w-5" />
+                แลกของรางวัล
               </Link>
             </div>
           </div>

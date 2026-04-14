@@ -11,9 +11,11 @@ import {
   MapPin,
   RefreshCw,
   Truck,
+  User,
   X,
   XCircle,
 } from 'lucide-react';
+import Link from 'next/link';
 import Image from 'next/image';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ConfirmDialog from '@/app/_components/ConfirmDialog';
@@ -333,15 +335,24 @@ export default function FarmerRewards() {
                 </p>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => void loadRewards(true)}
-              disabled={isLoading}
-              aria-label="รีเฟรชข้อมูล"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 disabled:opacity-50"
-            >
-              <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              <button
+                type="button"
+                onClick={() => void loadRewards(true)}
+                disabled={isLoading}
+                aria-label="รีเฟรชข้อมูล"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+              <Link
+                href="/farmer?profile=1"
+                className="flex items-center gap-2 rounded-full bg-white/20 border border-white/40 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/30 active:scale-95"
+              >
+                <User className="h-4 w-4" />
+                ข้อมูลส่วนตัว
+              </Link>
+            </div>
           </div>
         </div>
 

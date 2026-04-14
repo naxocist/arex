@@ -92,7 +92,6 @@ export const roleMeta: Record<UserRole, RoleMeta> = {
 export const roleNavItems: RoleNavItem[] = [
   { icon: Home, label: 'งานวัสดุ', shortLabel: 'ส่งวัสดุ', path: '/farmer', roles: ['farmer'] },
   { icon: Gift, label: 'แลกของรางวัล', shortLabel: 'รางวัล', path: '/farmer/rewards', roles: ['farmer'] },
-  { icon: UserCircle, label: 'ข้อมูลส่วนตัว', shortLabel: 'โปรไฟล์', path: '/farmer?profile=1', roles: ['farmer'] },
   { icon: Truck, label: 'ขนส่ง', shortLabel: 'คิวขนส่ง', path: '/logistics', roles: ['logistics'] },
   { icon: ClipboardList, label: 'ประวัติขนส่ง', shortLabel: 'ประวัติ', path: '/logistics/history', roles: ['logistics'] },
   { icon: SlidersHorizontal, label: 'ตั้งค่าทีมขนส่ง', shortLabel: 'ตั้งค่า', path: '/logistics/settings', roles: ['logistics'] },
