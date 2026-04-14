@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDown, Coins, Gift, Kanban, LayoutList, PackagePlus, RefreshCw, Route, Sprout, Truck, User, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ConfirmDialog from '@/app/_components/ConfirmDialog';
@@ -112,6 +112,7 @@ function StatusDot({ status }: { status: string }) {
 
 export default function FarmerHome() {
   const reduceMotion = useReducedMotion();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [materialType, setMaterialType] = useState<CreateSubmissionPayload['material_type']>('');
@@ -241,6 +242,11 @@ export default function FarmerHome() {
     setProfileMessage(null);
     if (!profile) void loadProfile();
     setShowProfile(true);
+  };
+
+  const handleCloseProfile = () => {
+    setShowProfile(false);
+    router.replace('/farmer', { scroll: false });
   };
 
   const handleSaveProfile = async () => {
@@ -1016,7 +1022,7 @@ export default function FarmerHome() {
               initial={reduceMotion ? {} : { opacity: 0 }}
               animate={reduceMotion ? {} : { opacity: 1 }}
               exit={reduceMotion ? {} : { opacity: 0 }}
-              onClick={() => setShowProfile(false)}
+              onClick={handleCloseProfile}
             />
             <motion.div
               key="profile-sheet"
@@ -1039,7 +1045,7 @@ export default function FarmerHome() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowProfile(false)}
+                  onClick={handleCloseProfile}
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-500"
                 >
                   <X className="h-5 w-5" />
