@@ -93,7 +93,8 @@ with demo_users as (
       ('90000000-0000-4000-8000-000000000004'::uuid, 'factory@gmail.com',   'factory',   'วรินทร์ โรงงาน',  '0810003001', 'สระบุรี'),
       ('90000000-0000-4000-8000-000000000008'::uuid, 'factory2@gmail.com',  'factory',   'กิตติ โรงงาน',    '0810003002', 'ชัยนาท'),
       ('90000000-0000-4000-8000-000000000005'::uuid, 'warehouse@gmail.com', 'warehouse', 'มานพ คลังสินค้า', '0810004001', 'ปทุมธานี'),
-      ('90000000-0000-4000-8000-000000000006'::uuid, 'executive@gmail.com', 'executive', 'ผู้บริหาร AREX',  '0810005001', 'กรุงเทพมหานคร')
+      ('90000000-0000-4000-8000-000000000006'::uuid, 'executive@gmail.com', 'executive', 'ผู้บริหาร AREX',  '0810005001', 'กรุงเทพมหานคร'),
+      ('90000000-0000-4000-8000-000000000010'::uuid, 'admin@gmail.com',     'admin',     'ผู้ดูแลระบบ AREX','0810006001', 'กรุงเทพมหานคร')
   ) as t(id, email, role, display_name, phone, province)
 ),
 inserted_users as (
@@ -132,7 +133,8 @@ values
   ('90000000-0000-4000-8000-000000000004', 'factory',   'วรินทร์ โรงงาน',  '0810003001', 'สระบุรี'),
   ('90000000-0000-4000-8000-000000000008', 'factory',   'กิตติ โรงงาน',    '0810003002', 'ชัยนาท'),
   ('90000000-0000-4000-8000-000000000005', 'warehouse', 'มานพ คลังสินค้า', '0810004001', 'ปทุมธานี'),
-  ('90000000-0000-4000-8000-000000000006', 'executive', 'ผู้บริหาร AREX',  '0810005001', 'กรุงเทพมหานคร');
+  ('90000000-0000-4000-8000-000000000006', 'executive', 'ผู้บริหาร AREX',  '0810005001', 'กรุงเทพมหานคร'),
+  ('90000000-0000-4000-8000-000000000010', 'admin',     'ผู้ดูแลระบบ AREX','0810006001', 'กรุงเทพมหานคร');
 
 -- -----------------------------------------------------------------------
 -- Material types
@@ -969,5 +971,44 @@ begin
   end if;
 
 end $$;
+
+-- ── Storage: reward-images bucket ─────────────────────────────────────────
+-- Must be in seed (not migrations) because Supabase manages storage schema.
+-- Recreated on every db:reset so the bucket is always available locally.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'reward-images',
+  'reward-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+do $$ begin
+  drop policy if exists "Public read reward images" on storage.objects;
+  drop policy if exists "Auth users can upload reward images" on storage.objects;
+  drop policy if exists "Auth users can update reward images" on storage.objects;
+  drop policy if exists "Auth users can delete reward images" on storage.objects;
+end $$;
+
+create policy "Public read reward images"
+  on storage.objects for select
+  using (bucket_id = 'reward-images');
+
+create policy "Auth users can upload reward images"
+  on storage.objects for insert
+  with check (bucket_id = 'reward-images' and auth.role() = 'authenticated');
+
+create policy "Auth users can update reward images"
+  on storage.objects for update
+  using (bucket_id = 'reward-images' and auth.role() = 'authenticated');
+
+create policy "Auth users can delete reward images"
+  on storage.objects for delete
+  using (bucket_id = 'reward-images' and auth.role() = 'authenticated');
 
 commit;

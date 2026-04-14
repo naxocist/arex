@@ -53,6 +53,7 @@ export default function UserSelection() {
       logistics: '/logistics',
       factory: '/factory',
       warehouse: '/warehouse',
+      admin: '/admin',
     }),
     [],
   );
@@ -68,10 +69,11 @@ export default function UserSelection() {
         accessToken: login.access_token,
         refreshToken: login.refresh_token,
         role: login.user.role,
+        approvalStatus: login.approval_status ?? 'approved',
       });
 
       const role = login.user.role;
-      if (role === 'farmer' || role === 'executive' || role === 'logistics' || role === 'factory' || role === 'warehouse') {
+      if (role === 'farmer' || role === 'executive' || role === 'logistics' || role === 'factory' || role === 'warehouse' || role === 'admin') {
         setRole(role);
         navigate.push(rolePathMap[role]);
         return;
@@ -154,6 +156,7 @@ export default function UserSelection() {
         accessToken: response.access_token,
         refreshToken: response.refresh_token,
         role: response.user.role,
+        approvalStatus: response.approval_status ?? 'approved',
       });
 
       const role = response.user.role;
@@ -209,6 +212,17 @@ export default function UserSelection() {
               แพลตฟอร์มแลกเปลี่ยนวัสดุเหลือใช้ทางการเกษตร<br />
               ส่งวัสดุ รับ PMUC Coin และแลกรับรางวัล
             </p>
+            {/* Motto */}
+            <div className="mt-5">
+              <p className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-stone-400">Zero Burn to Earn</p>
+              <p className="mt-0.5 text-2xl font-bold tracking-tight text-stone-800">
+                เลิกเผา{' '}
+                <span className="relative inline-block">
+                  เป๋าตุง
+                  <span className="absolute bottom-0.5 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-amber-400 to-emerald-400 opacity-70" />
+                </span>
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 w-full">
@@ -268,6 +282,13 @@ export default function UserSelection() {
               <div>
                 <p className="text-[0.65rem] font-bold uppercase tracking-[0.24em] text-primary">AREX Platform</p>
                 <h1 className="text-2xl font-light tracking-tight text-primary">ยินดีต้อนรับ</h1>
+                <p className="mt-0.5 text-sm font-bold tracking-tight text-stone-700">
+                  เลิกเผา{' '}
+                  <span className="relative inline-block">
+                    เป๋าตุง
+                    <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-gradient-to-r from-amber-400 to-emerald-400 opacity-70" />
+                  </span>
+                </p>
               </div>
             </div>
 

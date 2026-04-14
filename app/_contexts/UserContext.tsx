@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { clearAuthSession, getStoredRole } from '@/app/_lib/apiClient';
 
-export type UserRole = 'farmer' | 'executive' | 'logistics' | 'factory' | 'warehouse';
+export type UserRole = 'farmer' | 'executive' | 'logistics' | 'factory' | 'warehouse' | 'admin';
 
 interface UserContextType {
   role: UserRole | null;
@@ -16,7 +16,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export function UserProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(() => {
     const storedRole = getStoredRole();
-    if (storedRole === 'farmer' || storedRole === 'executive' || storedRole === 'logistics' || storedRole === 'factory' || storedRole === 'warehouse') {
+    if (storedRole === 'farmer' || storedRole === 'executive' || storedRole === 'logistics' || storedRole === 'factory' || storedRole === 'warehouse' || storedRole === 'admin') {
       return storedRole;
     }
     return null;

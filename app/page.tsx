@@ -11,6 +11,7 @@ const rolePaths: Record<UserRole, string> = {
   logistics: '/logistics',
   factory: '/factory',
   warehouse: '/warehouse',
+  admin: '/admin',
 };
 
 export default function RootPage() {

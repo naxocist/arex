@@ -552,18 +552,19 @@ class WorkflowService:
             if not isinstance(stock_qty, int) or stock_qty < 0:
                 raise WorkflowError("Stock quantity must be a non-negative integer")
 
+            insert_data: dict[str, Any] = {
+                "name_th": name_th,
+                "description_th": payload.get("description_th", "").strip() or None,
+                "points_cost": points_cost,
+                "stock_qty": stock_qty,
+                "active": payload.get("active", True),
+            }
+            if "image_url" in payload:
+                insert_data["image_url"] = payload["image_url"] or None
+
             response = (
                 self.client.table("rewards_catalog")
-                .insert(
-                    {
-                        "name_th": name_th,
-                        "description_th": payload.get("description_th", "").strip()
-                        or None,
-                        "points_cost": points_cost,
-                        "stock_qty": stock_qty,
-                        "active": payload.get("active", True),
-                    }
-                )
+                .insert(insert_data)
                 .execute()
             )
             return _first_row(response.data)
@@ -605,6 +606,8 @@ class WorkflowService:
                 update_data["stock_qty"] = payload["stock_qty"]
             if "active" in payload:
                 update_data["active"] = payload["active"]
+            if "image_url" in payload:
+                update_data["image_url"] = payload["image_url"] or None
 
             if not update_data:
                 raise WorkflowError("No fields to update")

@@ -79,6 +79,7 @@ function RewardImage({ src, alt, className }: { src: string | null; alt: string;
           src={src}
           alt={alt}
           fill
+          unoptimized
           className="object-cover"
           onError={() => setErrored(true)}
           sizes="(max-width: 768px) 50vw, 200px"
@@ -551,7 +552,7 @@ export default function FarmerRewards() {
                         <div className="min-w-0 flex items-center gap-3">
                           <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl">
                             {rewardImg ? (
-                              <Image src={rewardImg} alt={rewardName} fill className="object-cover" sizes="40px" />
+                              <Image src={rewardImg} alt={rewardName} fill unoptimized className="object-cover" sizes="40px" />
                             ) : (
                               <div className={`flex h-full w-full items-center justify-center rounded-xl ${
                                 isPending ? 'bg-amber-50' : isDelivered ? 'bg-emerald-50' : 'bg-stone-50'
@@ -719,6 +720,7 @@ export default function FarmerRewards() {
                       src={reward.image_url}
                       alt={reward.name_th}
                       fill
+                      unoptimized
                       className="object-cover"
                       sizes="100vw"
                     />

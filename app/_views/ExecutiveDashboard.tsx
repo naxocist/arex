@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { ArrowRight, Boxes, Coins, Flame, Leaf, RefreshCw, Settings, Users, Wallet } from 'lucide-react';
+import { ArrowRight, Boxes, Coins, Flame, Leaf, RefreshCw, Users, Wallet } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import AlertBanner from '@/app/_components/AlertBanner';
 import EmptyState from '@/app/_components/EmptyState';
@@ -140,13 +140,6 @@ export default function ExecutiveDashboard() {
             <p className="mt-1 text-sm text-on-surface-variant">ข้อมูลสรุประบบ AREX ทั้งหมดแบบเรียลไทม์</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Link
-              href="/executive/settings"
-              className="flex h-9 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-50"
-            >
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">จัดการ Master Data</span>
-            </Link>
             <motion.button
               type="button"
               onClick={() => void loadOverview(true)}
@@ -509,11 +502,6 @@ export default function ExecutiveDashboard() {
                 <div className="flex flex-col rounded-2xl border border-primary/20 bg-primary/5 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wider text-primary/80">คำขอแลกรางวัล</p>
                   <p className="mt-auto pt-3 text-2xl font-semibold text-stone-900">{formatNumber(metrics.rewardRequestsTotal)}</p>
-                  <p className="mt-1 text-xs text-stone-500">รายการ</p>
-                </div>
-                <div className="flex flex-col rounded-2xl border border-primary/20 bg-primary/5 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary/80">แปลงน้ำหนักได้</p>
-                  <p className="mt-auto pt-3 text-2xl font-semibold text-stone-900">{formatNumber(metrics.submissionsConvertibleCount)}</p>
                   <p className="mt-1 text-xs text-stone-500">รายการ</p>
                 </div>
               </div>

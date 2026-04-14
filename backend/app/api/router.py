@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.executive import router as executive_router
 from app.api.routes.factory import router as factory_router
@@ -19,3 +20,4 @@ api_router.include_router(logistics_router)
 api_router.include_router(factory_router)
 api_router.include_router(warehouse_router)
 api_router.include_router(executive_router)
+api_router.include_router(admin_router)

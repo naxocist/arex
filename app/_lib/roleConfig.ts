@@ -5,10 +5,13 @@ import {
   Gift,
   Home,
   PackageCheck,
+  Settings2,
   Shapes,
+  ShieldCheck,
   SlidersHorizontal,
   Truck,
   UserCircle,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import type { UserRole } from '@/app/_contexts/UserContext';
@@ -76,6 +79,14 @@ export const roleMeta: Record<UserRole, RoleMeta> = {
     accentClassName: 'text-green-900 bg-green-100 border-green-200',
     softClassName: 'from-green-100 via-white to-blue-50',
   },
+  admin: {
+    id: 'admin',
+    label: 'ผู้ดูแลระบบ',
+    shortLabel: 'Admin',
+    description: 'อนุมัติบัญชีผู้ใช้ ติดตามภาพรวมระบบ และตั้งค่าทั่วไป',
+    accentClassName: 'text-violet-900 bg-violet-100 border-violet-200',
+    softClassName: 'from-violet-100 via-white to-blue-50',
+  },
 };
 
 export const roleNavItems: RoleNavItem[] = [
@@ -86,11 +97,15 @@ export const roleNavItems: RoleNavItem[] = [
   { icon: ClipboardList, label: 'ประวัติขนส่ง', shortLabel: 'ประวัติ', path: '/logistics/history', roles: ['logistics'] },
   { icon: SlidersHorizontal, label: 'ตั้งค่าทีมขนส่ง', shortLabel: 'ตั้งค่า', path: '/logistics/settings', roles: ['logistics'] },
   { icon: Factory, label: 'โรงงาน', shortLabel: 'ตรวจรับเข้า', path: '/factory', roles: ['factory'] },
-  { icon: Shapes, label: 'จัดการวัสดุ', shortLabel: 'วัสดุ', path: '/factory/materials', roles: ['factory'] },
+  { icon: Shapes, label: 'จัดการวัสดุ / รางวัล', shortLabel: 'วัสดุ/รางวัล', path: '/factory/materials', roles: ['factory'] },
   { icon: SlidersHorizontal, label: 'ตั้งค่าโรงงาน', shortLabel: 'ตั้งค่า', path: '/factory/settings', roles: ['factory'] },
   { icon: PackageCheck, label: 'คลังสินค้า', shortLabel: 'อนุมัติ', path: '/warehouse', roles: ['warehouse'] },
   { icon: BarChart3, label: 'ผู้บริหาร', shortLabel: 'ภาพรวม', path: '/executive', roles: ['executive'] },
-  { icon: SlidersHorizontal, label: 'ตั้งค่าระบบ', shortLabel: 'Master Data', path: '/executive/settings', roles: ['executive'] },
+  { icon: SlidersHorizontal, label: 'ตั้งค่าวัสดุ / รางวัล', shortLabel: 'วัสดุ/รางวัล', path: '/executive/settings', roles: ['executive'] },
+  { icon: Users, label: 'อนุมัติบัญชี', shortLabel: 'อนุมัติ', path: '/admin', roles: ['admin'] },
+  { icon: BarChart3, label: 'ภาพรวมระบบ', shortLabel: 'ภาพรวม', path: '/admin/overview', roles: ['admin'] },
+  { icon: SlidersHorizontal, label: 'ตั้งค่าวัสดุ / รางวัล', shortLabel: 'วัสดุ/รางวัล', path: '/admin/settings', roles: ['admin'] },
+  { icon: Settings2, label: 'ตั้งค่าการอนุมัติ', shortLabel: 'การอนุมัติ', path: '/admin/approval', roles: ['admin'] },
 ];
 
 const routeMetaByPath: Record<string, RouteMeta> = {
@@ -135,8 +150,24 @@ const routeMetaByPath: Record<string, RouteMeta> = {
     description: 'ติดตามปริมาณวัสดุ งานค้าง แต้ม และแนวโน้มของระบบ AREX',
   },
   '/executive/settings': {
-    title: 'ตั้งค่าระบบ',
-    description: 'จัดการ material, หน่วย และสูตรแต้มที่มีผลต่อการคำนวณทั้งระบบ',
+    title: 'ตั้งค่าวัสดุ / รางวัล',
+    description: 'จัดการประเภทวัสดุ อัตราแต้ม หน่วยวัด และรางวัลในระบบ',
+  },
+  '/admin': {
+    title: 'อนุมัติบัญชีผู้ใช้',
+    description: 'ตรวจสอบและอนุมัติหรือปฏิเสธคำขอลงทะเบียนของผู้ใช้ใหม่',
+  },
+  '/admin/overview': {
+    title: 'ภาพรวมระบบ',
+    description: 'ติดตามปริมาณวัสดุ งานค้าง แต้ม และสถานะบัญชีผู้ใช้',
+  },
+  '/admin/settings': {
+    title: 'ตั้งค่าวัสดุ / รางวัล',
+    description: 'จัดการประเภทวัสดุ อัตราแต้ม หน่วยวัด และรางวัลในระบบ',
+  },
+  '/admin/approval': {
+    title: 'ตั้งค่าการอนุมัติ',
+    description: 'กำหนดว่าบทบาทใดต้องผ่านการอนุมัติก่อนเข้าใช้งานระบบ',
   },
 };
 

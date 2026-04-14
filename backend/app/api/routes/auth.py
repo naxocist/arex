@@ -222,6 +222,19 @@ def _register_user(
             detail="Missing created user id",
         )
 
+    # Check if this role requires approval
+    approval_status = "approved"
+    try:
+        settings_res = service_client.table("admin_settings").select("approval_required_roles").eq("key", "global").execute()
+        settings_rows = settings_res.data or []
+        if settings_rows:
+            required_roles: list[str] = settings_rows[0].get("approval_required_roles") or []
+            if role.value in required_roles:
+                approval_status = "pending"
+    except Exception:
+        # If settings can't be read, default to approved (fail open)
+        approval_status = "approved"
+
     try:
         service_client.table("profiles").insert(
             {
@@ -230,6 +243,7 @@ def _register_user(
                 "display_name": payload.display_name.strip(),
                 "phone": payload.phone.strip(),
                 "province": payload.province.strip(),
+                "approval_status": approval_status,
             }
         ).execute()
 
@@ -319,7 +333,9 @@ def _register_user(
             detail="Registration succeeded but auto-login failed",
         ) from exc
 
-    return _serialize_auth_response(login_response)
+    result = _serialize_auth_response(login_response)
+    result["approval_status"] = approval_status
+    return result
 
 
 @router.get("/me")
@@ -348,7 +364,22 @@ def login(payload: LoginRequest) -> dict[str, Any]:
             detail="Invalid email or password",
         ) from exc
 
-    return _serialize_auth_response(auth_response)
+    result = _serialize_auth_response(auth_response)
+    # Attach approval_status from profiles so frontend can gate access
+    try:
+        service_client = get_service_client()
+        user_id = result["user"]["id"]
+        profile_res = (
+            service_client.table("profiles")
+            .select("approval_status")
+            .eq("id", user_id)
+            .single()
+            .execute()
+        )
+        result["approval_status"] = (profile_res.data or {}).get("approval_status", "approved")
+    except Exception:
+        result["approval_status"] = "approved"
+    return result
 
 
 @router.post("/refresh")

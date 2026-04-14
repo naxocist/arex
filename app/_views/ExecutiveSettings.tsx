@@ -2,13 +2,15 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { Gift, Plus, RefreshCw, Ruler, Save, Shapes, X } from 'lucide-react';
+import { Gift, ImagePlus, Plus, RefreshCw, Ruler, Save, Shapes, Trash2, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import SectionCard from '@/app/_components/SectionCard';
 import {
   ApiError,
   executiveApi,
+  uploadRewardImage,
+  deleteRewardImage,
   type ExecutiveMaterialPointRuleItem,
   type ExecutiveMaterialTypeItem,
   type ExecutiveMeasurementUnitItem,
@@ -66,6 +68,9 @@ interface RewardDraftRow {
   points_cost: string;
   stock_qty: string;
   active: boolean;
+  image_url: string | null;
+  uploadingImage?: boolean;
+  imageOpen?: boolean;
 }
 
 interface NewRewardDraft {
@@ -74,6 +79,8 @@ interface NewRewardDraft {
   points_cost: string;
   stock_qty: string;
   active: boolean;
+  image_url: string | null;
+  uploadingImage?: boolean;
 }
 
 function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
@@ -129,18 +136,13 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
 
   const [rewardRows, setRewardRows] = useState<RewardDraftRow[]>([]);
   const [isAddingReward, setIsAddingReward] = useState(false);
-  const [newReward, setNewReward] = useState<NewRewardDraft>({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true });
+  const [newReward, setNewReward] = useState<NewRewardDraft>({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null });
 
   const activeMaterialCount = useMemo(
     () => materialRows.filter((row) => row.active).length,
     [materialRows],
   );
   const activeUnitCount = useMemo(() => unitRows.filter((row) => row.active).length, [unitRows]);
-  const configuredPointCount = useMemo(
-    () => materialRows.filter((row) => row.points_per_kg.trim()).length,
-    [materialRows],
-  );
-
   const loadConfiguration = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
@@ -148,7 +150,7 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
         executiveApi.listMaterialTypes({ forceRefresh }),
         executiveApi.listMeasurementUnits({ forceRefresh }),
         executiveApi.listMaterialPointRules({ forceRefresh }),
-        ...(mode === 'executive' ? [executiveApi.listRewards({ forceRefresh })] : []),
+        executiveApi.listRewards({ forceRefresh }),
       ];
       const [materialResponse, unitResponse, pointRuleResponse, rewardResponse] =
         await Promise.all(requests) as [
@@ -177,6 +179,7 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
             points_cost: String(item.points_cost),
             stock_qty: String(item.stock_qty),
             active: item.active,
+            image_url: item.image_url ?? null,
           })),
         );
       }
@@ -351,6 +354,44 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
     setRewardRows((prev) => prev.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
   };
 
+  const handleImageUpload = async (
+    file: File,
+    onUploading: (v: boolean) => void,
+    onDone: (url: string) => void,
+    oldUrl?: string | null,
+  ) => {
+    onUploading(true);
+    try {
+      if (oldUrl) await deleteRewardImage(oldUrl);
+      const url = await uploadRewardImage(file);
+      onDone(url);
+    } catch (e) {
+      setMessage(e instanceof Error ? `อัปโหลดรูปไม่สำเร็จ: ${e.message}` : 'อัปโหลดรูปไม่สำเร็จ');
+    } finally {
+      onUploading(false);
+    }
+  };
+
+  // Delete image from storage + save null to DB immediately
+  const handleDeleteImage = async (index: number) => {
+    const row = rewardRows[index];
+    if (!row.image_url) return;
+    const oldUrl = row.image_url;
+    // Optimistic clear
+    updateRewardRow(index, { image_url: null, uploadingImage: true });
+    try {
+      await deleteRewardImage(oldUrl);
+      await executiveApi.updateReward(row.id, { image_url: null });
+      setMessage('ลบรูปภาพสำเร็จ');
+    } catch (e) {
+      // Rollback
+      updateRewardRow(index, { image_url: oldUrl });
+      setMessage(e instanceof Error ? `ลบรูปไม่สำเร็จ: ${e.message}` : 'ลบรูปไม่สำเร็จ');
+    } finally {
+      updateRewardRow(index, { uploadingImage: false });
+    }
+  };
+
   const handleCreateReward = async () => {
     const name = newReward.name_th.trim();
     const pointsText = newReward.points_cost.trim();
@@ -381,10 +422,11 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
         points_cost: points,
         stock_qty: stock,
         active: newReward.active,
+        image_url: newReward.image_url ?? undefined,
       });
       setMessage('สร้างรางวัลสำเร็จ');
       setIsAddingReward(false);
-      setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true });
+      setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null });
       await loadConfiguration(true);
     } catch (error) {
       if (error instanceof Error) {
@@ -428,6 +470,7 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
         points_cost: points,
         stock_qty: stock,
         active: row.active,
+        image_url: row.image_url,
       });
       await loadConfiguration(true);
       setMessage('บันทึกรางวัลสำเร็จ');
@@ -453,9 +496,9 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
           <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
             {mode === 'factory' ? 'โรงงาน' : 'ผู้บริหาร'}
           </p>
-          <h1 className="mt-0.5 text-4xl font-light tracking-tight text-on-surface">ตั้งค่าวัสดุ</h1>
+          <h1 className="mt-0.5 text-4xl font-light tracking-tight text-on-surface">ตั้งค่าวัสดุ / รางวัล</h1>
           <p className="mt-1 text-sm text-on-surface-variant">
-            {mode === 'factory' ? 'จัดการประเภทวัสดุ หน่วยวัด และอัตราแต้มต่อกิโลกรัม' : 'จัดการข้อมูลหลัก กฎแต้ม และแคตตาล็อกรางวัล'}
+            จัดการประเภทวัสดุ อัตราแต้ม หน่วยวัด และรางวัลในระบบ
           </p>
         </div>
         <button
@@ -483,13 +526,11 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
           <span className="text-lg font-semibold text-stone-950">{activeUnitCount}</span>
           <span className="text-sm text-stone-600">หน่วยวัด</span>
         </div>
-        {mode === 'executive' && (
-          <div className="flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2">
+        <div className="flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2">
             <Gift className="h-4 w-4 text-amber-600" />
             <span className="text-lg font-semibold text-stone-950">{rewardRows.filter((r) => r.active).length}</span>
             <span className="text-sm text-stone-600">รางวัล</span>
           </div>
-        )}
       </div>
 
       {/* Materials + Units 2-col grid */}
@@ -791,8 +832,8 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
         </SectionCard>
       </div>
 
-      {/* Rewards — full width (executive only) */}
-      {mode === 'executive' && <SectionCard
+      {/* Rewards — full width */}
+      <SectionCard
           title="จัดการรางวัล"
           description="เพิ่ม แก้ไข และเปิด/ปิดใช้งานรางวัลที่เกษตรกรเห็น"
           actions={
@@ -860,6 +901,46 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
                     className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
                   />
                 </div>
+                {/* Image upload — new reward */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">รูปภาพรางวัล (ไม่บังคับ)</label>
+                  <div className="flex items-center gap-3">
+                    {newReward.image_url ? (
+                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-stone-200">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={newReward.image_url} alt="" className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setNewReward((prev) => ({ ...prev, image_url: null }))}
+                          className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : null}
+                    <label className={`flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-500 hover:border-primary hover:text-primary transition-colors ${newReward.uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <ImagePlus className="h-4 w-4" />
+                      {newReward.uploadingImage ? 'กำลังอัปโหลด...' : newReward.image_url ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          void handleImageUpload(
+                            f,
+                            (v) => setNewReward((prev) => ({ ...prev, uploadingImage: v })),
+                            (url) => setNewReward((prev) => ({ ...prev, image_url: url })),
+                            newReward.image_url,
+                          );
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
                 <div className="flex items-end pb-0.5 sm:col-span-2">
                   <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700">
                     <input
@@ -884,7 +965,7 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setIsAddingReward(false); setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true }); }}
+                  onClick={() => { setIsAddingReward(false); setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null }); }}
                   className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
                 >
                   <X className="h-4 w-4" />
@@ -898,6 +979,7 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
 
           <div>
             <div className="hidden md:flex md:items-center md:gap-3 px-2 pb-2 border-b border-stone-100">
+              <span className="w-9 shrink-0" />
               <span className="flex-1 text-xs font-semibold text-stone-600">ชื่อรางวัล</span>
               <span className="flex-1 text-xs font-semibold text-stone-600">รายละเอียด</span>
               <span className="w-20 shrink-0 text-xs font-semibold text-stone-600">แต้มที่ใช้</span>
@@ -908,54 +990,147 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
             {rewardRows.map((row, index) => {
               const requestKey = `reward:${row.id}`;
               return (
-                <div key={row.id} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
-                  <div className="flex flex-1 items-center gap-3">
-                    <input
-                      value={row.name_th}
-                      onChange={(event) => updateRewardRow(index, { name_th: event.target.value })}
-                      className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                      placeholder="ชื่อรางวัล"
-                    />
-                    <input
-                      value={row.description_th}
-                      onChange={(event) => updateRewardRow(index, { description_th: event.target.value })}
-                      className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                      placeholder="รายละเอียด"
-                    />
-                    <input
-                      value={row.points_cost}
-                      onChange={(event) => updateRewardRow(index, { points_cost: event.target.value })}
-                      className="w-20 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                      type="number"
-                      placeholder="แต้ม"
-                    />
-                    <input
-                      value={row.stock_qty}
-                      onChange={(event) => updateRewardRow(index, { stock_qty: event.target.value })}
-                      className="w-20 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                      type="number"
-                      placeholder="สต็อก"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="flex w-14 shrink-0 cursor-pointer items-center gap-1.5 text-stone-500">
-                      <input type="checkbox" checked={row.active} onChange={(event) => updateRewardRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
-                      <span className="text-xs">ใช้</span>
-                    </label>
+                <div key={row.id} className="border-b border-stone-100 last:border-0">
+                  {/* Main row */}
+                  <div className="flex flex-col gap-2 py-2.5 md:flex-row md:items-center md:gap-3 md:px-2">
+                    {/* Thumbnail — click to toggle image panel */}
                     <button
                       type="button"
-                      onClick={() => void saveRewardRow(row)}
-                      disabled={savingKey === requestKey}
-                      className="w-14 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                      onClick={() => updateRewardRow(index, { imageOpen: !row.imageOpen })}
+                      className={`relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border transition-all ${
+                        row.image_url
+                          ? 'border-stone-200 hover:ring-2 hover:ring-primary/30'
+                          : 'border-dashed border-stone-300 hover:border-primary/60'
+                      } ${row.imageOpen ? 'ring-2 ring-primary/40' : ''}`}
+                      title={row.image_url ? 'ดู/เปลี่ยนรูปภาพ' : 'เพิ่มรูปภาพ'}
                     >
-                      {savingKey === requestKey ? '...' : 'บันทึก'}
+                      {row.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={row.image_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <ImagePlus className="h-3.5 w-3.5 text-stone-400 mx-auto" />
+                      )}
                     </button>
+                    <div className="flex flex-1 items-center gap-3">
+                      <input
+                        value={row.name_th}
+                        onChange={(event) => updateRewardRow(index, { name_th: event.target.value })}
+                        className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                        placeholder="ชื่อรางวัล"
+                      />
+                      <input
+                        value={row.description_th}
+                        onChange={(event) => updateRewardRow(index, { description_th: event.target.value })}
+                        className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                        placeholder="รายละเอียด"
+                      />
+                      <input
+                        value={row.points_cost}
+                        onChange={(event) => updateRewardRow(index, { points_cost: event.target.value })}
+                        className="w-20 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                        type="number"
+                        placeholder="แต้ม"
+                      />
+                      <input
+                        value={row.stock_qty}
+                        onChange={(event) => updateRewardRow(index, { stock_qty: event.target.value })}
+                        className="w-20 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                        type="number"
+                        placeholder="สต็อก"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="flex w-14 shrink-0 cursor-pointer items-center gap-1.5 text-stone-500">
+                        <input type="checkbox" checked={row.active} onChange={(event) => updateRewardRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
+                        <span className="text-xs">ใช้</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => void saveRewardRow(row)}
+                        disabled={savingKey === requestKey}
+                        className="w-14 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                      >
+                        {savingKey === requestKey ? '...' : 'บันทึก'}
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Inline image panel */}
+                  <AnimatePresence initial={false}>
+                    {row.imageOpen && (
+                      <motion.div
+                        key="img-panel"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: reduceMotion ? 0 : 0.2, ease: 'easeInOut' }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mb-3 ml-0 md:ml-12 flex flex-wrap items-start gap-4 rounded-xl border border-stone-100 bg-stone-50/60 px-4 py-3">
+                          {/* Preview */}
+                          <div className={`relative h-28 w-28 shrink-0 overflow-hidden rounded-xl border bg-white ${row.image_url ? 'border-stone-200' : 'border-dashed border-stone-300'}`}>
+                            {row.image_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={row.image_url} alt={row.name_th} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full items-center justify-center">
+                                <ImagePlus className="h-6 w-6 text-stone-300" />
+                              </div>
+                            )}
+                            {row.uploadingImage && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Controls */}
+                          <div className="flex flex-col gap-2">
+                            <p className="text-xs font-semibold text-stone-500">
+                              {row.image_url ? 'รูปภาพปัจจุบัน' : 'ยังไม่มีรูปภาพ'}
+                            </p>
+                            <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-medium text-stone-600 hover:border-primary hover:text-primary transition-colors ${row.uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
+                              <ImagePlus className="h-3.5 w-3.5" />
+                              {row.uploadingImage ? 'กำลังอัปโหลด...' : row.image_url ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                className="sr-only"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (!f) return;
+                                  void handleImageUpload(
+                                    f,
+                                    (v) => updateRewardRow(index, { uploadingImage: v }),
+                                    (url) => updateRewardRow(index, { image_url: url }),
+                                    row.image_url,
+                                  );
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                            {row.image_url && (
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteImage(index)}
+                                disabled={row.uploadingImage}
+                                className="inline-flex items-center gap-2 rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                {row.uploadingImage ? 'กำลังลบ...' : 'ลบรูป'}
+                              </button>
+                            )}
+                            <p className="text-[10px] text-stone-400">JPG / PNG / WebP · สูงสุด 5 MB<br/>บันทึกแถวเพื่อให้การเปลี่ยนแปลงมีผล</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               );
             })}
           </div>
-        </SectionCard>}
+        </SectionCard>
     </div>
     </ErrorBoundary>
   );

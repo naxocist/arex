@@ -203,7 +203,7 @@ def upsert_material_point_rule(
 @router.get("/rewards")
 def list_rewards(
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.ADMIN, Role.FACTORY)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:
@@ -223,7 +223,7 @@ def list_rewards(
 def create_reward(
     payload: dict[str, Any],
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.ADMIN, Role.FACTORY)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:
@@ -277,7 +277,7 @@ def update_reward(
     reward_id: str,
     payload: dict[str, Any],
     current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.ADMIN)
+        require_roles(Role.EXECUTIVE, Role.ADMIN, Role.FACTORY)
     ),
     workflow_service: WorkflowService = Depends(get_workflow_service),
 ) -> dict[str, Any]:

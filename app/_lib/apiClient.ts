@@ -6,6 +6,7 @@ export const API_BASE_URL =
 const ACCESS_TOKEN_KEY = 'AREX_ACCESS_TOKEN';
 const REFRESH_TOKEN_KEY = 'AREX_REFRESH_TOKEN';
 const AUTH_ROLE_KEY = 'AREX_AUTH_ROLE';
+const AUTH_APPROVAL_KEY = 'AREX_APPROVAL_STATUS';
 const DEFAULT_GET_CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface CacheEntry {
@@ -116,6 +117,7 @@ export function setAuthSession(params: {
   accessToken: string;
   refreshToken?: string | null;
   role?: string | null;
+  approvalStatus?: string | null;
 }): void {
   if (typeof window === 'undefined') return;
   clearApiResponseCache();
@@ -134,6 +136,13 @@ export function setAuthSession(params: {
       localStorage.removeItem(AUTH_ROLE_KEY);
     }
   }
+  if (params.approvalStatus !== undefined) {
+    if (params.approvalStatus) {
+      localStorage.setItem(AUTH_APPROVAL_KEY, params.approvalStatus);
+    } else {
+      localStorage.removeItem(AUTH_APPROVAL_KEY);
+    }
+  }
 }
 
 export function clearAuthSession(): void {
@@ -142,11 +151,17 @@ export function clearAuthSession(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(AUTH_ROLE_KEY);
+  localStorage.removeItem(AUTH_APPROVAL_KEY);
 }
 
 export function getStoredRole(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem(AUTH_ROLE_KEY);
+}
+
+export function getStoredApprovalStatus(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(AUTH_APPROVAL_KEY);
 }
 
 function shouldRetryWithRefresh(error: ApiError): boolean {
@@ -766,6 +781,7 @@ export interface LoginResponse {
   access_token: string;
   refresh_token: string | null;
   token_type: string;
+  approval_status?: string;
   user: {
     id: string;
     email: string | null;
@@ -979,14 +995,115 @@ export const executiveApi = {
     apiRequest<{ value_chain: ValueChainItem[]; actor: string }>('/executive/value-chain', options),
   listRewards: (options?: RequestBehaviorOptions) =>
     apiRequest<{ rewards: FarmerRewardItem[]; actor: string }>('/executive/rewards', options),
-  createReward: (payload: { name_th: string; description_th?: string; points_cost: number; stock_qty: number; active?: boolean }) =>
+  createReward: (payload: { name_th: string; description_th?: string; points_cost: number; stock_qty: number; active?: boolean; image_url?: string | null }) =>
     apiRequest<{ message: string; reward: FarmerRewardItem; actor: string }>('/executive/rewards', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  updateReward: (rewardId: string, payload: Partial<{ name_th: string; description_th: string; points_cost: number; stock_qty: number; active: boolean }>) =>
+  updateReward: (rewardId: string, payload: Partial<{ name_th: string; description_th: string; points_cost: number; stock_qty: number; active: boolean; image_url: string | null }>) =>
     apiRequest<{ message: string; reward: FarmerRewardItem; actor: string }>(`/executive/rewards/${encodeURIComponent(rewardId)}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
 };
+
+// ── Admin ──────────────────────────────────────────────────────────────────
+export interface AdminProfile {
+  id: string;
+  display_name: string;
+  email: string;
+  role: string;
+  phone: string;
+  province: string;
+  approval_status: 'pending' | 'approved' | 'rejected';
+  approval_note: string | null;
+  created_at: string;
+}
+
+export interface AdminSettings {
+  approval_required_roles: string[];
+}
+
+export interface AdminOverview {
+  pending_approvals: Record<string, number>;
+  pending_total: number;
+  overview: ExecutiveOverview;
+}
+
+export const adminApi = {
+  getOverview: (options?: RequestBehaviorOptions) =>
+    apiRequest<AdminOverview>('/admin/dashboard/overview', options),
+  listPendingAccounts: (roleFilter?: string) =>
+    apiRequest<{ accounts: AdminProfile[] }>(
+      `/admin/accounts/pending${roleFilter ? `?role_filter=${encodeURIComponent(roleFilter)}` : ''}`,
+    ),
+  listAllAccounts: (params?: { role_filter?: string; approval_filter?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.role_filter) qs.set('role_filter', params.role_filter);
+    if (params?.approval_filter) qs.set('approval_filter', params.approval_filter);
+    const query = qs.toString();
+    return apiRequest<{ accounts: AdminProfile[] }>(`/admin/accounts/all${query ? `?${query}` : ''}`);
+  },
+  approveAccount: (profileId: string) =>
+    apiRequest<{ message: string }>(`/admin/accounts/${encodeURIComponent(profileId)}/approve`, { method: 'POST' }),
+  rejectAccount: (profileId: string, note?: string) =>
+    apiRequest<{ message: string }>(`/admin/accounts/${encodeURIComponent(profileId)}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ note }),
+    }),
+  getSettings: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ settings: AdminSettings }>('/admin/settings', options),
+  updateSettings: (approvalRequiredRoles: string[]) =>
+    apiRequest<{ message: string; settings: AdminSettings }>('/admin/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ approval_required_roles: approvalRequiredRoles }),
+    }),
+};
+
+// ── Storage ────────────────────────────────────────────────────────────────
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || 'http://127.0.0.1:54321';
+
+export async function uploadRewardImage(file: File): Promise<string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
+  if (!token) throw new Error('Not authenticated');
+
+  const ext = file.name.split('.').pop() ?? 'jpg';
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const uploadUrl = `${SUPABASE_URL}/storage/v1/object/reward-images/${fileName}`;
+
+  const res = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': file.type,
+    },
+    body: file,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Upload failed: ${text}`);
+  }
+
+  return `${SUPABASE_URL}/storage/v1/object/public/reward-images/${fileName}`;
+}
+
+export async function deleteRewardImage(imageUrl: string): Promise<void> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
+  if (!token) return;
+
+  // Extract the file path after /reward-images/
+  const marker = '/reward-images/';
+  const idx = imageUrl.indexOf(marker);
+  if (idx === -1) return; // not a storage URL we own
+
+  const fileName = imageUrl.slice(idx + marker.length);
+  const deleteUrl = `${SUPABASE_URL}/storage/v1/object/reward-images/${fileName}`;
+
+  await fetch(deleteUrl, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  // Ignore errors — old file cleanup is best-effort
+}
