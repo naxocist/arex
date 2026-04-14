@@ -128,6 +128,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+          token_format: access_token
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -140,6 +141,7 @@ jobs:
       - name: Configure Artifact Registry auth
         run: |
           gcloud auth configure-docker "${{ steps.config.outputs.region }}-docker.pkg.dev" --quiet
+          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin "${{ steps.config.outputs.region }}-docker.pkg.dev"
 
       - name: Build and push image
         run: |
