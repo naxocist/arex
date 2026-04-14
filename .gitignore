@@ -44,3 +44,6 @@ venv/
 backend/supabase/.branches/
 backend/supabase/.temp/
 backend/supabase/dumps/*.sql
+
+# Production seed contains real passwords — never commit
+backend/supabase/seeds/seed.prod.sql

@@ -48,12 +48,13 @@ begin
   for r in
     select *
     from (values
-      ('bbbbbbbb-0000-4000-8000-000000000001'::uuid, 'farmer@arex.com',    'farmer',    'เกษตรกร Staging'),
-      ('bbbbbbbb-0000-4000-8000-000000000002'::uuid, 'logistics@arex.com', 'logistics', 'ขนส่ง Staging'),
-      ('bbbbbbbb-0000-4000-8000-000000000003'::uuid, 'factory@arex.com',   'factory',   'โรงงาน Staging'),
-      ('bbbbbbbb-0000-4000-8000-000000000004'::uuid, 'warehouse@arex.com', 'warehouse', 'คลังสินค้า Staging'),
-      ('bbbbbbbb-0000-4000-8000-000000000005'::uuid, 'executive@arex.com', 'executive', 'ผู้บริหาร Staging'),
-      ('bbbbbbbb-0000-4000-8000-000000000006'::uuid, 'admin@arex.com',     'admin',     'ผู้ดูแลระบบ Staging')
+      ('bbbbbbbb-0000-4000-8000-000000000001'::uuid, 'farmer@gmail.com',    'farmer',    'เกษตรกร Staging'),
+      ('bbbbbbbb-0000-4000-8000-000000000002'::uuid, 'logistics@gmail.com', 'logistics', 'ขนส่ง Staging'),
+      ('bbbbbbbb-0000-4000-8000-000000000003'::uuid, 'factory@gmail.com',   'factory',   'โรงงาน Staging'),
+      ('bbbbbbbb-0000-4000-8000-000000000004'::uuid, 'warehouse@gmail.com', 'warehouse', 'คลังสินค้า Staging'),
+      ('bbbbbbbb-0000-4000-8000-000000000005'::uuid, 'executive@gmail.com', 'executive', 'ผู้บริหาร Staging'),
+      ('bbbbbbbb-0000-4000-8000-000000000006'::uuid, 'admin@gmail.com',     'admin',     'ผู้ดูแลระบบ Staging'),
+      ('bbbbbbbb-0000-4000-8000-000000000007'::uuid, 'farmer2@gmail.com',   'farmer',    'เกษตรกร 2 Staging')
     ) as t(id, email, role, display_name)
   loop
     insert into auth.users (
