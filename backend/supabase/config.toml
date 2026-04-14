@@ -13,7 +13,7 @@ major_version = 17
 
 [db.seed]
 enabled = true
-sql_paths = ["./seed.sql"]
+sql_paths = ["./seeds/seed.local.sql"]
 
 [studio]
 enabled = true

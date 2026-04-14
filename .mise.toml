@@ -4,6 +4,9 @@ python = "3.11"
 uv = "latest"
 supabase = "latest"
 
+[env]
+_.file = { path = "backend/supabase/.env.supabase", ignore_missing = true }
+
 [tasks.setup]
 description = "Install frontend and backend dependencies"
 run = "npm install && cd backend && uv sync"
@@ -27,6 +30,30 @@ run = "supabase db reset --workdir backend"
 [tasks."db:migrate:new"]
 description = "Create a new migration (pass -- my_migration_name)"
 run = "supabase migration new --workdir backend"
+
+[tasks."db:push:staging"]
+description = "Push unapplied migrations to staging Supabase"
+run = "supabase link --project-ref %STAGING_PROJECT_REF% --password %STAGING_DB_PASSWORD% --workdir backend && supabase db push --workdir backend"
+
+[tasks."db:seed:staging"]
+description = "Apply reference + role accounts to staging (safe to re-run, never wipes data)"
+run = "supabase link --project-ref %STAGING_PROJECT_REF% --password %STAGING_DB_PASSWORD% --workdir backend && supabase db query --workdir backend --linked --file supabase/seeds/seed.staging.sql"
+
+[tasks."db:push:prod"]
+description = "Push unapplied migrations to production Supabase"
+run = "supabase link --project-ref %PROD_PROJECT_REF% --password %PROD_DB_PASSWORD% --workdir backend && supabase db push --workdir backend"
+
+[tasks."db:seed:prod"]
+description = "Apply reference data + initial admin to production (safe to re-run, never wipes data)"
+run = "supabase link --project-ref %PROD_PROJECT_REF% --password %PROD_DB_PASSWORD% --workdir backend && supabase db query --workdir backend --linked --file supabase/seeds/seed.prod.sql"
+
+[tasks."db:diff"]
+description = "Diff local schema vs current linked remote (shows what would be pushed)"
+run = "supabase db diff --workdir backend"
+
+[tasks."db:migration:list"]
+description = "List migrations and their applied status on linked remote"
+run = "supabase migration list --workdir backend"
 
 [tasks."db:dump:auth"]
 description = "Dump local auth data for cloud push"

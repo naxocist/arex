@@ -181,40 +181,80 @@ will wait, not cancel the in-flight deploy.
 
 ### First deploy (before GitHub Actions has ever run)
 
-```bash
-# Authenticate locally
-gcloud auth login
-gcloud config set project YOUR_PROJECT_ID
+Run these from the **repo root** in Git Bash. Replace the two placeholder values at the top — everything else is derived automatically.
 
-# Build and push image manually
-REGION=YOUR_REGION
-PROJECT=YOUR_PROJECT_ID
+```bash
+# ── 1. Set your project config (edit these two lines) ────────────────────────
+REGION=asia-southeast1              # Cloud Run + Artifact Registry region
+PROJECT=bpk-project-478118-i        # GCP project ID
+
+# ── 2. Derived values (do not edit) ──────────────────────────────────────────
 SHA=$(git rev-parse HEAD)
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/arex-backend/arex-backend"
 
-gcloud auth configure-docker "${REGION}-docker.pkg.dev"
+# ── 3. Authenticate ───────────────────────────────────────────────────────────
+gcloud auth login
+gcloud config set project "${PROJECT}"
 
-docker buildx build --platform linux/amd64 --target prod \
+# On Windows Git Bash, gcloud's credential helper outputs a form-feed character
+# that breaks docker push. Use a direct token login instead:
+gcloud auth print-access-token | tr -d '\r\n\f' | \
+  docker login -u oauth2accesstoken --password-stdin "${REGION}-docker.pkg.dev"
+
+# ── 4. Build and push — production image ─────────────────────────────────────
+# Build context is backend/ — Dockerfile, pyproject.toml and uv.lock are all there.
+# On Windows Git Bash, --push is broken (form-feed bug). Build then push separately.
+docker buildx build \
+  --platform linux/amd64 \
+  --target prod \
   --provenance=false \
-  --tag "${IMAGE}:${SHA}" --tag "${IMAGE}:latest" \
-  --push ./backend
+  --tag "${IMAGE}:${SHA}" \
+  --tag "${IMAGE}:latest" \
+  backend
+docker push "${IMAGE}:${SHA}"
+docker push "${IMAGE}:latest"
 
-# Deploy production
+# ── 5. Build and push — staging image ────────────────────────────────────────
+docker buildx build \
+  --platform linux/amd64 \
+  --target prod \
+  --provenance=false \
+  --tag "${IMAGE}:${SHA}-staging" \
+  --tag "${IMAGE}:staging" \
+  backend
+docker push "${IMAGE}:${SHA}-staging"
+docker push "${IMAGE}:staging"
+
+# ── 6. Deploy production ──────────────────────────────────────────────────────
 gcloud run deploy arex-backend-prod \
   --image "${IMAGE}:${SHA}" \
   --region "${REGION}" \
   --allow-unauthenticated \
+  --quiet \
   --set-secrets "SUPABASE_URL=AREX_PROD_SUPABASE_URL:latest,SUPABASE_PUBLISHABLE_KEY=AREX_PROD_SUPABASE_PUBLISHABLE_KEY:latest,SUPABASE_SECRET_KEY=AREX_PROD_SUPABASE_SECRET_KEY:latest,CORS_ORIGINS=AREX_PROD_CORS_ORIGINS:latest"
 
-# Deploy staging
+# ── 7. Deploy staging ─────────────────────────────────────────────────────────
 gcloud run deploy arex-backend-staging \
   --image "${IMAGE}:${SHA}-staging" \
   --region "${REGION}" \
   --allow-unauthenticated \
+  --quiet \
   --set-secrets "SUPABASE_URL=AREX_STAGING_SUPABASE_URL:latest,SUPABASE_PUBLISHABLE_KEY=AREX_STAGING_SUPABASE_PUBLISHABLE_KEY:latest,SUPABASE_SECRET_KEY=AREX_STAGING_SUPABASE_SECRET_KEY:latest,CORS_ORIGINS=AREX_STAGING_CORS_ORIGINS:latest"
 ```
 
-Both commands print the HTTPS service URL at the end — paste into Vercel env vars.
+Both deploy commands print the HTTPS service URL at the end — paste into Vercel env vars.
+
+After the services are up, push the initial schema and seed:
+
+```bash
+# Push migrations then seed — staging
+mise run db:push:staging
+mise run db:seed:staging
+
+# Push migrations then seed — production
+mise run db:push:prod
+mise run db:seed:prod
+```
 
 ### Rotating or updating a secret
 
