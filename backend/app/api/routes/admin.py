@@ -88,7 +88,6 @@ def list_all_accounts(
 @router.post("/accounts/{profile_id}/approve")
 def approve_account(
     profile_id: str,
-    payload: ApproveAccountRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.ADMIN)),
 ) -> dict[str, Any]:
     client = get_service_client()
@@ -97,7 +96,7 @@ def approve_account(
             client.table("profiles")
             .update({
                 "approval_status": "approved",
-                "approval_note": payload.note,
+                "approval_note": None,
             })
             .eq("id", profile_id)
             .execute()
