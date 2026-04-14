@@ -36,5 +36,9 @@ function FarmerLayoutInner({ children }: { children: React.ReactNode }) {
 }
 
 export default function FarmerLayout({ children }: { children: React.ReactNode }) {
-  return <FarmerLayoutInner>{children}</FarmerLayoutInner>;
+  return (
+    <React.Suspense fallback={null}>
+      <FarmerLayoutInner>{children}</FarmerLayoutInner>
+    </React.Suspense>
+  );
 }
