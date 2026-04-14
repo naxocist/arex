@@ -6,7 +6,7 @@
 -- What this includes:
 --   ✓ Reference data  (material types, units, point rules, rewards catalog, value chain)
 --   ✓ Storage bucket + RLS policies for reward images
---   ✓ One initial admin account to bootstrap the system
+--   ✓ Initial accounts: admin, executive, warehouse (roles that can't self-register)
 --
 -- What this does NOT include:
 --   ✗ Demo / test users of any kind
@@ -28,8 +28,9 @@ begin
   for r in
     select *
     from (values
-      ('cccccccc-0000-4000-8000-000000000001'::uuid, 'admin@gmail.com',     'admin',     'AREX Admin',     'Arex2569!'),
-      ('cccccccc-0000-4000-8000-000000000002'::uuid, 'executive@gmail.com', 'executive', 'AREX Executive', 'Arex2569!')
+      ('cccccccc-0000-4000-8000-000000000001'::uuid, 'admin@arex.com',     'admin',     'AREX Admin',      'Arex2026!'),
+      ('cccccccc-0000-4000-8000-000000000002'::uuid, 'executive@arex.com', 'executive', 'AREX Executive',  'Arex2026!'),
+      ('cccccccc-0000-4000-8000-000000000003'::uuid, 'warehouse@arex.com', 'warehouse', 'AREX Warehouse',  'Arex2026!')
     ) as t(id, email, role, display_name, password)
   loop
     if exists (select 1 from auth.users where email = r.email or id = r.id) then

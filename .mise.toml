@@ -36,7 +36,7 @@ description = "Push unapplied migrations to staging Supabase"
 run = "supabase link --project-ref %STAGING_PROJECT_REF% --password %STAGING_DB_PASSWORD% --workdir backend && supabase db push --workdir backend"
 
 [tasks."db:seed:staging"]
-description = "Apply reference + role accounts to staging (safe to re-run, never wipes data)"
+description = "WIPE staging DB and reseed from scratch (truncates all tables + auth users)"
 run = "supabase link --project-ref %STAGING_PROJECT_REF% --password %STAGING_DB_PASSWORD% --workdir backend && supabase db query --workdir backend --linked --file supabase/seeds/seed.staging.sql"
 
 [tasks."db:push:prod"]
