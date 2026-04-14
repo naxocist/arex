@@ -15,7 +15,6 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import Link from 'next/link';
 import Image from 'next/image';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ConfirmDialog from '@/app/_components/ConfirmDialog';
@@ -25,6 +24,7 @@ import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
 import { SkeletonCard } from '@/app/_components/Skeleton';
 import StatusBadge from '@/app/_components/StatusBadge';
+import { useFarmerProfile } from '@/app/_contexts/FarmerProfileContext';
 import {
   ApiError,
   farmerApi,
@@ -162,6 +162,7 @@ const ACTIVE_REQUEST_STATUSES = new Set(['requested', 'warehouse_approved']);
 
 export default function FarmerRewards() {
   const reduceMotion = useReducedMotion();
+  const { openProfile } = useFarmerProfile();
 
   const [availablePoints, setAvailablePoints] = useState(0);
   const [rewardsCatalog, setRewardsCatalog] = useState<FarmerRewardItem[]>([]);
@@ -345,13 +346,14 @@ export default function FarmerRewards() {
               >
                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
-              <Link
-                href="/farmer?profile=1"
+              <button
+                type="button"
+                onClick={openProfile}
                 className="flex items-center gap-2 rounded-full bg-white/20 border border-white/40 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/30 active:scale-95"
               >
                 <User className="h-4 w-4" />
                 ข้อมูลส่วนตัว
-              </Link>
+              </button>
             </div>
           </div>
         </div>

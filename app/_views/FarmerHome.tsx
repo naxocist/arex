@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDown, Coins, Gift, Kanban, LayoutList, PackagePlus, RefreshCw, Route, Sprout, Truck, User, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ConfirmDialog from '@/app/_components/ConfirmDialog';
@@ -14,6 +13,7 @@ const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLo
 import { SkeletonCard } from '@/app/_components/Skeleton';
 import StatusBadge from '@/app/_components/StatusBadge';
 import StatusStepper from '@/app/_components/StatusStepper';
+import { useFarmerProfile } from '@/app/_contexts/FarmerProfileContext';
 import {
   ApiError,
   farmerApi,
@@ -22,7 +22,6 @@ import {
   type FarmerMeasurementUnitItem,
   type FarmerSubmissionItem,
 } from '@/app/_lib/apiClient';
-import { THAI_PROVINCES } from '@/app/_lib/utils';
 
 const ACTIVE_STATUSES = new Set(['submitted', 'pickup_scheduled', 'picked_up', 'delivered_to_factory', 'factory_confirmed']);
 const LIVE_DOT_STATUSES = new Set(['pickup_scheduled', 'picked_up']);
@@ -112,8 +111,7 @@ function StatusDot({ status }: { status: string }) {
 
 export default function FarmerHome() {
   const reduceMotion = useReducedMotion();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const { openProfile } = useFarmerProfile();
 
   const [materialType, setMaterialType] = useState<CreateSubmissionPayload['material_type']>('');
   const [quantityValue, setQuantityValue] = useState('');
@@ -136,14 +134,6 @@ export default function FarmerHome() {
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [sortCol, setSortCol] = useState<SortCol>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
-
-  const [showProfile, setShowProfile] = useState(false);
-  const [profile, setProfile] = useState<{ display_name: string | null; phone: string | null; province: string | null } | null>(null);
-  const [profileForm, setProfileForm] = useState({ display_name: '', phone: '', province: '' });
-  const [provinceSearch, setProvinceSearch] = useState('');
-  const [provinceOpen, setProvinceOpen] = useState(false);
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [profileMessage, setProfileMessage] = useState<string | null>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean; title: string; message: string; fields?: { label: string; value: string }[]; onConfirm: () => void;
@@ -222,57 +212,6 @@ export default function FarmerHome() {
   };
 
   useEffect(() => { void loadDashboard(); }, []);
-  useEffect(() => { if (searchParams.get('profile') === '1') handleOpenProfile(); }, [searchParams]);
-
-  const loadProfile = async () => {
-    try {
-      const res = await farmerApi.getProfile({ forceRefresh: true });
-      setProfile(res);
-      setProfileForm({
-        display_name: res.display_name ?? '',
-        phone: res.phone ?? '',
-        province: res.province ?? '',
-      });
-    } catch {
-      // non-fatal — profile sheet will just be empty
-    }
-  };
-
-  const handleOpenProfile = () => {
-    setProfileMessage(null);
-    if (!profile) void loadProfile();
-    setShowProfile(true);
-  };
-
-  const handleCloseProfile = () => {
-    setShowProfile(false);
-    router.replace('/farmer', { scroll: false });
-  };
-
-  const handleSaveProfile = async () => {
-    setProfileMessage(null);
-    if (!profileForm.display_name.trim()) { setProfileMessage('กรุณาระบุชื่อผู้ใช้งาน'); return; }
-    const digitsOnly = profileForm.phone.replace(/\D/g, '');
-    if (digitsOnly.length !== 10) { setProfileMessage('เบอร์โทรต้องมี 10 หลัก'); return; }
-    if (!profileForm.province || !THAI_PROVINCES.includes(profileForm.province as typeof THAI_PROVINCES[number])) {
-      setProfileMessage('เลือกจังหวัดจากรายการ'); return;
-    }
-    setIsSavingProfile(true);
-    try {
-      const res = await farmerApi.updateProfile({
-        display_name: profileForm.display_name.trim() || null,
-        phone: digitsOnly || null,
-        province: profileForm.province.trim() || null,
-      });
-      setProfile(res);
-      setProfileMessage('บันทึกข้อมูลสำเร็จแล้ว');
-    } catch (error) {
-      setProfileMessage(error instanceof ApiError ? `บันทึกไม่สำเร็จ: ${error.message}` : 'บันทึกไม่สำเร็จ');
-    } finally {
-      setIsSavingProfile(false);
-    }
-  };
-
   const handleSubmitMaterial = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!hasAccessToken()) { setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI'); return; }
@@ -369,7 +308,7 @@ export default function FarmerHome() {
               </button>
               <button
                 type="button"
-                onClick={handleOpenProfile}
+                onClick={openProfile}
                 className="flex items-center gap-2 rounded-full bg-white/20 border border-white/40 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/30 active:scale-95"
               >
                 <User className="h-4 w-4" />
@@ -1009,128 +948,6 @@ export default function FarmerHome() {
           ส่งรายการวัสดุใหม่
         </motion.button>
       </div>
-
-      {/* ── Profile sheet ── */}
-      <AnimatePresence>
-        {showProfile && (
-          <>
-            <motion.div
-              key="profile-backdrop"
-              className="fixed inset-0 z-40 bg-black/40"
-              initial={reduceMotion ? {} : { opacity: 0 }}
-              animate={reduceMotion ? {} : { opacity: 1 }}
-              exit={reduceMotion ? {} : { opacity: 0 }}
-              onClick={handleCloseProfile}
-            />
-            <motion.div
-              key="profile-sheet"
-              className="fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl"
-              initial={reduceMotion ? {} : { y: '100%' }}
-              animate={reduceMotion ? {} : { y: 0 }}
-              exit={reduceMotion ? {} : { y: '100%' }}
-              transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-            >
-              {/* Header */}
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-100 bg-white px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
-                    <User className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-base font-bold text-stone-900">ข้อมูลส่วนตัว</p>
-                    <p className="text-xs text-stone-400">แก้ไขได้ทุกเมื่อ</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCloseProfile}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-500"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              {/* Form */}
-              <div className="space-y-5 px-5 pb-8 pt-5">
-                {profileMessage && (
-                  <AlertBanner message={profileMessage} tone={inferMessageTone(profileMessage)} />
-                )}
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-stone-700">ชื่อผู้ใช้งาน <span className="text-rose-500">*</span></label>
-                  <input
-                    type="text"
-                    value={profileForm.display_name}
-                    onChange={(e) => setProfileForm((prev) => ({ ...prev, display_name: e.target.value }))}
-                    placeholder="เช่น นายสมชาย ใจดี"
-                    className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-stone-700">เบอร์โทร <span className="text-rose-500">*</span></label>
-                  <input
-                    type="tel"
-                    value={profileForm.phone}
-                    onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
-                    placeholder="เช่น 08xxxxxxxx"
-                    className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                  />
-                  <p className="text-xs text-stone-400">10 หลัก ไม่ต้องใส่ขีด</p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-stone-700">จังหวัด <span className="text-rose-500">*</span></label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={provinceSearch !== '' ? provinceSearch : profileForm.province}
-                      onChange={(e) => {
-                        setProvinceSearch(e.target.value);
-                        setProvinceOpen(true);
-                        setProfileForm((prev) => ({ ...prev, province: '' }));
-                      }}
-                      onFocus={() => { setProvinceSearch(profileForm.province); setProvinceOpen(true); }}
-                      onBlur={() => setTimeout(() => setProvinceOpen(false), 150)}
-                      placeholder="พิมพ์เพื่อค้นหาจังหวัด"
-                      className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                    />
-                    {provinceOpen && (
-                      <ul className="absolute z-50 bottom-full mb-1 max-h-52 w-full overflow-y-auto rounded-2xl border border-stone-200 bg-white shadow-lg">
-                        {THAI_PROVINCES.filter((p) => !provinceSearch || p.includes(provinceSearch)).map((p) => (
-                          <li
-                            key={p}
-                            onMouseDown={() => {
-                              setProfileForm((prev) => ({ ...prev, province: p }));
-                              setProvinceSearch('');
-                              setProvinceOpen(false);
-                            }}
-                            className="cursor-pointer px-4 py-3 text-base hover:bg-emerald-50 hover:text-emerald-900"
-                          >
-                            {p}
-                          </li>
-                        ))}
-                        {THAI_PROVINCES.filter((p) => !provinceSearch || p.includes(provinceSearch)).length === 0 && (
-                          <li className="px-4 py-3 text-base text-stone-400">ไม่พบจังหวัด</li>
-                        )}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => void handleSaveProfile()}
-                  disabled={isSavingProfile}
-                  className="flex w-full min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 disabled:opacity-50"
-                >
-                  {isSavingProfile ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       <ConfirmDialog
         open={confirmDialog.open}
