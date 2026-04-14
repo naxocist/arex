@@ -17,6 +17,12 @@ interface CacheEntry {
 const GET_RESPONSE_CACHE = new Map<string, CacheEntry>();
 let authRefreshInFlight: Promise<boolean> | null = null;
 
+// Registered by UserProvider — called when token refresh fails and session is cleared.
+let onAuthFailure: (() => void) | null = null;
+export function registerAuthFailureHandler(handler: () => void) {
+  onAuthFailure = handler;
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -313,6 +319,7 @@ export async function apiRequest<T>(
           });
         }
         clearAuthSession();
+        onAuthFailure?.();
       }
 
       throw error;

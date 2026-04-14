@@ -1,7 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { clearAuthSession, getStoredRole } from '@/app/_lib/apiClient';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { clearAuthSession, getStoredRole, registerAuthFailureHandler } from '@/app/_lib/apiClient';
 
 export type UserRole = 'farmer' | 'executive' | 'logistics' | 'factory' | 'warehouse' | 'admin';
 
@@ -14,6 +15,7 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [role, setRole] = useState<UserRole | null>(() => {
     const storedRole = getStoredRole();
     if (storedRole === 'farmer' || storedRole === 'executive' || storedRole === 'logistics' || storedRole === 'factory' || storedRole === 'warehouse' || storedRole === 'admin') {
@@ -22,9 +24,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return null;
   });
 
+  useEffect(() => {
+    registerAuthFailureHandler(() => {
+      setRole(null);
+      router.replace('/');
+    });
+  }, [router]);
+
   const logout = () => {
     clearAuthSession();
     setRole(null);
+    router.replace('/');
   };
 
   return (
