@@ -125,9 +125,11 @@ jobs:
             > deploy-report/run-context.json
 
       - name: Authenticate to Google Cloud
+        id: auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+          token_format: access_token
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -137,10 +139,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Configure Artifact Registry auth
-        run: |
-          gcloud auth configure-docker "${{ steps.config.outputs.region }}-docker.pkg.dev" --quiet
-          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin "${{ steps.config.outputs.region }}-docker.pkg.dev"
+      - name: Log in to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ steps.config.outputs.region }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
 
       - name: Build and push image
         run: |
