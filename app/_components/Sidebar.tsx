@@ -94,10 +94,10 @@ function SidebarContent({
             </div>
           </div>
           <div>
-            <h1 className="text-sm font-bold leading-tight tracking-tight text-emerald-900">AREX</h1>
+            <h1 className="text-sm font-bold leading-tight tracking-tight text-emerald-900">Zero Burn</h1>
             {roleInfo
               ? <p className="text-[11px] font-medium text-stone-500 leading-tight">{roleInfo.label}</p>
-              : <p className="text-[11px] text-stone-400 leading-tight">Platform</p>
+              : <p className="text-[11px] text-stone-400 leading-tight">to Earn</p>
             }
           </div>
         </div>
@@ -212,7 +212,7 @@ export function MobileTopBar({ onOpen }: { onOpen: () => void }) {
           </div>
         </div>
         <div>
-          <p className="text-sm font-bold leading-tight tracking-tight text-emerald-900">AREX</p>
+          <p className="text-sm font-bold leading-tight tracking-tight text-emerald-900">Zero Burn</p>
           {roleInfo && (
             <p className="text-[11px] font-medium text-stone-500">{roleInfo.label}</p>
           )}

@@ -146,7 +146,7 @@ const routeMetaByPath: Record<string, RouteMeta> = {
   },
   '/executive': {
     title: 'ภาพรวมผู้บริหาร',
-    description: 'ติดตามปริมาณวัสดุ งานค้าง แต้ม และแนวโน้มของระบบ AREX',
+    description: 'ติดตามปริมาณวัสดุ งานค้าง แต้ม และแนวโน้มของระบบ Zero Burn to Earn',
   },
   '/executive/settings': {
     title: 'ตั้งค่าวัสดุ / รางวัล',
@@ -172,7 +172,7 @@ const routeMetaByPath: Record<string, RouteMeta> = {
 
 export function getRouteMeta(pathname: string): RouteMeta {
   return routeMetaByPath[pathname] ?? {
-    title: 'AREX Platform',
+    title: 'PMUC Zero Burn to Earn',
     description: 'ระบบติดตามและบริหารงานตามบทบาท',
   };
 }

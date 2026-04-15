@@ -70,7 +70,6 @@ interface RewardDraftRow {
   active: boolean;
   image_url: string | null;
   uploadingImage?: boolean;
-  imageOpen?: boolean;
 }
 
 interface NewRewardDraft {
@@ -359,11 +358,13 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
     onUploading: (v: boolean) => void,
     onDone: (url: string) => void,
     oldUrl?: string | null,
+    rewardId?: string, // if provided, auto-saves to DB after upload
   ) => {
     onUploading(true);
     try {
       if (oldUrl) await deleteRewardImage(oldUrl);
       const url = await uploadRewardImage(file);
+      if (rewardId) await executiveApi.updateReward(rewardId, { image_url: url });
       onDone(url);
     } catch (e) {
       setMessage(e instanceof Error ? `อัปโหลดรูปไม่สำเร็จ: ${e.message}` : 'อัปโหลดรูปไม่สำเร็จ');
@@ -486,6 +487,10 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
   };
 
   const reduceMotion = useReducedMotion();
+
+  // Image modal state
+  const [imageModal, setImageModal] = useState<{ index: number } | null>(null);
+  const imgModalRow = imageModal !== null ? rewardRows[imageModal.index] : null;
 
   return (
     <ErrorBoundary>
@@ -904,41 +909,55 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
                 {/* Image upload — new reward */}
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">รูปภาพรางวัล (ไม่บังคับ)</label>
-                  <div className="flex items-center gap-3">
+                  <label className={`group relative flex cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed transition-colors ${newReward.image_url ? 'border-stone-200' : 'border-stone-300 hover:border-primary'} ${newReward.uploadingImage ? 'pointer-events-none' : ''}`}>
                     {newReward.image_url ? (
-                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-stone-200">
+                      <div className="relative h-32 w-full">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={newReward.image_url} alt="" className="h-full w-full object-cover" />
+                        <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
+                          <ImagePlus className="h-5 w-5 text-white drop-shadow" />
+                          <span className="text-xs font-semibold text-white drop-shadow">เปลี่ยนรูป</span>
+                        </div>
                         <button
                           type="button"
-                          onClick={() => setNewReward((prev) => ({ ...prev, image_url: null }))}
-                          className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                          onClick={(e) => { e.preventDefault(); setNewReward((prev) => ({ ...prev, image_url: null })); }}
+                          className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                    ) : null}
-                    <label className={`flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-500 hover:border-primary hover:text-primary transition-colors ${newReward.uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <ImagePlus className="h-4 w-4" />
-                      {newReward.uploadingImage ? 'กำลังอัปโหลด...' : newReward.image_url ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        className="sr-only"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          void handleImageUpload(
-                            f,
-                            (v) => setNewReward((prev) => ({ ...prev, uploadingImage: v })),
-                            (url) => setNewReward((prev) => ({ ...prev, image_url: url })),
-                            newReward.image_url,
-                          );
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
-                  </div>
+                    ) : (
+                      <div className="flex h-32 w-full flex-col items-center justify-center gap-2 bg-stone-50 transition-colors group-hover:bg-primary/5">
+                        {newReward.uploadingImage ? (
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        ) : (
+                          <>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-stone-300 bg-white transition-colors group-hover:border-primary">
+                              <ImagePlus className="h-4 w-4 text-stone-400 transition-colors group-hover:text-primary" />
+                            </div>
+                            <p className="text-xs font-medium text-stone-500 group-hover:text-primary transition-colors">คลิกเพื่ออัปโหลดรูป</p>
+                            <p className="text-[10px] text-stone-400">JPG · PNG · WebP · สูงสุด 5 MB</p>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        void handleImageUpload(
+                          f,
+                          (v) => setNewReward((prev) => ({ ...prev, uploadingImage: v })),
+                          (url) => setNewReward((prev) => ({ ...prev, image_url: url })),
+                          newReward.image_url,
+                        );
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
                 </div>
 
                 <div className="flex items-end pb-0.5 sm:col-span-2">
@@ -993,15 +1012,15 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
                 <div key={row.id} className="border-b border-stone-100 last:border-0">
                   {/* Main row */}
                   <div className="flex flex-col gap-2 py-2.5 md:flex-row md:items-center md:gap-3 md:px-2">
-                    {/* Thumbnail — click to toggle image panel */}
+                    {/* Thumbnail — click to open image modal */}
                     <button
                       type="button"
-                      onClick={() => updateRewardRow(index, { imageOpen: !row.imageOpen })}
+                      onClick={() => setImageModal({ index })}
                       className={`relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border transition-all ${
                         row.image_url
                           ? 'border-stone-200 hover:ring-2 hover:ring-primary/30'
                           : 'border-dashed border-stone-300 hover:border-primary/60'
-                      } ${row.imageOpen ? 'ring-2 ring-primary/40' : ''}`}
+                      }`}
                       title={row.image_url ? 'ดู/เปลี่ยนรูปภาพ' : 'เพิ่มรูปภาพ'}
                     >
                       {row.image_url ? (
@@ -1055,83 +1074,120 @@ export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'exec
                     </div>
                   </div>
 
-                  {/* Inline image panel */}
-                  <AnimatePresence initial={false}>
-                    {row.imageOpen && (
-                      <motion.div
-                        key="img-panel"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: reduceMotion ? 0 : 0.2, ease: 'easeInOut' }}
-                        className="overflow-hidden"
-                      >
-                        <div className="mb-3 ml-0 md:ml-12 flex flex-wrap items-start gap-4 rounded-xl border border-stone-100 bg-stone-50/60 px-4 py-3">
-                          {/* Preview */}
-                          <div className={`relative h-28 w-28 shrink-0 overflow-hidden rounded-xl border bg-white ${row.image_url ? 'border-stone-200' : 'border-dashed border-stone-300'}`}>
-                            {row.image_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={row.image_url} alt={row.name_th} className="h-full w-full object-cover" />
-                            ) : (
-                              <div className="flex h-full items-center justify-center">
-                                <ImagePlus className="h-6 w-6 text-stone-300" />
-                              </div>
-                            )}
-                            {row.uploadingImage && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Controls */}
-                          <div className="flex flex-col gap-2">
-                            <p className="text-xs font-semibold text-stone-500">
-                              {row.image_url ? 'รูปภาพปัจจุบัน' : 'ยังไม่มีรูปภาพ'}
-                            </p>
-                            <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-medium text-stone-600 hover:border-primary hover:text-primary transition-colors ${row.uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
-                              <ImagePlus className="h-3.5 w-3.5" />
-                              {row.uploadingImage ? 'กำลังอัปโหลด...' : row.image_url ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}
-                              <input
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp"
-                                className="sr-only"
-                                onChange={(e) => {
-                                  const f = e.target.files?.[0];
-                                  if (!f) return;
-                                  void handleImageUpload(
-                                    f,
-                                    (v) => updateRewardRow(index, { uploadingImage: v }),
-                                    (url) => updateRewardRow(index, { image_url: url }),
-                                    row.image_url,
-                                  );
-                                  e.target.value = '';
-                                }}
-                              />
-                            </label>
-                            {row.image_url && (
-                              <button
-                                type="button"
-                                onClick={() => void handleDeleteImage(index)}
-                                disabled={row.uploadingImage}
-                                className="inline-flex items-center gap-2 rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-50 transition-colors"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                {row.uploadingImage ? 'กำลังลบ...' : 'ลบรูป'}
-                              </button>
-                            )}
-                            <p className="text-[10px] text-stone-400">JPG / PNG / WebP · สูงสุด 5 MB<br/>บันทึกแถวเพื่อให้การเปลี่ยนแปลงมีผล</p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
               );
             })}
           </div>
         </SectionCard>
     </div>
+
+    {/* ── Reward image modal ── */}
+    <AnimatePresence>
+      {imageModal !== null && imgModalRow && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            key="img-modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.18 }}
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+            onClick={() => setImageModal(null)}
+          />
+          {/* Panel */}
+          <motion.div
+            key="img-modal-panel"
+            initial={reduceMotion ? {} : { opacity: 0, scale: 0.95, y: 12 }}
+            animate={reduceMotion ? {} : { opacity: 1, scale: 1, y: 0 }}
+            exit={reduceMotion ? {} : { opacity: 0, scale: 0.95, y: 12 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white shadow-2xl"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
+              <div>
+                <p className="text-sm font-bold text-stone-800">รูปภาพรางวัล</p>
+                <p className="text-xs text-stone-400 truncate max-w-[220px]">{imgModalRow.name_th}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setImageModal(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Image area — natural dimensions, no crop */}
+            <div className="px-5 pt-4">
+              {imgModalRow.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imgModalRow.image_url}
+                  alt={imgModalRow.name_th}
+                  className="w-full rounded-2xl object-contain"
+                  style={{ maxHeight: '60vh' }}
+                />
+              ) : (
+                <div className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-200 bg-stone-50">
+                  <Gift className="h-8 w-8 text-stone-300" />
+                  <p className="text-xs text-stone-400">ยังไม่มีรูปภาพ</p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 px-5 py-4">
+              {imgModalRow.uploadingImage ? (
+                <div className="flex flex-1 items-center justify-center gap-2 py-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <span className="text-xs text-stone-500">กำลังอัปโหลด...</span>
+                </div>
+              ) : (
+                <>
+                  <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity">
+                    <ImagePlus className="h-4 w-4" />
+                    {imgModalRow.image_url ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        const idx = imageModal.index;
+                        void handleImageUpload(
+                          f,
+                          (v) => updateRewardRow(idx, { uploadingImage: v }),
+                          (url) => updateRewardRow(idx, { image_url: url }),
+                          imgModalRow.image_url,
+                          imgModalRow.id,
+                        );
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {imgModalRow.image_url && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleDeleteImage(imageModal.index);
+                        setImageModal(null);
+                      }}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 text-red-400 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+            <p className="px-5 pb-4 text-center text-[10px] text-stone-400">JPG · PNG · WebP · สูงสุด 5 MB</p>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
     </ErrorBoundary>
   );
 }

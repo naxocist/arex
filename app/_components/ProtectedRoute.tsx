@@ -57,7 +57,7 @@ function ApprovalGate({ role, status }: { role: string; status: 'pending' | 'rej
           {/* Divider with AREX branding */}
           <div className="my-8 flex items-center gap-3">
             <div className="h-px flex-1 bg-stone-200" />
-            <span className="text-[0.6rem] font-bold uppercase tracking-widest text-stone-300">AREX</span>
+            <span className="text-[0.6rem] font-bold uppercase tracking-widest text-stone-300">PMUC</span>
             <div className="h-px flex-1 bg-stone-200" />
           </div>
 
@@ -105,7 +105,7 @@ function ApprovalGate({ role, status }: { role: string; status: 'pending' | 'rej
         {/* Divider */}
         <div className="my-8 flex items-center gap-3">
           <div className="h-px flex-1 bg-stone-200" />
-          <span className="text-[0.6rem] font-bold uppercase tracking-widest text-stone-300">AREX</span>
+          <span className="text-[0.6rem] font-bold uppercase tracking-widest text-stone-300">PMUC</span>
           <div className="h-px flex-1 bg-stone-200" />
         </div>
 

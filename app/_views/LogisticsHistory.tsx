@@ -90,9 +90,9 @@ function HistoryCard({
   const hasExpanded = expandedContent !== null && expandedContent !== undefined && expandedContent !== false && expandedContent !== '';
   return (
     <motion.div className={`overflow-hidden rounded-xl border border-stone-200/80 border-l-4 ${borderColor} bg-white shadow-sm`}>
-      <button type="button" onClick={hasExpanded ? onToggle : undefined} className={`flex w-full items-start gap-3 px-5 py-4 text-left ${hasExpanded ? '' : 'cursor-default'}`}>
-        <div className="min-w-0 flex-1">{children}</div>
-        {hasExpanded && (
+      {hasExpanded ? (
+        <button type="button" onClick={onToggle} className="flex w-full items-start gap-3 px-5 py-4 text-left">
+          <div className="min-w-0 flex-1">{children}</div>
           <motion.span
             animate={reduceMotion ? {} : { rotate: isExpanded ? 180 : 0 }}
             transition={{ duration: 0.22 }}
@@ -101,8 +101,12 @@ function HistoryCard({
           >
             <ChevronDown className="h-4 w-4" />
           </motion.span>
-        )}
-      </button>
+        </button>
+      ) : (
+        <div className="flex w-full items-start gap-3 px-5 py-4 text-left">
+          <div className="min-w-0 flex-1">{children}</div>
+        </div>
+      )}
       <AnimatePresence initial={false}>
         {hasExpanded && isExpanded && (
           <motion.div

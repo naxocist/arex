@@ -206,7 +206,7 @@ export default function UserSelection() {
           </div>
 
           <div>
-            <p className="text-[0.7rem] font-bold uppercase tracking-[0.28em] text-primary">AREX Platform</p>
+            <p className="text-[0.7rem] font-bold uppercase tracking-[0.28em] text-primary">PMUC Zero Burn to Earn</p>
             <h1 className="mt-1 text-4xl font-light tracking-tight text-primary">ยินดีต้อนรับ</h1>
             <p className="mt-2 text-base leading-relaxed text-on-surface-variant">
               แพลตฟอร์มแลกเปลี่ยนวัสดุเหลือใช้ทางการเกษตร<br />
@@ -255,7 +255,7 @@ export default function UserSelection() {
           </div>
 
           <p className="text-xs font-medium uppercase tracking-widest text-stone-400 mt-auto">
-            © 2026 AREX Platform
+            © 2026 PMUC Zero Burn to Earn
           </p>
         </motion.div>
 
@@ -280,7 +280,7 @@ export default function UserSelection() {
                 </div>
               </div>
               <div>
-                <p className="text-[0.65rem] font-bold uppercase tracking-[0.24em] text-primary">AREX Platform</p>
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.24em] text-primary">PMUC Zero Burn to Earn</p>
                 <h1 className="text-2xl font-light tracking-tight text-primary">ยินดีต้อนรับ</h1>
                 <p className="mt-0.5 text-sm font-bold tracking-tight text-stone-700">
                   เลิกเผา{' '}
@@ -606,7 +606,7 @@ export default function UserSelection() {
 
         {/* Footer — mobile only */}
         <p className="lg:hidden text-center text-xs text-stone-400">
-          © 2026 AREX Platform • บพข. &amp; LAWDEE CO., LTD. • CEDT
+          © 2026 PMUC Zero Burn to Earn • บพข. &amp; LAWDEE CO., LTD. • CEDT
         </p>
 
         </div>{/* end form column */}

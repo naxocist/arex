@@ -137,7 +137,7 @@ export default function ExecutiveDashboard() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">ผู้บริหาร</p>
             <h1 className="mt-0.5 text-4xl font-light tracking-tight text-on-surface">ภาพรวมระบบ</h1>
-            <p className="mt-1 text-sm text-on-surface-variant">ข้อมูลสรุประบบ AREX ทั้งหมดแบบเรียลไทม์</p>
+            <p className="mt-1 text-sm text-on-surface-variant">ข้อมูลสรุประบบ Zero Burn to Earn ทั้งหมดแบบเรียลไทม์</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <motion.button

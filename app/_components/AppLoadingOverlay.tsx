@@ -45,7 +45,7 @@ export default function AppLoadingOverlay() {
             </div>
             <div className="mt-5 flex items-center justify-center gap-3 text-primary">
               <LoaderCircle className="h-5 w-5 animate-spin" />
-              <p className="text-sm font-semibold uppercase tracking-[0.22em]">AREX Loading</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em]">Zero Burn Loading</p>
             </div>
             <h2 className="mt-3 text-xl font-semibold text-stone-950">กำลังโหลดข้อมูลจากระบบ</h2>
             <p className="mt-2 text-sm leading-6 text-stone-600">
