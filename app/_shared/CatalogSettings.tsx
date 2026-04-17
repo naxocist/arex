@@ -15,7 +15,7 @@ import {
   type ExecutiveMaterialTypeItem,
   type ExecutiveMeasurementUnitItem,
   type FarmerRewardItem,
-} from '@/app/_lib/apiClient';
+} from '@/app/_lib/api';
 
 interface MaterialDraftRow {
   originalCode: string;
@@ -120,7 +120,7 @@ function mergeMaterialRows(
   }));
 }
 
-export default function ExecutiveSettings({ mode = 'executive' }: { mode?: 'executive' | 'factory' }) {
+export default function CatalogSettings({ mode = 'executive' }: { mode?: 'executive' | 'factory' }) {
   const [isLoading, setIsLoading] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);

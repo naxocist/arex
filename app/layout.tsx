@@ -3,7 +3,8 @@ import { UserProvider } from '@/app/_contexts/UserContext';
 import '@/app/globals.css';
 
 export const metadata: Metadata = {
-  title: 'AREX Platform',
+  title: 'PMUC Zero Burn to Earn',
+  icons: { icon: '/favicon.svg' },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

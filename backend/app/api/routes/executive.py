@@ -10,7 +10,7 @@ from app.models.workflow import (
     UpsertMaterialTypeRequest,
     UpsertMeasurementUnitRequest,
 )
-from app.services.workflow_service import WorkflowService, get_workflow_service
+from app.services.executive_service import ExecutiveDomainService, get_executive_domain_service
 
 router = APIRouter(prefix="/executive", tags=["executive"])
 
@@ -20,7 +20,7 @@ def get_dashboard_overview(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, object]:
     try:
         overview = workflow_service.get_executive_overview()
@@ -39,7 +39,7 @@ def list_material_types(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         material_types = workflow_service.list_material_types(active_only=False)
@@ -59,7 +59,7 @@ def create_material_type(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         material_type = workflow_service.create_material_type(payload)
@@ -81,7 +81,7 @@ def update_material_type(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         material_type = workflow_service.update_material_type(material_code, payload)
@@ -101,7 +101,7 @@ def list_measurement_units(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         units = workflow_service.list_measurement_units(active_only=False)
@@ -121,7 +121,7 @@ def create_measurement_unit(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         unit = workflow_service.create_measurement_unit(payload)
@@ -143,7 +143,7 @@ def update_measurement_unit(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         unit = workflow_service.update_measurement_unit(unit_code, payload)
@@ -163,7 +163,7 @@ def list_material_point_rules(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         rules = workflow_service.list_material_point_rules()
@@ -185,7 +185,7 @@ def upsert_material_point_rule(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         rule = workflow_service.upsert_material_point_rule(material_code, payload)
@@ -205,7 +205,7 @@ def list_rewards(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.ADMIN, Role.FACTORY)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         rewards = workflow_service.list_all_rewards_catalog()
@@ -225,7 +225,7 @@ def create_reward(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.ADMIN, Role.FACTORY)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         reward = workflow_service.create_reward(payload)
@@ -245,7 +245,7 @@ def get_impact_kpis(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         kpis = workflow_service.get_impact_kpis()
@@ -261,7 +261,7 @@ def list_value_chain(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.ADMIN)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         mappings = workflow_service.list_value_chain()
@@ -279,7 +279,7 @@ def update_reward(
     current_user: AuthenticatedUser = Depends(
         require_roles(Role.EXECUTIVE, Role.ADMIN, Role.FACTORY)
     ),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         reward = workflow_service.update_reward(reward_id, payload)

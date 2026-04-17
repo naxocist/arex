@@ -28,7 +28,7 @@ import {
   logisticsApi,
   type LogisticsPickupJobItem,
   type LogisticsRewardDeliveryJobItem,
-} from '@/app/_lib/apiClient';
+} from '@/app/_lib/api';
 
 function hasAccessToken(): boolean {
   if (typeof window === 'undefined') return false;

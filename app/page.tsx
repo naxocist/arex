@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStoredRole } from '@/app/_lib/apiClient';
+import { getStoredRole } from '@/app/_lib/api';
 import { UserRole } from '@/app/_contexts/UserContext';
 
 const rolePaths: Record<UserRole, string> = {

@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import FarmerProfileSheet from '@/app/_components/FarmerProfileSheet';
 import { FarmerProfileProvider } from '@/app/_contexts/FarmerProfileContext';
+import ProtectedRoute from '@/app/_components/ProtectedRoute';
 
 function FarmerLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -14,13 +15,11 @@ function FarmerLayoutInner({ children }: { children: React.ReactNode }) {
 
   const closeProfile = useCallback(() => {
     setShowProfile(false);
-    // Clear ?profile=1 from URL if present
     if (searchParams.get('profile') === '1') {
       router.replace(window.location.pathname, { scroll: false });
     }
   }, [router, searchParams]);
 
-  // Open from ?profile=1 query param (sidebar link)
   React.useEffect(() => {
     if (searchParams.get('profile') === '1') {
       setShowProfile(true);
@@ -37,8 +36,10 @@ function FarmerLayoutInner({ children }: { children: React.ReactNode }) {
 
 export default function FarmerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <React.Suspense fallback={null}>
-      <FarmerLayoutInner>{children}</FarmerLayoutInner>
-    </React.Suspense>
+    <ProtectedRoute allowedRole="farmer">
+      <React.Suspense fallback={null}>
+        <FarmerLayoutInner>{children}</FarmerLayoutInner>
+      </React.Suspense>
+    </ProtectedRoute>
   );
 }

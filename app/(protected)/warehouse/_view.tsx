@@ -23,7 +23,7 @@ import EmptyState from '@/app/_components/EmptyState';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import { SkeletonCard } from '@/app/_components/Skeleton';
 import StatusBadge from '@/app/_components/StatusBadge';
-import { ApiError, warehouseApi, type WarehousePendingRequestItem } from '@/app/_lib/apiClient';
+import { ApiError, warehouseApi, type WarehousePendingRequestItem } from '@/app/_lib/api';
 
 /* ── helpers ── */
 function hasAccessToken(): boolean {

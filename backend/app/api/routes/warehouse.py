@@ -6,7 +6,7 @@ from app.api.deps import require_roles
 from app.core.errors import WorkflowError
 from app.models.auth import AuthenticatedUser, Role
 from app.models.workflow import RejectRewardRequest
-from app.services.workflow_service import WorkflowService, get_workflow_service
+from app.services.warehouse_service import WarehouseService, get_warehouse_service
 
 router = APIRouter(prefix="/warehouse", tags=["warehouse"])
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/warehouse", tags=["warehouse"])
 @router.get("/reward-requests/pending")
 def list_pending_reward_requests(
     current_user: AuthenticatedUser = Depends(require_roles(Role.WAREHOUSE)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: WarehouseService = Depends(get_warehouse_service),
 ) -> dict[str, Any]:
     try:
         pending = workflow_service.list_pending_reward_requests()
@@ -31,7 +31,7 @@ def list_pending_reward_requests(
 @router.get("/reward-requests/answered")
 def list_answered_reward_requests(
     current_user: AuthenticatedUser = Depends(require_roles(Role.WAREHOUSE)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: WarehouseService = Depends(get_warehouse_service),
 ) -> dict[str, Any]:
     try:
         answered = workflow_service.list_answered_reward_requests()
@@ -49,7 +49,7 @@ def list_answered_reward_requests(
 def approve_reward_request(
     request_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.WAREHOUSE)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: WarehouseService = Depends(get_warehouse_service),
 ) -> dict[str, Any]:
     try:
         result = workflow_service.approve_reward_request(
@@ -70,7 +70,7 @@ def reject_reward_request(
     request_id: str,
     payload: RejectRewardRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.WAREHOUSE)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: WarehouseService = Depends(get_warehouse_service),
 ) -> dict[str, Any]:
     try:
         result = workflow_service.reject_reward_request(

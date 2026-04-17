@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import type { UserRole } from '@/app/_contexts/UserContext';
 
-export interface RoleMeta {
+interface RoleMeta {
   id: UserRole;
   label: string;
   shortLabel: string;
@@ -25,7 +25,7 @@ export interface RoleMeta {
   softClassName: string;
 }
 
-export interface RoleNavItem {
+interface RoleNavItem {
   path: string;
   label: string;
   shortLabel: string;
@@ -33,10 +33,6 @@ export interface RoleNavItem {
   roles: UserRole[];
 }
 
-export interface RouteMeta {
-  title: string;
-  description: string;
-}
 
 export const roleMeta: Record<UserRole, RoleMeta> = {
   farmer: {
@@ -107,72 +103,3 @@ export const roleNavItems: RoleNavItem[] = [
   { icon: Settings2, label: 'ตั้งค่าการอนุมัติ', shortLabel: 'การอนุมัติ', path: '/admin/approval', roles: ['admin'] },
 ];
 
-const routeMetaByPath: Record<string, RouteMeta> = {
-  '/farmer': {
-    title: 'งานวัสดุเกษตร',
-    description: 'แจ้งส่งวัสดุใหม่ ติดตามคิวรับ และดูความคืบหน้าจนรับแต้มสำเร็จ',
-  },
-  '/farmer/rewards': {
-    title: 'การแลกของรางวัล',
-    description: 'ดูแต้มคงเหลือ เลือกรางวัลที่พร้อมแลก และติดตามการจัดส่ง',
-  },
-  '/logistics': {
-    title: 'ศูนย์ปฏิบัติการขนส่ง',
-    description: 'บริหารคิวรับวัสดุ งานขนส่งไปโรงงาน และงานส่งมอบรางวัล',
-  },
-  '/logistics/history': {
-    title: 'ประวัติการขนส่ง',
-    description: 'บันทึกงานขนส่งวัสดุที่ส่งถึงโรงงานเรียบร้อยแล้ว',
-  },
-  '/logistics/settings': {
-    title: 'ตั้งค่าข้อมูลทีมขนส่ง',
-    description: 'จัดการชื่อทีมขนส่ง ที่อยู่ และตำแหน่งสำหรับการวางแผนขนส่ง',
-  },
-  '/factory': {
-    title: 'คิวตรวจรับโรงงาน',
-    description: 'ตรวจรับวัสดุที่ส่งถึงโรงงานและยืนยันน้ำหนักจริงเพื่อปิดงาน',
-  },
-  '/factory/materials': {
-    title: 'จัดการวัสดุและแต้ม',
-    description: 'จัดการประเภทวัสดุ หน่วยวัด และอัตราแต้มต่อกิโลกรัม',
-  },
-  '/factory/settings': {
-    title: 'ตั้งค่าข้อมูลโรงงาน',
-    description: 'จัดการชื่อโรงงาน ที่อยู่ และตำแหน่งสำหรับการวางแผนขนส่ง',
-  },
-  '/warehouse': {
-    title: 'กล่องงานคลังสินค้า',
-    description: 'ตรวจสอบคำขอแลกรางวัลและตัดสินใจอนุมัติหรือปฏิเสธอย่างรวดเร็ว',
-  },
-  '/executive': {
-    title: 'ภาพรวมผู้บริหาร',
-    description: 'ติดตามปริมาณวัสดุ งานค้าง แต้ม และแนวโน้มของระบบ Zero Burn to Earn',
-  },
-  '/executive/settings': {
-    title: 'ตั้งค่าวัสดุ / รางวัล',
-    description: 'จัดการประเภทวัสดุ อัตราแต้ม หน่วยวัด และรางวัลในระบบ',
-  },
-  '/admin': {
-    title: 'อนุมัติบัญชีผู้ใช้',
-    description: 'ตรวจสอบและอนุมัติหรือปฏิเสธคำขอลงทะเบียนของผู้ใช้ใหม่',
-  },
-  '/admin/overview': {
-    title: 'ภาพรวมระบบ',
-    description: 'ติดตามปริมาณวัสดุ งานค้าง แต้ม และสถานะบัญชีผู้ใช้',
-  },
-  '/admin/settings': {
-    title: 'ตั้งค่าวัสดุ / รางวัล',
-    description: 'จัดการประเภทวัสดุ อัตราแต้ม หน่วยวัด และรางวัลในระบบ',
-  },
-  '/admin/approval': {
-    title: 'ตั้งค่าการอนุมัติ',
-    description: 'กำหนดว่าบทบาทใดต้องผ่านการอนุมัติก่อนเข้าใช้งานระบบ',
-  },
-};
-
-export function getRouteMeta(pathname: string): RouteMeta {
-  return routeMetaByPath[pathname] ?? {
-    title: 'PMUC Zero Burn to Earn',
-    description: 'ระบบติดตามและบริหารงานตามบทบาท',
-  };
-}

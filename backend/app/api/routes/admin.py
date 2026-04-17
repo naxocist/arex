@@ -7,7 +7,7 @@ from app.api.deps import require_roles
 from app.core.errors import WorkflowError
 from app.db.supabase import get_service_client
 from app.models.auth import AuthenticatedUser, Role
-from app.services.workflow_service import WorkflowService, get_workflow_service
+from app.services.executive_service import ExecutiveDomainService, get_executive_domain_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -188,7 +188,7 @@ def update_admin_settings(
 @router.get("/dashboard/overview")
 def get_admin_dashboard_overview(
     current_user: AuthenticatedUser = Depends(require_roles(Role.ADMIN)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
         overview = workflow_service.get_executive_overview()

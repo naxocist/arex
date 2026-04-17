@@ -6,7 +6,7 @@ from app.api.deps import require_roles
 from app.core.errors import WorkflowError
 from app.models.auth import AuthenticatedUser, Role
 from app.models.workflow import SchedulePickupRequest, ScheduleRewardDeliveryRequest, UpsertLogisticsInfoRequest
-from app.services.workflow_service import WorkflowService, get_workflow_service
+from app.services.logistics_service import LogisticsService, get_logistics_service
 
 router = APIRouter(prefix="/logistics", tags=["logistics"])
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/logistics", tags=["logistics"])
 @router.get("/pickup-queue")
 def get_pickup_queue(
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         queue = workflow_service.list_pickup_queue()
@@ -29,7 +29,7 @@ def get_pickup_queue(
 @router.get("/pickup-jobs")
 def get_pickup_jobs(
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         jobs = workflow_service.list_logistics_pickup_jobs(current_user.user_id)
@@ -44,7 +44,7 @@ def get_pickup_jobs(
 @router.get("/factories")
 def get_factories(
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         factories = workflow_service.list_active_factories()
@@ -59,7 +59,7 @@ def get_factories(
 @router.get("/reward-requests/approved")
 def get_approved_reward_requests(
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         queue = workflow_service.list_approved_reward_requests()
@@ -74,7 +74,7 @@ def get_approved_reward_requests(
 @router.get("/reward-delivery-jobs")
 def get_reward_delivery_jobs(
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         jobs = workflow_service.list_reward_delivery_jobs(current_user.user_id)
@@ -91,7 +91,7 @@ def schedule_pickup(
     submission_id: str,
     payload: SchedulePickupRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         result = workflow_service.schedule_pickup(submission_id, current_user.user_id, payload)
@@ -107,7 +107,7 @@ def schedule_pickup(
 def mark_delivered_to_factory(
     pickup_job_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         result = workflow_service.mark_delivered_to_factory(pickup_job_id, current_user.user_id)
@@ -123,7 +123,7 @@ def mark_delivered_to_factory(
 def mark_picked_up(
     pickup_job_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         result = workflow_service.mark_pickup_picked_up(pickup_job_id, current_user.user_id)
@@ -140,7 +140,7 @@ def schedule_reward_delivery(
     request_id: str,
     payload: ScheduleRewardDeliveryRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         result = workflow_service.schedule_reward_delivery(request_id, current_user.user_id, payload)
@@ -156,7 +156,7 @@ def schedule_reward_delivery(
 def mark_reward_out_for_delivery(
     delivery_job_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         result = workflow_service.mark_reward_out_for_delivery(delivery_job_id, current_user.user_id)
@@ -172,7 +172,7 @@ def mark_reward_out_for_delivery(
 def mark_reward_delivered(
     delivery_job_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         result = workflow_service.mark_reward_delivered(delivery_job_id, current_user.user_id)
@@ -187,7 +187,7 @@ def mark_reward_delivered(
 @router.get("/me")
 def get_my_logistics(
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         return workflow_service.get_or_create_logistics_for_profile(current_user.user_id)
@@ -199,7 +199,7 @@ def get_my_logistics(
 def update_my_logistics(
     payload: UpsertLogisticsInfoRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
         return workflow_service.update_logistics_for_profile(current_user.user_id, payload)

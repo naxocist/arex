@@ -13,7 +13,7 @@ import { cn } from '@/app/_lib/utils';
 const BASE_BADGE_CLASS =
   'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide';
 
-export function getStatusBadgeClass(status: string): string {
+function getStatusBadgeClass(status: string): string {
   const normalized = status.trim().toLowerCase();
 
   if (normalized === 'warehouse_rejected' || normalized === 'cancelled') {

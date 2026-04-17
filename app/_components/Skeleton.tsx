@@ -4,21 +4,6 @@ interface SkeletonProps {
   className?: string;
 }
 
-export function SkeletonLine({ className }: SkeletonProps) {
-  return (
-    <div
-      className={cn('h-4 animate-pulse rounded-full bg-surface-container', className)}
-    />
-  );
-}
-
-export function SkeletonBlock({ className }: SkeletonProps) {
-  return (
-    <div
-      className={cn('h-32 animate-pulse rounded-2xl bg-surface-container', className)}
-    />
-  );
-}
 
 export function SkeletonStatCard({ className }: SkeletonProps) {
   return (

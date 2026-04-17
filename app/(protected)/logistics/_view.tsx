@@ -33,7 +33,7 @@ import {
   type LogisticsPickupJobItem,
   type LogisticsPickupQueueItem,
   type LogisticsRewardDeliveryJobItem,
-} from '@/app/_lib/apiClient';
+} from '@/app/_lib/api';
 
 /* ── helpers ── */
 function hasAccessToken(): boolean {
@@ -895,14 +895,17 @@ export default function LogisticsTracking() {
                                 )}
                               </div>
                               <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                <button type="button" onClick={handleCopy} disabled={copiedId === item.id}
-                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40 transition-colors">
+                                <div role="button" tabIndex={0} onClick={copiedId === item.id ? undefined : handleCopy}
+                                  aria-disabled={copiedId === item.id}
+                                  onKeyDown={(e) => e.key === 'Enter' && !copiedId && handleCopy()}
+                                  className={`flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors cursor-pointer ${copiedId === item.id ? 'opacity-40' : ''}`}>
                                   {copiedId === item.id ? <CheckCheck className="h-4 w-4 text-emerald-500" /> : <ClipboardCopy className="h-4 w-4" />}
-                                </button>
-                                <button type="button" onClick={() => generatePickupJobPdf(item)}
-                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors">
+                                </div>
+                                <div role="button" tabIndex={0} onClick={() => generatePickupJobPdf(item)}
+                                  onKeyDown={(e) => e.key === 'Enter' && generatePickupJobPdf(item)}
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors cursor-pointer">
                                   <Download className="h-4 w-4" />
-                                </button>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1171,14 +1174,17 @@ export default function LogisticsTracking() {
                                 )}
                               </div>
                               <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                <button type="button" onClick={handleCopy} disabled={copiedId === item.id}
-                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40 transition-colors">
+                                <div role="button" tabIndex={0} onClick={copiedId === item.id ? undefined : handleCopy}
+                                  aria-disabled={copiedId === item.id}
+                                  onKeyDown={(e) => e.key === 'Enter' && !copiedId && handleCopy()}
+                                  className={`flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors cursor-pointer ${copiedId === item.id ? 'opacity-40' : ''}`}>
                                   {copiedId === item.id ? <CheckCheck className="h-4 w-4 text-emerald-500" /> : <ClipboardCopy className="h-4 w-4" />}
-                                </button>
-                                <button type="button" onClick={() => generateDeliveryJobPdf(item)}
-                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors">
+                                </div>
+                                <div role="button" tabIndex={0} onClick={() => generateDeliveryJobPdf(item)}
+                                  onKeyDown={(e) => e.key === 'Enter' && generateDeliveryJobPdf(item)}
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors cursor-pointer">
                                   <Download className="h-4 w-4" />
-                                </button>
+                                </div>
                               </div>
                             </div>
                           </div>

@@ -30,7 +30,7 @@ import {
   farmerApi,
   type FarmerRewardItem,
   type FarmerRewardRequestItem,
-} from '@/app/_lib/apiClient';
+} from '@/app/_lib/api';
 
 function hasAccessToken(): boolean {
   if (typeof window === 'undefined') return false;
@@ -605,7 +605,13 @@ export default function FarmerRewards() {
 
                         {/* Col 3: status + chevron */}
                         <div className="flex flex-col items-end gap-1 min-w-0">
-                          <StatusBadge status={request.status} label={formatRewardRequestStatus(request.status)} size="sm" />
+                          {isApproved && hasDelivery ? (
+                            <StatusBadge status={deliveryJob.status} label={formatDeliveryStatus(deliveryJob.status)} size="sm" />
+                          ) : isApproved && !hasDelivery ? (
+                            <StatusBadge status="pickup_scheduled" label="รอจัดส่ง" size="sm" />
+                          ) : (
+                            <StatusBadge status={request.status} label={formatRewardRequestStatus(request.status)} size="sm" />
+                          )}
                           <motion.span
                             animate={reduceMotion ? {} : { rotate: isExpanded ? 180 : 0 }}
                             transition={{ duration: 0.18 }}

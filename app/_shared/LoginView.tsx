@@ -12,11 +12,11 @@ import {
 import AlertBanner from '@/app/_components/AlertBanner';
 import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
-import { ApiError, authApi, setAuthSession } from '@/app/_lib/apiClient';
+import { ApiError, authApi, setAuthSession } from '@/app/_lib/api';
 import { useUser, UserRole } from '@/app/_contexts/UserContext';
 import { THAI_PROVINCES } from '@/app/_lib/utils';
 
-export default function UserSelection() {
+export default function LoginView() {
   const navigate = useRouter();
   const { setRole } = useUser();
 

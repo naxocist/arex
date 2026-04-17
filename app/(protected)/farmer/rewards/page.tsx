@@ -1,12 +1,5 @@
-'use client';
-
-import ProtectedRoute from '@/app/_components/ProtectedRoute';
-import FarmerRewards from '@/app/_views/FarmerRewards';
+import FarmerRewards from './_view';
 
 export default function FarmerRewardsPage() {
-  return (
-    <ProtectedRoute allowedRole="farmer">
-      <FarmerRewards />
-    </ProtectedRoute>
-  );
+  return <FarmerRewards />;
 }

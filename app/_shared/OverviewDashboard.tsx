@@ -10,7 +10,7 @@ import EmptyState from '@/app/_components/EmptyState';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import SectionCard from '@/app/_components/SectionCard';
 import { SkeletonStatCard } from '@/app/_components/Skeleton';
-import { ApiError, executiveApi, type ExecutiveOverview, type ImpactKpis, type ValueChainItem } from '@/app/_lib/apiClient';
+import { ApiError, executiveApi, type ExecutiveOverview, type ImpactKpis, type ValueChainItem } from '@/app/_lib/api';
 
 function formatNumber(value: number): string {
   return value.toLocaleString('th-TH');
@@ -61,7 +61,7 @@ function DonutCenterLabel({ cx, cy, innerLabel, innerValue }: DonutLabelProps) {
   );
 }
 
-export default function ExecutiveDashboard() {
+export default function OverviewDashboard() {
   const [overview, setOverview] = useState<ExecutiveOverview | null>(null);
   const [impactKpis, setImpactKpis] = useState<ImpactKpis | null>(null);
   const [valueChain, setValueChain] = useState<ValueChainItem[]>([]);

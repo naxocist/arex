@@ -1,12 +1,5 @@
-'use client';
-
-import ProtectedRoute from '@/app/_components/ProtectedRoute';
-import LogisticsHistory from '@/app/_views/LogisticsHistory';
+import LogisticsHistory from './_view';
 
 export default function LogisticsHistoryPage() {
-  return (
-    <ProtectedRoute allowedRole="logistics">
-      <LogisticsHistory />
-    </ProtectedRoute>
-  );
+  return <LogisticsHistory />;
 }

@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { User, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import { useFarmerProfile } from '@/app/_contexts/FarmerProfileContext';
-import { ApiError, farmerApi } from '@/app/_lib/apiClient';
+import { ApiError, farmerApi } from '@/app/_lib/api';
 import { THAI_PROVINCES } from '@/app/_lib/utils';
 
 function inferMessageTone(msg: string): 'success' | 'error' | 'info' {

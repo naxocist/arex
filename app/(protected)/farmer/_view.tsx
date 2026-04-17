@@ -21,7 +21,7 @@ import {
   type FarmerMaterialTypeItem,
   type FarmerMeasurementUnitItem,
   type FarmerSubmissionItem,
-} from '@/app/_lib/apiClient';
+} from '@/app/_lib/api';
 
 const ACTIVE_STATUSES = new Set(['submitted', 'pickup_scheduled', 'picked_up', 'delivered_to_factory', 'factory_confirmed']);
 const LIVE_DOT_STATUSES = new Set(['pickup_scheduled', 'picked_up']);

@@ -1,12 +1,5 @@
-'use client';
-
-import ProtectedRoute from '@/app/_components/ProtectedRoute';
-import LogisticsSettings from '@/app/_views/LogisticsSettings';
+import LogisticsSettings from './_view';
 
 export default function LogisticsSettingsPage() {
-  return (
-    <ProtectedRoute allowedRole="logistics">
-      <LogisticsSettings />
-    </ProtectedRoute>
-  );
+  return <LogisticsSettings />;
 }

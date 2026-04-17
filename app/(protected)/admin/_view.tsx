@@ -20,7 +20,7 @@ import AlertBanner from '@/app/_components/AlertBanner';
 import EmptyState from '@/app/_components/EmptyState';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import { SkeletonCard } from '@/app/_components/Skeleton';
-import { adminApi, ApiError, type AdminProfile } from '@/app/_lib/apiClient';
+import { adminApi, ApiError, type AdminProfile } from '@/app/_lib/api';
 import { roleMeta } from '@/app/_lib/roleConfig';
 
 /* ── helpers ── */

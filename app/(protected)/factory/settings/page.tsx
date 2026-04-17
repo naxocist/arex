@@ -1,12 +1,5 @@
-'use client';
-
-import ProtectedRoute from '@/app/_components/ProtectedRoute';
-import FactorySettings from '@/app/_views/FactorySettings';
+import FactorySettings from './_view';
 
 export default function FactorySettingsPage() {
-  return (
-    <ProtectedRoute allowedRole="factory">
-      <FactorySettings />
-    </ProtectedRoute>
-  );
+  return <FactorySettings />;
 }

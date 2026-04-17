@@ -23,7 +23,7 @@ import {
   type FactoryConfirmedIntakeItem,
   type FactoryIntakeSummary,
   type FactoryPendingIntakeItem,
-} from '@/app/_lib/apiClient';
+} from '@/app/_lib/api';
 
 function hasAccessToken(): boolean {
   if (typeof window === 'undefined') return false;

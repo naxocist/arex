@@ -1,12 +1,5 @@
-'use client';
-
-import ProtectedRoute from '@/app/_components/ProtectedRoute';
-import FactoryIntake from '@/app/_views/FactoryIntake';
+import FactoryIntake from './_view';
 
 export default function FactoryPage() {
-  return (
-    <ProtectedRoute allowedRole="factory">
-      <FactoryIntake />
-    </ProtectedRoute>
-  );
+  return <FactoryIntake />;
 }

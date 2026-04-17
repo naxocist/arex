@@ -6,7 +6,7 @@ from app.api.deps import require_roles
 from app.core.errors import WorkflowError
 from app.models.auth import AuthenticatedUser, Role
 from app.models.workflow import CreateRewardRequest, CreateSubmissionRequest, UpdateFarmerProfileRequest
-from app.services.workflow_service import WorkflowService, get_workflow_service
+from app.services.farmer_service import FarmerDomainService, get_farmer_domain_service
 
 router = APIRouter(prefix="/farmer", tags=["farmer"])
 
@@ -25,7 +25,7 @@ def get_me(
 @router.get("/profile")
 def get_profile(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         return workflow_service.get_farmer_profile(current_user.user_id)
@@ -37,7 +37,7 @@ def get_profile(
 def update_profile(
     payload: UpdateFarmerProfileRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         return workflow_service.update_farmer_profile(current_user.user_id, payload)
@@ -49,7 +49,7 @@ def update_profile(
 def create_submission(
     payload: CreateSubmissionRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         submission = workflow_service.create_submission(current_user.user_id, payload)
@@ -64,7 +64,7 @@ def create_submission(
 @router.get("/submissions")
 def list_submissions(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         submissions = workflow_service.list_farmer_submissions(current_user.user_id)
@@ -76,7 +76,7 @@ def list_submissions(
 @router.get("/material-types")
 def list_material_types(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         material_types = workflow_service.list_material_types()
@@ -91,7 +91,7 @@ def list_material_types(
 @router.get("/measurement-units")
 def list_measurement_units(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         units = workflow_service.list_measurement_units()
@@ -106,7 +106,7 @@ def list_measurement_units(
 @router.get("/rewards")
 def list_rewards(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         rewards = workflow_service.list_rewards_catalog()
@@ -121,7 +121,7 @@ def list_rewards(
 @router.get("/reward-requests")
 def list_reward_requests(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         requests = workflow_service.list_farmer_reward_requests(current_user.user_id)
@@ -136,7 +136,7 @@ def list_reward_requests(
 @router.get("/points")
 def get_points(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         return workflow_service.get_farmer_points(current_user.user_id)
@@ -148,7 +148,7 @@ def get_points(
 def create_reward_request(
     payload: CreateRewardRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         request_data = workflow_service.create_reward_request(current_user.user_id, payload)
@@ -164,7 +164,7 @@ def create_reward_request(
 def cancel_reward_request(
     request_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
         result = workflow_service.cancel_reward_request(current_user.user_id, request_id)

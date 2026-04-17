@@ -1,12 +1,5 @@
-'use client';
-
-import ProtectedRoute from '@/app/_components/ProtectedRoute';
-import ExecutiveSettings from '@/app/_views/ExecutiveSettings';
+import ExecutiveSettings from '@/app/_shared/CatalogSettings';
 
 export default function FactoryMaterialsPage() {
-  return (
-    <ProtectedRoute allowedRole="factory">
-      <ExecutiveSettings mode="factory" />
-    </ProtectedRoute>
-  );
+  return <ExecutiveSettings mode="factory" />;
 }

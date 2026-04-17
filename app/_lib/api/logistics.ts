@@ -1,0 +1,31 @@
+import { apiRequest, type RequestBehaviorOptions } from './core';
+import type { LogisticsFactoryOptionItem, LogisticsPickupQueueItem, LogisticsPickupJobItem, LogisticsApprovedRewardRequestItem, LogisticsRewardDeliveryJobItem, SchedulePickupPayload, SchedulePickupResponse, ScheduleRewardDeliveryPayload, ScheduleRewardDeliveryResponse, LogisticsInfoItem, UpsertLogisticsInfoPayload } from './types';
+
+export const logisticsApi = {
+  listFactories: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ factories: LogisticsFactoryOptionItem[]; actor: string }>('/logistics/factories', options),
+  getPickupQueue: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ queue: LogisticsPickupQueueItem[]; actor: string }>('/logistics/pickup-queue', options),
+  getPickupJobs: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ jobs: LogisticsPickupJobItem[]; actor: string }>('/logistics/pickup-jobs', options),
+  getApprovedRewardRequests: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ queue: LogisticsApprovedRewardRequestItem[]; actor: string }>('/logistics/reward-requests/approved', options),
+  getRewardDeliveryJobs: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ jobs: LogisticsRewardDeliveryJobItem[]; actor: string }>('/logistics/reward-delivery-jobs', options),
+  schedulePickup: (submissionId: string, payload: SchedulePickupPayload) =>
+    apiRequest<SchedulePickupResponse>(`/logistics/pickup-jobs/${submissionId}/schedule`, { method: 'POST', body: JSON.stringify(payload) }),
+  markPickedUp: (pickupJobId: string) =>
+    apiRequest(`/logistics/pickup-jobs/${pickupJobId}/picked-up`, { method: 'POST' }),
+  markDeliveredToFactory: (pickupJobId: string) =>
+    apiRequest(`/logistics/pickup-jobs/${pickupJobId}/delivered-to-factory`, { method: 'POST' }),
+  scheduleRewardDelivery: (requestId: string, payload: ScheduleRewardDeliveryPayload) =>
+    apiRequest<ScheduleRewardDeliveryResponse>(`/logistics/reward-delivery-jobs/${requestId}/schedule`, { method: 'POST', body: JSON.stringify(payload) }),
+  markRewardOutForDelivery: (deliveryJobId: string) =>
+    apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/out-for-delivery`, { method: 'POST' }),
+  markRewardDelivered: (deliveryJobId: string) =>
+    apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/delivered`, { method: 'POST' }),
+  getMyInfo: (options?: RequestBehaviorOptions) =>
+    apiRequest<LogisticsInfoItem>('/logistics/me', options),
+  updateMyInfo: (payload: UpsertLogisticsInfoPayload) =>
+    apiRequest<LogisticsInfoItem>('/logistics/me', { method: 'PUT', body: JSON.stringify(payload) }),
+};

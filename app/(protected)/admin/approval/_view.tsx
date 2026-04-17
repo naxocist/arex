@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { RefreshCw, Save, ShieldCheck } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
-import { adminApi, ApiError } from '@/app/_lib/apiClient';
+import { adminApi, ApiError } from '@/app/_lib/api';
 import { roleMeta } from '@/app/_lib/roleConfig';
 
 function hasAccessToken(): boolean {

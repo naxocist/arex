@@ -1,12 +1,5 @@
-'use client';
-
-import ProtectedRoute from '@/app/_components/ProtectedRoute';
-import WarehouseApproval from '@/app/_views/WarehouseApproval';
+import WarehouseApproval from './_view';
 
 export default function WarehousePage() {
-  return (
-    <ProtectedRoute allowedRole="warehouse">
-      <WarehouseApproval />
-    </ProtectedRoute>
-  );
+  return <WarehouseApproval />;
 }

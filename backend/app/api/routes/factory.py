@@ -6,7 +6,7 @@ from app.api.deps import require_roles
 from app.core.errors import WorkflowError
 from app.models.auth import AuthenticatedUser, Role
 from app.models.workflow import ConfirmFactoryIntakeRequest, UpsertFactoryInfoRequest
-from app.services.workflow_service import WorkflowService, get_workflow_service
+from app.services.factory_service import FactoryService, get_factory_service
 
 router = APIRouter(prefix="/factory", tags=["factory"])
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/factory", tags=["factory"])
 @router.get("/intakes/pending")
 def list_pending_intakes(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FACTORY)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FactoryService = Depends(get_factory_service),
 ) -> dict[str, Any]:
     try:
         data = workflow_service.list_factory_pending_intakes(current_user.user_id)
@@ -26,7 +26,7 @@ def list_pending_intakes(
 @router.get("/me")
 def get_my_factory(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FACTORY)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FactoryService = Depends(get_factory_service),
 ) -> dict[str, Any]:
     try:
         return workflow_service.get_or_create_factory_for_profile(current_user.user_id)
@@ -38,7 +38,7 @@ def get_my_factory(
 def update_my_factory(
     payload: UpsertFactoryInfoRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.FACTORY)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FactoryService = Depends(get_factory_service),
 ) -> dict[str, Any]:
     try:
         return workflow_service.update_factory_for_profile(current_user.user_id, payload)
@@ -50,7 +50,7 @@ def update_my_factory(
 def confirm_intake(
     payload: ConfirmFactoryIntakeRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.FACTORY)),
-    workflow_service: WorkflowService = Depends(get_workflow_service),
+    workflow_service: FactoryService = Depends(get_factory_service),
 ) -> dict[str, Any]:
     try:
         result = workflow_service.confirm_factory_intake(current_user.user_id, payload)

@@ -1,12 +1,5 @@
-'use client';
-
-import ProtectedRoute from '@/app/_components/ProtectedRoute';
-import AdminDashboard from '@/app/_views/AdminDashboard';
+import AdminDashboard from './_view';
 
 export default function AdminPage() {
-  return (
-    <ProtectedRoute allowedRole="admin">
-      <AdminDashboard />
-    </ProtectedRoute>
-  );
+  return <AdminDashboard />;
 }

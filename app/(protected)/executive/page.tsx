@@ -1,12 +1,5 @@
-'use client';
+import ExecutiveDashboard from '@/app/_shared/OverviewDashboard';
 
-import ProtectedRoute from '@/app/_components/ProtectedRoute';
-import ExecutiveDashboard from '@/app/_views/ExecutiveDashboard';
-
-export default function DashboardPage() {
-  return (
-    <ProtectedRoute allowedRole="executive">
-      <ExecutiveDashboard />
-    </ProtectedRoute>
-  );
+export default function ExecutiveDashboardPage() {
+  return <ExecutiveDashboard />;
 }

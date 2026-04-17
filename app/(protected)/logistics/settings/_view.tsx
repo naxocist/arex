@@ -7,7 +7,7 @@ import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
-import { ApiError, logisticsApi } from '@/app/_lib/apiClient';
+import { ApiError, logisticsApi } from '@/app/_lib/api';
 
 function hasAccessToken(): boolean {
   if (typeof window === 'undefined') return false;

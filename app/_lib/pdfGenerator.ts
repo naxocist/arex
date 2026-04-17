@@ -2,7 +2,7 @@
 
 import { jsPDF } from 'jspdf';
 import { sarabunRegularB64, sarabunBoldB64 } from './fonts/sarabunFont';
-import { type LogisticsPickupJobItem, type LogisticsRewardDeliveryJobItem } from './apiClient';
+import { type LogisticsPickupJobItem, type LogisticsRewardDeliveryJobItem } from './api';
 
 function buildGoogleMapsUrl(lat: number, lng: number): string {
   return `https://www.google.com/maps?q=${lat},${lng}`;

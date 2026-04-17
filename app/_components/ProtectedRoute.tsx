@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Clock, LogOut, ShieldX } from 'lucide-react';
-import { clearAuthSession, getStoredApprovalStatus } from '@/app/_lib/apiClient';
+import { clearAuthSession, getStoredApprovalStatus } from '@/app/_lib/api';
 import { roleMeta } from '@/app/_lib/roleConfig';
 import { useUser } from '@/app/_contexts/UserContext';
 import type { UserRole } from '@/app/_contexts/UserContext';

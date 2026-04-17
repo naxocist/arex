@@ -264,12 +264,3 @@ export function DesktopSidebar() {
     </aside>
   );
 }
-
-interface SidebarProps {
-  mobile?: boolean;
-  onNavigate?: () => void;
-}
-
-export default function Sidebar({}: SidebarProps) {
-  return null;
-}
