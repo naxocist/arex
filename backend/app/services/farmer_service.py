@@ -140,7 +140,7 @@ class FarmerService(BaseService):
             submission_ids = [str(item["id"]) for item in submissions if item.get("id")]
             pickup_jobs = (
                 self.client.table("pickup_jobs")
-                .select("submission_id, planned_pickup_at, pickup_window_end_at, status, created_at")
+                .select("id, submission_id, planned_pickup_at, pickup_window_end_at, status, created_at")
                 .in_("submission_id", submission_ids)
                 .neq("status", "cancelled")
                 .order("created_at", desc=True)
@@ -154,6 +154,42 @@ class FarmerService(BaseService):
                     continue
                 latest_pickup_by_submission[sid] = job
 
+            # Map pickup_job_id → submission_id for points lookup
+            job_id_to_submission_id: dict[str, str] = {
+                str(job["id"]): str(job["submission_id"])
+                for job in pickup_jobs
+                if job.get("id") and job.get("submission_id")
+            }
+
+            # Fetch factory_intakes for those pickup_jobs to get intake IDs
+            pickup_job_ids = list(job_id_to_submission_id.keys())
+            points_by_submission: dict[str, int] = {}
+            if pickup_job_ids:
+                intakes = (
+                    self.client.table("factory_intakes")
+                    .select("id, pickup_job_id")
+                    .in_("pickup_job_id", pickup_job_ids)
+                    .execute()
+                ).data or []
+                intake_id_to_submission_id: dict[str, str] = {
+                    str(intake["id"]): job_id_to_submission_id[str(intake["pickup_job_id"])]
+                    for intake in intakes
+                    if intake.get("id") and str(intake.get("pickup_job_id")) in job_id_to_submission_id
+                }
+                if intake_id_to_submission_id:
+                    ledger_rows = (
+                        self.client.table("points_ledger")
+                        .select("reference_id, points_amount")
+                        .eq("entry_type", "intake_credit")
+                        .in_("reference_id", list(intake_id_to_submission_id.keys()))
+                        .execute()
+                    ).data or []
+                    for row in ledger_rows:
+                        intake_id = str(row.get("reference_id") or "")
+                        sid = intake_id_to_submission_id.get(intake_id)
+                        if sid:
+                            points_by_submission[sid] = int(row.get("points_amount") or 0)
+
             return [
                 {
                     **item,
@@ -166,6 +202,7 @@ class FarmerService(BaseService):
                     "pickup_job_status": latest_pickup_by_submission.get(
                         str(item.get("id")) if item.get("id") else "", {}
                     ).get("status"),
+                    "credited_points": points_by_submission.get(str(item.get("id") or ""), None),
                 }
                 for item in submissions
             ]

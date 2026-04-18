@@ -393,6 +393,15 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
     }
   };
 
+  const cancelAddReward = async () => {
+    const url = newReward.image_url;
+    setIsAddingReward(false);
+    setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null });
+    if (url) {
+      try { await deleteRewardImage(url); } catch { /* best-effort */ }
+    }
+  };
+
   const handleCreateReward = async () => {
     const name = newReward.name_th.trim();
     const pointsText = newReward.points_cost.trim();
@@ -865,7 +874,12 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
               className="overflow-hidden"
             >
             <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
-              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">เพิ่มรางวัลใหม่</p>
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">เพิ่มรางวัลใหม่</p>
+                <button type="button" onClick={() => { void cancelAddReward(); }} className="rounded-full p-1 text-stone-400 transition hover:bg-stone-100 hover:text-stone-600">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">ชื่อรางวัล</label>
@@ -909,55 +923,80 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                 {/* Image upload — new reward */}
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">รูปภาพรางวัล (ไม่บังคับ)</label>
-                  <label className={`group relative flex cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed transition-colors ${newReward.image_url ? 'border-stone-200' : 'border-stone-300 hover:border-primary'} ${newReward.uploadingImage ? 'pointer-events-none' : ''}`}>
-                    {newReward.image_url ? (
-                      <div className="relative h-32 w-full">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={newReward.image_url} alt="" className="h-full w-full object-cover" />
-                        <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
-                          <ImagePlus className="h-5 w-5 text-white drop-shadow" />
-                          <span className="text-xs font-semibold text-white drop-shadow">เปลี่ยนรูป</span>
-                        </div>
+                  {newReward.image_url ? (
+                    <div className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={newReward.image_url} alt="" className="w-full rounded-2xl object-contain" style={{ maxHeight: '40vh' }} />
+                      <div className="absolute right-2 top-2 flex gap-1.5">
+                        <label className={`flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-black/80 ${newReward.uploadingImage ? 'pointer-events-none opacity-60' : ''}`}>
+                          <ImagePlus className="h-3.5 w-3.5" />
+                          เปลี่ยนรูป
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="sr-only"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (!f) return;
+                              void handleImageUpload(
+                                f,
+                                (v) => setNewReward((prev) => ({ ...prev, uploadingImage: v })),
+                                (url) => setNewReward((prev) => ({ ...prev, image_url: url })),
+                                newReward.image_url,
+                              );
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
                         <button
                           type="button"
-                          onClick={(e) => { e.preventDefault(); setNewReward((prev) => ({ ...prev, image_url: null })); }}
-                          className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                          onClick={() => {
+                            const url = newReward.image_url;
+                            setNewReward((prev) => ({ ...prev, image_url: null }));
+                            if (url) { void deleteRewardImage(url).catch(() => {}); }
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                    ) : (
-                      <div className="flex h-32 w-full flex-col items-center justify-center gap-2 bg-stone-50 transition-colors group-hover:bg-primary/5">
-                        {newReward.uploadingImage ? (
-                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                        ) : (
-                          <>
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-stone-300 bg-white transition-colors group-hover:border-primary">
-                              <ImagePlus className="h-4 w-4 text-stone-400 transition-colors group-hover:text-primary" />
-                            </div>
-                            <p className="text-xs font-medium text-stone-500 group-hover:text-primary transition-colors">คลิกเพื่ออัปโหลดรูป</p>
-                            <p className="text-[10px] text-stone-400">JPG · PNG · WebP · สูงสุด 5 MB</p>
-                          </>
-                        )}
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="sr-only"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (!f) return;
-                        void handleImageUpload(
-                          f,
-                          (v) => setNewReward((prev) => ({ ...prev, uploadingImage: v })),
-                          (url) => setNewReward((prev) => ({ ...prev, image_url: url })),
-                          newReward.image_url,
-                        );
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
+                      {newReward.uploadingImage && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/30">
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <label className={`group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-300 bg-stone-50 py-10 transition-colors hover:border-primary hover:bg-primary/5 ${newReward.uploadingImage ? 'pointer-events-none' : ''}`}>
+                      {newReward.uploadingImage ? (
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      ) : (
+                        <>
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-stone-300 bg-white transition-colors group-hover:border-primary">
+                            <ImagePlus className="h-4 w-4 text-stone-400 transition-colors group-hover:text-primary" />
+                          </div>
+                          <p className="text-xs font-medium text-stone-500 transition-colors group-hover:text-primary">คลิกเพื่ออัปโหลดรูป</p>
+                          <p className="text-[10px] text-stone-400">JPG · PNG · WebP · สูงสุด 5 MB</p>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          void handleImageUpload(
+                            f,
+                            (v) => setNewReward((prev) => ({ ...prev, uploadingImage: v })),
+                            (url) => setNewReward((prev) => ({ ...prev, image_url: url })),
+                            newReward.image_url,
+                          );
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
                 </div>
 
                 <div className="flex items-end pb-0.5 sm:col-span-2">
@@ -984,7 +1023,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setIsAddingReward(false); setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null }); }}
+                  onClick={() => { void cancelAddReward(); }}
                   className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
                 >
                   <X className="h-4 w-4" />

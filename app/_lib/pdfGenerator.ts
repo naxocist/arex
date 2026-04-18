@@ -130,7 +130,25 @@ function addFooter(w: PdfWriter) {
   w.doc.text('AREX Platform · ระบบบริหารจัดการวัสดุเหลือใช้', pageW - w.margin, pageH - 5, { align: 'right' });
 }
 
-export function generatePickupJobPdf(item: LogisticsPickupJobItem): void {
+export interface RouteSegment {
+  label: string; // e.g. "ฉัน → เกษตรกร"
+  distanceKm: number | null;
+}
+
+function addRouteSection(w: PdfWriter, segments: RouteSegment[]) {
+  addSectionLabel(w, 'ระยะทาง (ทางถนน)');
+  const valid = segments.filter((s) => s.distanceKm !== null);
+  for (const seg of segments) {
+    const val = seg.distanceKm !== null ? `${seg.distanceKm.toFixed(1)} กม.` : 'ไม่สามารถคำนวณได้';
+    addField(w, seg.label, val);
+  }
+  if (valid.length > 1) {
+    const total = valid.reduce((sum, s) => sum + (s.distanceKm ?? 0), 0);
+    addField(w, 'รวมระยะทาง', `${total.toFixed(1)} กม.`);
+  }
+}
+
+export function generatePickupJobPdf(item: LogisticsPickupJobItem, route?: RouteSegment[]): void {
   const doc = makePdf();
   const margin = 18;
   const maxWidth = doc.internal.pageSize.getWidth() - margin * 2;
@@ -195,11 +213,13 @@ export function generatePickupJobPdf(item: LogisticsPickupJobItem): void {
     }
   }
 
+  if (route && route.length > 0) addRouteSection(w, route);
+
   addFooter(w);
   doc.save(`ใบรับวัสดุ_${item.id.slice(0, 8)}.pdf`);
 }
 
-export function generateDeliveryJobPdf(item: LogisticsRewardDeliveryJobItem): void {
+export function generateDeliveryJobPdf(item: LogisticsRewardDeliveryJobItem, route?: RouteSegment[]): void {
   const doc = makePdf();
   const margin = 18;
   const maxWidth = doc.internal.pageSize.getWidth() - margin * 2;
@@ -244,6 +264,8 @@ export function generateDeliveryJobPdf(item: LogisticsRewardDeliveryJobItem): vo
       : undefined
   );
   addField(w, 'วันและเวลานัดส่ง', dateRange);
+
+  if (route && route.length > 0) addRouteSection(w, route);
 
   addFooter(w);
   doc.save(`ใบส่งรางวัล_${item.id.slice(0, 8)}.pdf`);

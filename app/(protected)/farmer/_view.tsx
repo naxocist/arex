@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
-import { ChevronDown, Coins, Gift, Kanban, LayoutList, PackagePlus, RefreshCw, Route, Sprout, Truck, User, X } from 'lucide-react';
+import { ArrowDownAZ, CalendarCheck, ClipboardList, Coins, Factory, Gift, MapPin, PackagePlus, RefreshCw, Truck, User, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ConfirmDialog from '@/app/_components/ConfirmDialog';
 import EmptyState from '@/app/_components/EmptyState';
@@ -12,7 +12,6 @@ import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
 import { SkeletonCard } from '@/app/_components/Skeleton';
 import StatusBadge from '@/app/_components/StatusBadge';
-import StatusStepper from '@/app/_components/StatusStepper';
 import { useFarmerProfile } from '@/app/_contexts/FarmerProfileContext';
 import {
   ApiError,
@@ -26,24 +25,35 @@ import {
 const ACTIVE_STATUSES = new Set(['submitted', 'pickup_scheduled', 'picked_up', 'delivered_to_factory', 'factory_confirmed']);
 const LIVE_DOT_STATUSES = new Set(['pickup_scheduled', 'picked_up']);
 
-const STATUS_GROUP_OPTIONS = [
-  { value: 'all', label: 'ทั้งหมด' },
-  { value: 'active', label: 'กำลังดำเนินการ' },
-  { value: 'done', label: 'เสร็จสิ้น' },
+const STATUS_FILTER_OPTIONS = [
+  { value: 'submitted',            label: 'รอจัดคิวรถ',   Icon: ClipboardList, color: 'amber'   },
+  { value: 'pickup_scheduled',     label: 'จัดคิวรถแล้ว', Icon: CalendarCheck, color: 'sky'     },
+  { value: 'picked_up',           label: 'รับวัสดุแล้ว', Icon: Truck,         color: 'blue'    },
+  { value: 'delivered_to_factory', label: 'ส่งถึงโรงงาน', Icon: Factory,       color: 'violet'  },
+  { value: 'points_credited',      label: 'ได้แต้มแล้ว',  Icon: Coins,         color: 'emerald' },
 ] as const;
 
-type StatusGroup = (typeof STATUS_GROUP_OPTIONS)[number]['value'];
-type SortCol = 'date' | 'qty' | 'status';
-type SortDir = 'asc' | 'desc';
-
-const STATUS_ORDER: Record<string, number> = {
-  pickup_scheduled: 0,
-  picked_up: 1,
-  delivered_to_factory: 2,
-  submitted: 3,
-  factory_confirmed: 4,
-  points_credited: 5,
+const TAB_ACTIVE_CLASSES: Record<string, string> = {
+  amber:   'bg-amber-500  text-white border-amber-500',
+  sky:     'bg-sky-500    text-white border-sky-500',
+  blue:    'bg-blue-500   text-white border-blue-500',
+  violet:  'bg-violet-500 text-white border-violet-500',
+  indigo:  'bg-indigo-500 text-white border-indigo-500',
+  emerald: 'bg-emerald-500 text-white border-emerald-500',
 };
+const TAB_COUNT_ACTIVE: Record<string, string> = {
+  amber: 'bg-amber-400', sky: 'bg-sky-400', blue: 'bg-blue-400',
+  violet: 'bg-violet-400', indigo: 'bg-indigo-400', emerald: 'bg-emerald-400',
+};
+
+type StatusGroup = (typeof STATUS_FILTER_OPTIONS)[number]['value'] | 'all';
+type SortKey = 'date_desc' | 'date_asc' | 'material';
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'date_desc', label: 'ล่าสุดก่อน' },
+  { key: 'date_asc',  label: 'เก่าสุดก่อน' },
+  { key: 'material',  label: 'ชื่อวัสดุ ก–ฮ' },
+];
 
 function hasAccessToken(): boolean {
   if (typeof window === 'undefined') return false;
@@ -127,13 +137,9 @@ export default function FarmerHome() {
   const [availablePoints, setAvailablePoints] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [statusGroup, setStatusGroup] = useState<StatusGroup>('all');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [boardExpandedId, setBoardExpandedId] = useState<string | null>(null);
+  const [statusGroup, setStatusGroup] = useState<StatusGroup>('submitted');
+  const [sortKey, setSortKey] = useState<SortKey>('date_desc');
   const [showForm, setShowForm] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
-  const [sortCol, setSortCol] = useState<SortCol>('date');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean; title: string; message: string; fields?: { label: string; value: string }[]; onConfirm: () => void;
@@ -151,32 +157,15 @@ export default function FarmerHome() {
     return map;
   }, [materialTypes]);
 
-  const stats = useMemo(() => ({
-    all: submissions.length,
-    waitingPickup: submissions.filter((s) => s.status === 'submitted' || s.status === 'pickup_scheduled').length,
-    inTransit: submissions.filter((s) => s.status === 'picked_up' || s.status === 'delivered_to_factory').length,
-    completed: submissions.filter((s) => s.status === 'points_credited').length,
-  }), [submissions]);
-
   const filteredSubmissions = useMemo(() => {
-    let list = submissions;
-    if (statusGroup === 'active') list = list.filter((s) => ACTIVE_STATUSES.has(s.status));
-    else if (statusGroup === 'done') list = list.filter((s) => s.status === 'points_credited');
-    const dir = sortDir === 'asc' ? 1 : -1;
+    let list = statusGroup !== 'all' ? submissions.filter((s) => s.status === statusGroup) : submissions;
     return [...list].sort((a, b) => {
-      if (sortCol === 'status') {
-        const diff = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
-        if (diff !== 0) return diff * dir;
-      }
-      if (sortCol === 'qty') {
-        const diff = (Number(a.quantity_value) || 0) - (Number(b.quantity_value) || 0);
-        if (diff !== 0) return diff * dir;
-      }
+      if (sortKey === 'material') return (materialNameByCode[a.material_type] ?? a.material_type).localeCompare(materialNameByCode[b.material_type] ?? b.material_type, 'th');
       const ta = new Date(a.created_at ?? 0).getTime();
       const tb = new Date(b.created_at ?? 0).getTime();
-      return (ta - tb) * (sortCol === 'date' ? dir : 1);
+      return sortKey === 'date_asc' ? ta - tb : tb - ta;
     });
-  }, [submissions, statusGroup, sortCol, sortDir]);
+  }, [submissions, statusGroup, sortKey, materialNameByCode]);
 
   const loadDashboard = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
@@ -191,7 +180,10 @@ export default function FarmerHome() {
         farmerApi.listMeasurementUnits({ forceRefresh }),
         farmerApi.getPoints({ forceRefresh }),
       ]);
-      setSubmissions(submissionsResponse.submissions);
+      const subs = submissionsResponse.submissions;
+      setSubmissions(subs);
+      const firstTabWithItems = STATUS_FILTER_OPTIONS.find((opt) => subs.some((s) => s.status === opt.value));
+      if (firstTabWithItems) setStatusGroup(firstTabWithItems.value);
       setAvailablePoints(pointsResponse.available_points);
       const nextMaterialTypes = materialTypesResponse.material_types || [];
       setMaterialTypes(nextMaterialTypes);
@@ -341,460 +333,158 @@ export default function FarmerHome() {
           )}
         </AnimatePresence>
 
-        {/* ── Stats strip (horizontal scroll on mobile) ── */}
-        <div className="mb-5 -mx-1 flex gap-3 overflow-x-auto px-1 pb-1 scrollbar-hide">
-          {[
-            { label: 'รายการทั้งหมด', value: stats.all, icon: Sprout, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { label: 'รอรับวัสดุ', value: stats.waitingPickup, icon: Truck, color: 'text-amber-600', bg: 'bg-amber-50' },
-            { label: 'ระหว่างขนส่ง', value: stats.inTransit, icon: Route, color: 'text-sky-600', bg: 'bg-sky-50' },
-            { label: 'ได้แต้มแล้ว', value: stats.completed, icon: Coins, color: 'text-violet-600', bg: 'bg-violet-50' },
-          ].map((s) => (
-            <div key={s.label} className="flex shrink-0 items-center gap-2.5 rounded-2xl border border-stone-100 bg-white px-4 py-3 shadow-sm">
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${s.bg}`}>
-                <s.icon className={`h-4 w-4 ${s.color}`} />
-              </div>
-              <div>
-                <p className="text-xl font-bold leading-none text-stone-900">{isLoading ? '—' : s.value}</p>
-                <p className="mt-0.5 text-xs text-stone-500">{s.label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* ── Submissions list ── */}
+        <div className="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
 
-        {/* ── View toggle ── */}
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm font-semibold text-stone-600">รายการวัสดุ</p>
-          <div className="flex rounded-xl border border-stone-200 bg-stone-50 p-1">
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${viewMode === 'list' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}
-              aria-label="มุมมองรายการ"
-            >
-              <LayoutList className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('board')}
-              className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${viewMode === 'board' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}
-              aria-label="มุมมองกระดาน"
-            >
-              <Kanban className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* ── Board / Pipeline view ── */}
-        {viewMode === 'board' && (() => {
-          const STAGES: {
-            statuses: string[];
-            label: string;
-            sublabel: string;
-            icon: React.ReactNode;
-            accent: string;      // tailwind text color
-            accentBg: string;    // tailwind bg color (light)
-            trackColor: string;  // tailwind bg for the left track bar
-            live: boolean;
-          }[] = [
-            {
-              statuses: ['submitted'],
-              label: 'รอจัดคิวรถ',
-              sublabel: 'ส่งรายการแล้ว รอทีมขนส่งนัดหมาย',
-              icon: <PackagePlus className="h-4 w-4" />,
-              accent: 'text-amber-700', accentBg: 'bg-amber-50', trackColor: 'bg-amber-400', live: false,
-            },
-            {
-              statuses: ['pickup_scheduled', 'picked_up'],
-              label: 'ขนส่งกำลังดำเนินการ',
-              sublabel: 'รถอยู่ระหว่างเดินทางหรือรับวัสดุแล้ว',
-              icon: <Truck className="h-4 w-4" />,
-              accent: 'text-sky-700', accentBg: 'bg-sky-50', trackColor: 'bg-sky-400', live: true,
-            },
-            {
-              statuses: ['delivered_to_factory', 'factory_confirmed'],
-              label: 'ถึงโรงงานแล้ว',
-              sublabel: 'รอโรงงานชั่งน้ำหนักและยืนยัน',
-              icon: <Route className="h-4 w-4" />,
-              accent: 'text-violet-700', accentBg: 'bg-violet-50', trackColor: 'bg-violet-400', live: false,
-            },
-            {
-              statuses: ['points_credited'],
-              label: 'เสร็จสิ้น — ได้แต้มแล้ว',
-              sublabel: 'PMUC Coin เข้าบัญชีเรียบร้อย',
-              icon: <Coins className="h-4 w-4" />,
-              accent: 'text-emerald-700', accentBg: 'bg-emerald-50', trackColor: 'bg-emerald-400', live: false,
-            },
-          ];
-
-          const totalActive = submissions.filter((s) => ACTIVE_STATUSES.has(s.status)).length;
-
-          return (
-            <div className="space-y-2">
-              {/* Pipeline header */}
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-bold text-stone-800">สถานะวัสดุทั้งหมด</p>
-                  <p className="text-xs text-stone-400">
-                    {totalActive > 0 ? `${totalActive} รายการกำลังดำเนินการ` : 'ไม่มีรายการที่กำลังดำเนินการ'}
-                  </p>
-                </div>
-              </div>
-
-              {isLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="h-16 animate-pulse rounded-2xl bg-stone-100" />
-                  ))}
-                </div>
-              ) : (
-                STAGES.map((stage, si) => {
-                  const items = submissions.filter((s) => stage.statuses.includes(s.status));
-                  const isEmpty = items.length === 0;
-                  const isLast = si === STAGES.length - 1;
-                  return (
-                    <div key={stage.label} className="relative flex gap-0">
-                      {/* Left timeline track */}
-                      <div className="flex flex-col items-center" style={{ width: 32, flexShrink: 0 }}>
-                        <div className={`mt-4 h-5 w-5 rounded-full flex items-center justify-center z-10 relative ${isEmpty ? 'bg-stone-200' : stage.trackColor}`}>
-                          {stage.live && !isEmpty ? (
-                            <>
-                              <span className={`animate-ping absolute inline-flex h-5 w-5 rounded-full opacity-40 ${stage.trackColor}`} />
-                              <span className="relative h-2 w-2 rounded-full bg-white" />
-                            </>
-                          ) : (
-                            <span className={`text-[9px] font-bold ${isEmpty ? 'text-stone-400' : 'text-white'}`}>{si + 1}</span>
-                          )}
-                        </div>
-                        {!isLast && (
-                          <div className={`w-0.5 flex-1 mt-1 ${isEmpty ? 'bg-stone-100' : stage.trackColor} opacity-40`} style={{ minHeight: 16 }} />
-                        )}
-                      </div>
-
-                      {/* Stage card */}
-                      <div className={`flex-1 mb-2 rounded-2xl border overflow-hidden transition-all ${
-                        isEmpty ? 'border-stone-100 bg-stone-50/60' : `border-transparent ${stage.accentBg} shadow-sm`
+          {/* Status filter tabs — horizontal scroll with snap */}
+          <div className="overflow-x-auto scrollbar-hide border-b border-stone-100">
+            <div className="flex gap-2 px-3 py-3" style={{ width: 'max-content' }}>
+              {STATUS_FILTER_OPTIONS.map(({ value, label, Icon, color }) => {
+                const count = submissions.filter((s) => s.status === value).length;
+                const isActive = statusGroup === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setStatusGroup(value)}
+                    className={`flex flex-col items-start justify-between rounded-2xl border px-3.5 py-3 transition-all active:scale-95 ${
+                      isActive
+                        ? TAB_ACTIVE_CLASSES[color]
+                        : 'bg-white border-stone-200 text-stone-600'
+                    }`}
+                    style={{ minWidth: 100, minHeight: 80 }}
+                  >
+                    <div className="flex w-full items-start justify-between gap-2">
+                      <Icon className={`h-5 w-5 ${isActive ? 'text-white' : count > 0 ? 'text-stone-600' : 'text-stone-300'}`} />
+                      <span className={`min-w-[22px] text-center rounded-full text-xs font-black px-1.5 py-0.5 leading-none ${
+                        isActive
+                          ? `${TAB_COUNT_ACTIVE[color]} text-white`
+                          : count > 0 ? 'bg-stone-100 text-stone-700' : 'bg-stone-50 text-stone-300'
                       }`}>
-                        {/* Stage header */}
-                        <div className="flex items-center gap-2.5 px-3 py-3">
-                          <span className={`${isEmpty ? 'text-stone-300' : stage.accent}`}>{stage.icon}</span>
-                          <div className="min-w-0 flex-1">
-                            <p className={`text-sm font-bold leading-none ${isEmpty ? 'text-stone-400' : stage.accent}`}>{stage.label}</p>
-                            {!isEmpty && <p className="mt-0.5 text-[11px] text-stone-500 leading-tight">{stage.sublabel}</p>}
+                        {count}
+                      </span>
+                    </div>
+                    <span className={`mt-2 text-xs font-semibold leading-tight text-left ${isActive ? 'text-white' : count > 0 ? 'text-stone-700' : 'text-stone-400'}`}>
+                      {label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Sort strip */}
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-stone-50/60 border-b border-stone-100">
+            <ArrowDownAZ className="h-4 w-4 text-stone-400 shrink-0" />
+            <span className="text-xs text-stone-400 font-medium">เรียง:</span>
+            {SORT_OPTIONS.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSortKey(key)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                  sortKey === key ? 'bg-stone-700 text-white' : 'text-stone-400 hover:text-stone-600'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Cards */}
+          <div>
+            {isLoading ? (
+              <div className="divide-y divide-stone-100">
+                {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+              </div>
+            ) : filteredSubmissions.length === 0 ? (
+              <div className="px-4 py-10">
+                <EmptyState
+                  title="ไม่มีรายการในสถานะนี้"
+                  description={statusGroup === 'submitted' ? 'กดปุ่มด้านล่างเพื่อส่งรายการวัสดุใหม่' : 'ยังไม่มีรายการที่ถึงขั้นตอนนี้'}
+                />
+              </div>
+            ) : (
+              <motion.div
+                key={`${statusGroup}-${sortKey}`}
+                className="divide-y divide-stone-100"
+                initial={reduceMotion ? {} : { opacity: 0 }}
+                animate={reduceMotion ? {} : { opacity: 1 }}
+                transition={{ duration: 0.15 }}
+              >
+                {filteredSubmissions.map((item) => {
+                  const isActiveStatus = ACTIVE_STATUSES.has(item.status);
+                  const isCredited = item.status === 'points_credited';
+                  const hasMap = item.pickup_lat != null && item.pickup_lng != null;
+                  const pickupWindow = formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at);
+                  const showPickupDate = isActiveStatus && item.pickup_window_start_at;
+
+                  return (
+                    <article key={item.id} className={`px-4 py-4 ${isCredited ? 'bg-emerald-50/30' : ''}`}>
+                      <div className="flex items-start gap-3">
+                        <StatusDot status={item.status} />
+
+                        {/* Main content */}
+                        <div className="min-w-0 flex-1 space-y-2">
+                          {/* Row 1: name + map button */}
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-base font-bold text-stone-900 leading-snug">
+                              {materialNameByCode[item.material_type] ?? item.material_type}
+                            </p>
+                            {hasMap && (
+                              <a
+                                href={`https://www.google.com/maps?q=${item.pickup_lat},${item.pickup_lng}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="shrink-0 flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700"
+                              >
+                                <MapPin className="h-3.5 w-3.5" />
+                                แผนที่
+                              </a>
+                            )}
                           </div>
-                          {!isEmpty && (
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${stage.accentBg} ${stage.accent} border border-current border-opacity-20`}>
-                              {items.length}
+
+                          {/* Row 2: qty + points or status badge */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm text-stone-700 font-semibold">
+                              {Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
+                            </span>
+                            {isCredited && item.credited_points != null ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black tabular-nums text-emerald-700">
+                                <Coins className="h-3 w-3" />
+                                +{item.credited_points.toLocaleString('th-TH')} แต้ม
+                              </span>
+                            ) : (
+                              <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} size="sm" />
+                            )}
+                          </div>
+
+                          {/* Row 3: submitted date */}
+                          <p className="text-xs text-stone-400">ส่งรายการเมื่อ {formatDateTime(item.created_at)}</p>
+
+                          {/* Row 4: pickup window (when scheduled/in-transit) */}
+                          {showPickupDate && (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200 px-3 py-1 text-xs font-semibold text-sky-700">
+                              📅 นัดรับ {pickupWindow}
                             </span>
                           )}
-                          {isEmpty && <span className="text-xs text-stone-300">ว่าง</span>}
+
+                          {/* pickup location text (no coords) */}
+                          {!hasMap && item.pickup_location_text && (
+                            <p className="flex items-center gap-1 text-xs text-stone-400">
+                              <MapPin className="h-3.5 w-3.5 shrink-0" />
+                              {item.pickup_location_text}
+                            </p>
+                          )}
                         </div>
-
-                        {/* Item chips + inline expansion */}
-                        {!isEmpty && (
-                          <div className="flex flex-col gap-1.5 px-3 pb-3">
-                            {items.map((item) => {
-                              const isBoardExpanded = boardExpandedId === item.id;
-                              const isActiveStatus = ACTIVE_STATUSES.has(item.status);
-                              return (
-                                <div key={item.id} className="rounded-xl bg-white/80 border border-white shadow-sm overflow-hidden">
-                                  {/* Chip row */}
-                                  <button
-                                    type="button"
-                                    onClick={() => setBoardExpandedId(isBoardExpanded ? null : item.id)}
-                                    className="flex w-full items-center gap-2 px-2.5 py-2 text-left transition active:bg-stone-50"
-                                  >
-                                    <div className="min-w-0 flex-1">
-                                      <span className="text-xs font-bold text-stone-800">
-                                        {materialNameByCode[item.material_type] ?? item.material_type}
-                                      </span>
-                                      <span className="mx-1.5 text-[10px] text-stone-300">·</span>
-                                      <span className="text-[10px] text-stone-500">
-                                        {Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
-                                      </span>
-                                      <span className="mx-1.5 text-[10px] text-stone-300">·</span>
-                                      <span className="text-[10px] text-stone-400">ส่งเมื่อ {formatDate(item.created_at)}</span>
-                                    </div>
-                                    <motion.span
-                                      animate={reduceMotion ? {} : { rotate: isBoardExpanded ? 180 : 0 }}
-                                      transition={{ duration: 0.18 }}
-                                      style={{ display: 'inline-flex' }}
-                                      className="shrink-0 text-stone-300"
-                                    >
-                                      <ChevronDown className="h-3.5 w-3.5" />
-                                    </motion.span>
-                                  </button>
-
-                                  {/* Inline detail */}
-                                  <AnimatePresence initial={false}>
-                                    {isBoardExpanded && (
-                                      <motion.div
-                                        initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
-                                        animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
-                                        exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
-                                        transition={{ duration: 0.22, ease: 'easeInOut' }}
-                                        style={{ overflow: 'hidden' }}
-                                      >
-                                        <div className="space-y-2 border-t border-stone-100 px-3 pb-3 pt-2.5">
-                                          {item.pickup_location_text && (
-                                            <p className="text-xs text-stone-600">
-                                              <span className="font-semibold">จุดนัดรับ: </span>
-                                              {item.pickup_location_text}
-                                            </p>
-                                          )}
-                                          {item.pickup_lat != null && item.pickup_lng != null && (
-                                            <a
-                                              href={`https://www.google.com/maps?q=${item.pickup_lat},${item.pickup_lng}`}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700"
-                                            >
-                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-                                              เปิดแผนที่
-                                            </a>
-                                          )}
-                                          {isActiveStatus && (
-                                            <StatusStepper
-                                              currentStatus={item.status}
-                                              createdAt={formatDateTime(item.created_at)}
-                                              pickupWindow={formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at)}
-                                            />
-                                          )}
-                                          {!isActiveStatus && (
-                                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                              <div>
-                                                <p className="text-stone-400">ส่งรายการ</p>
-                                                <p className="font-semibold text-stone-700">{formatDateTime(item.created_at)}</p>
-                                              </div>
-                                              <div>
-                                                <p className="text-stone-400">วันนัดรับ</p>
-                                                <p className="font-semibold text-stone-700">{formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at)}</p>
-                                              </div>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </motion.div>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
                       </div>
-                    </div>
+                    </article>
                   );
-                })
-              )}
-            </div>
-          );
-        })()}
-
-        {/* ── Submission table view ── */}
-        {viewMode === 'list' && (() => {
-          // Sort toggle helper
-          const handleColSort = (col: SortCol) => {
-            if (sortCol === col) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
-            else { setSortCol(col); setSortDir(col === 'date' ? 'desc' : 'asc'); }
-          };
-          const SortArrow = ({ col }: { col: SortCol }) => {
-            if (sortCol !== col) return null;
-            const label = col === 'date'
-              ? (sortDir === 'desc' ? 'ล่าสุดก่อน' : 'เก่าสุดก่อน')
-              : col === 'qty'
-              ? (sortDir === 'desc' ? 'มากก่อน' : 'น้อยก่อน')
-              : (sortDir === 'asc' ? 'ตามขั้นตอน' : 'ย้อนกลับ');
-            return <span className="ml-1 whitespace-nowrap rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary leading-none">{label}</span>;
-          };
-
-          const countAll = submissions.length;
-          const countActive = submissions.filter((s) => ACTIVE_STATUSES.has(s.status)).length;
-          const countDone = submissions.filter((s) => s.status === 'points_credited').length;
-
-          return (
-            <div className="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
-
-              {/* Filter + count header */}
-              <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-3">
-                {/* Segmented filter */}
-                <div className="flex rounded-xl bg-stone-100 p-0.5 gap-0.5">
-                  {([
-                    ['all', 'ทั้งหมด', countAll],
-                    ['active', 'กำลังดำเนินการ', countActive],
-                    ['done', 'เสร็จสิ้น', countDone],
-                  ] as [StatusGroup, string, number][]).map(([val, label, count]) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setStatusGroup(val)}
-                      className={`flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-all ${
-                        statusGroup === val
-                          ? 'bg-white text-stone-900 shadow-sm'
-                          : 'text-stone-500 hover:text-stone-700'
-                      }`}
-                    >
-                      {label}
-                      {count > 0 && (
-                        <span className={`rounded-full min-w-[18px] text-center px-1 py-0.5 text-[10px] font-bold leading-none ${
-                          statusGroup === val ? 'bg-primary/10 text-primary' : 'bg-stone-200 text-stone-400'
-                        }`}>{count}</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-stone-400 shrink-0">{filteredSubmissions.length} รายการ</p>
-              </div>
-
-              {/* Sort hint — permanent small note */}
-              {!isLoading && filteredSubmissions.length > 0 && (
-                <div className="flex items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2">
-                  <span className="text-sm">💡</span>
-                  <p className="text-xs text-amber-700">กดชื่อคอลัมน์เพื่อเรียงลำดับ</p>
-                </div>
-              )}
-
-              {/* Column headers — clickable for sort */}
-              {!isLoading && filteredSubmissions.length > 0 && (
-                <div className="grid grid-cols-[1fr_5rem_9rem] items-center border-b border-stone-100 bg-stone-50/60 px-4 py-2 text-xs font-semibold text-stone-400">
-                  <button type="button" onClick={() => handleColSort('date')} className="flex items-center gap-0.5 text-left hover:text-stone-600 transition-colors">
-                    ส่งเมื่อ<SortArrow col="date" />
-                  </button>
-                  <button type="button" onClick={() => handleColSort('qty')} className="flex items-center justify-end gap-0.5 pr-4 hover:text-stone-600 transition-colors">
-                    ปริมาณ<SortArrow col="qty" />
-                  </button>
-                  <button type="button" onClick={() => handleColSort('status')} className="flex items-center justify-end gap-0.5 hover:text-stone-600 transition-colors">
-                    สถานะ<SortArrow col="status" />
-                  </button>
-                </div>
-              )}
-
-              {/* Rows */}
-              <div>
-                {isLoading ? (
-                  <div className="divide-y divide-stone-100">
-                    {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
-                  </div>
-                ) : filteredSubmissions.length === 0 ? (
-                  <div className="px-4 py-10">
-                    <EmptyState
-                      title="ไม่พบรายการ"
-                      description="ลองสลับตัวกรองด้านบน หรือกดปุ่มเพื่อส่งรายการวัสดุใหม่"
-                    />
-                  </div>
-                ) : (
-                  <motion.div
-                    key={`${statusGroup}-${sortCol}-${sortDir}`}
-                    className="divide-y divide-stone-100"
-                    initial={reduceMotion ? {} : { opacity: 0 }}
-                    animate={reduceMotion ? {} : { opacity: 1 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    {filteredSubmissions.map((item) => {
-                      const isExpanded = expandedId === item.id;
-                      const isActiveStatus = ACTIVE_STATUSES.has(item.status);
-                      return (
-                        <article key={item.id}>
-                          {/* Table row */}
-                          <button
-                            type="button"
-                            onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                            className={`grid w-full grid-cols-[1fr_5rem_9rem] items-center gap-2 px-4 py-3.5 text-left transition-colors ${
-                              isExpanded ? 'bg-stone-50' : 'hover:bg-stone-50/60 active:bg-stone-50'
-                            }`}
-                          >
-                            {/* Col 1: material + date */}
-                            <div className="min-w-0 flex items-center gap-3">
-                              <StatusDot status={item.status} />
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-stone-900">
-                                  {materialNameByCode[item.material_type] ?? item.material_type}
-                                </p>
-                                <p className="text-xs text-stone-400">ส่งเมื่อ {formatDateTime(item.created_at)}</p>
-                              </div>
-                            </div>
-
-                            {/* Col 2: quantity */}
-                            <div className="pr-4 text-right">
-                              <p className="text-sm font-semibold tabular-nums text-stone-700">
-                                {Number(item.quantity_value).toLocaleString('th-TH')}
-                              </p>
-                              <p className="text-xs text-stone-400">{unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}</p>
-                            </div>
-
-                            {/* Col 3: status badge + chevron — right-aligned, fixed width */}
-                            <div className="flex flex-col items-end gap-1 min-w-0">
-                              <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} size="sm" />
-                              <motion.span
-                                animate={reduceMotion ? {} : { rotate: isExpanded ? 180 : 0 }}
-                                transition={{ duration: 0.18 }}
-                                style={{ display: 'inline-flex' }}
-                                className="text-stone-300"
-                              >
-                                <ChevronDown className="h-3.5 w-3.5" />
-                              </motion.span>
-                            </div>
-                          </button>
-
-                          {/* Expanded detail */}
-                          <AnimatePresence initial={false}>
-                            {isExpanded && (
-                              <motion.div
-                                key="detail"
-                                initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
-                                animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
-                                exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
-                                transition={{ duration: 0.24, ease: 'easeInOut' }}
-                                style={{ overflow: 'hidden' }}
-                              >
-                                <div className="mx-4 mb-4 mt-1 space-y-2.5 rounded-2xl bg-stone-50 px-4 py-3.5">
-                                  {item.pickup_location_text && (
-                                    <p className="text-sm text-stone-600">
-                                      <span className="font-semibold text-stone-800">จุดนัดรับ: </span>
-                                      {item.pickup_location_text}
-                                    </p>
-                                  )}
-                                  {item.pickup_lat != null && item.pickup_lng != null && (
-                                    <a
-                                      href={`https://www.google.com/maps?q=${item.pickup_lat},${item.pickup_lng}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"
-                                    >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-                                      เปิดแผนที่
-                                    </a>
-                                  )}
-                                  {isActiveStatus && (
-                                    <StatusStepper
-                                      currentStatus={item.status}
-                                      createdAt={formatDateTime(item.created_at)}
-                                      pickupWindow={formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at)}
-                                    />
-                                  )}
-                                  {!isActiveStatus && (
-                                    <div className="grid grid-cols-2 gap-2 text-sm">
-                                      <div>
-                                        <p className="text-xs text-stone-400">วันที่ส่งรายการ</p>
-                                        <p className="font-medium text-stone-800">ส่งเมื่อ {formatDateTime(item.created_at)}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-xs text-stone-400">วันนัดรับวัสดุ</p>
-                                        <p className="font-medium text-stone-800">{formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at)}</p>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </article>
-                      );
-                    })}
-                  </motion.div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
+                })}
+              </motion.div>
+            )}
+          </div>
+        </div>
 
         {/* ── Submit form sheet ── */}
         <AnimatePresence>

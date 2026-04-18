@@ -42,7 +42,7 @@ export interface FarmerSubmissionItem {
   id: string; material_type: string; quantity_value: number; quantity_unit: string;
   pickup_location_text: string; pickup_lat?: number | null; pickup_lng?: number | null;
   status: string; created_at: string; pickup_window_start_at?: string | null; pickup_window_end_at?: string | null;
-  pickup_job_status?: string | null;
+  pickup_job_status?: string | null; credited_points?: number | null;
 }
 export interface CreateRewardRequestPayload { reward_id: string; quantity: number; delivery_location_text?: string | null; delivery_lat?: number | null; delivery_lng?: number | null }
 

@@ -74,6 +74,12 @@ function copyToClipboard(text: string): Promise<void> {
   return navigator.clipboard.writeText(text);
 }
 
+function toKgForSort(value: number | null | undefined, unit: string | null | undefined): number {
+  const v = Number(value ?? 0);
+  if (unit === 'ton') return v * 1000;
+  return v;
+}
+
 /* ── Expandable card ── */
 function HistoryCard({
   children,
@@ -94,7 +100,7 @@ function HistoryCard({
   return (
     <motion.div className={`overflow-hidden rounded-xl border border-stone-200/80 border-l-4 ${borderColor} bg-white shadow-sm`}>
       {hasExpanded ? (
-        <button type="button" onClick={onToggle} className="flex w-full items-start gap-3 px-5 py-4 text-left">
+        <button type="button" onClick={onToggle} className="flex w-full items-start gap-2 px-3.5 py-2 text-left">
           <div className="min-w-0 flex-1">{children}</div>
           <motion.span
             animate={reduceMotion ? {} : { rotate: isExpanded ? 180 : 0 }}
@@ -106,7 +112,7 @@ function HistoryCard({
           </motion.span>
         </button>
       ) : (
-        <div className="flex w-full items-start gap-3 px-5 py-4 text-left">
+        <div className="flex w-full items-start gap-2 px-3.5 py-2 text-left">
           <div className="min-w-0 flex-1">{children}</div>
         </div>
       )}
@@ -166,7 +172,7 @@ function SortHeaderBar<T extends string>({
           </button>
         );
       })}
-      <span className="ml-auto text-[10px] text-stone-300 hidden sm:inline">💡 กดชื่อคอลัมน์เพื่อเรียงลำดับ</span>
+      <span className="ml-auto text-[11px] text-stone-400 hidden sm:inline">กดชื่อคอลัมน์เพื่อเรียงลำดับ</span>
     </div>
   );
 }
@@ -273,8 +279,10 @@ export default function LogisticsHistory() {
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copyLoadingId, setCopyLoadingId] = useState<string | null>(null);
+  const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'material' | 'reward'>('material');
-  const [materialSort, setMaterialSort] = useState<{ key: 'planned_pickup_at' | 'material'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'desc' });
+  const [materialSort, setMaterialSort] = useState<{ key: 'planned_pickup_at' | 'material' | 'weight'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'desc' });
   const [rewardSort, setRewardSort] = useState<{ key: 'planned_delivery_at' | 'reward_name'; dir: SortDir }>({ key: 'planned_delivery_at', dir: 'desc' });
 
   const deliveredPickupJobsRaw = useMemo(
@@ -298,6 +306,7 @@ export default function LogisticsHistory() {
   const deliveredPickupJobs = useMemo(() => [...deliveredPickupJobsRaw].sort((a, b) => {
     const mul = materialSort.dir === 'asc' ? 1 : -1;
     if (materialSort.key === 'material') return mul * (a.material_type ?? '').localeCompare(b.material_type ?? '');
+    if (materialSort.key === 'weight') return mul * (toKgForSort(a.quantity_value, a.quantity_unit) - toKgForSort(b.quantity_value, b.quantity_unit));
     return mul * (new Date(a.planned_pickup_at ?? 0).getTime() - new Date(b.planned_pickup_at ?? 0).getTime());
   }), [deliveredPickupJobsRaw, materialSort]);
 
@@ -394,12 +403,13 @@ export default function LogisticsHistory() {
 
         {/* ── Material delivery history ── */}
         {activeTab === 'material' && (
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {!isLoading && deliveredPickupJobs.length > 0 && (
               <SortHeaderBar
                 cols={[
                   { key: 'planned_pickup_at' as const, label: 'วันนัดรับ', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
                   { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+                  { key: 'weight' as const, label: 'น้ำหนัก', dirLabels: ['น้อยก่อน', 'มากก่อน'] },
                 ]}
                 sort={materialSort}
                 onSort={(key) => toggleSort(materialSort, key, setMaterialSort)}
@@ -412,7 +422,27 @@ export default function LogisticsHistory() {
             ) : (
               deliveredPickupJobs.map((item) => {
                 const isExp = expandedId === item.id;
-                const handleCopy = () => {
+                const getPickupRouteSegments = async () => {
+                  const segments: Array<{ label: string; distanceKm: number | null }> = [];
+                  const hasMe = hasValidCoordinates(myInfo?.lat, myInfo?.lng);
+                  const hasFarmer = hasValidCoordinates(item.pickup_lat, item.pickup_lng);
+                  const hasFactory = hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng);
+                  if (hasMe && hasFarmer) {
+                    const km = await fetchRoadDistanceKm(myInfo!.lat!, myInfo!.lng!, item.pickup_lat!, item.pickup_lng!);
+                    segments.push({ label: 'ฉัน → จุดรับวัสดุ (เกษตรกร)', distanceKm: km });
+                  }
+                  if (hasFarmer && hasFactory) {
+                    const km = await fetchRoadDistanceKm(item.pickup_lat!, item.pickup_lng!, item.destination_factory_lat!, item.destination_factory_lng!);
+                    segments.push({ label: `จุดรับวัสดุ → ${item.destination_factory_name_th ?? 'โรงงาน'}`, distanceKm: km });
+                  }
+                  return segments;
+                };
+                const handleCopy = async () => {
+                  setCopyLoadingId(item.id);
+                  const segments = await getPickupRouteSegments();
+                  setCopyLoadingId(null);
+                  const totalKm = segments.filter(s => s.distanceKm !== null).reduce((sum, s) => sum + (s.distanceKm ?? 0), 0);
+                  const hasDistance = segments.length > 0;
                   const lines = [
                     `[ใบรับวัสดุ AREX] เลขที่ ${item.id.slice(0, 8).toUpperCase()}`,
                     `สถานะ: ส่งถึงโรงงานแล้ว`,
@@ -429,6 +459,10 @@ export default function LogisticsHistory() {
                     item.destination_factory_name_th ? `โรงงานปลายทาง: ${item.destination_factory_name_th}` : null,
                     item.destination_factory_location_text ? `ที่อยู่โรงงาน: ${item.destination_factory_location_text}` : null,
                     hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng) ? `แผนที่โรงงาน: ${buildGoogleMapsUrl(item.destination_factory_lat as number, item.destination_factory_lng as number)}` : null,
+                    hasDistance ? `` : null,
+                    hasDistance ? `--- ระยะทาง (ทางถนน) ---` : null,
+                    ...segments.map(s => s.distanceKm !== null ? `${s.label}: ${s.distanceKm.toFixed(1)} กม.` : `${s.label}: ไม่สามารถคำนวณได้`),
+                    hasDistance && segments.filter(s => s.distanceKm !== null).length > 1 ? `รวม: ${totalKm.toFixed(1)} กม.` : null,
                   ].filter((l) => l !== null).join('\n');
                   void copyToClipboard(lines).then(() => { setCopiedId(item.id); setTimeout(() => setCopiedId(null), 1500); });
                 };
@@ -440,50 +474,37 @@ export default function LogisticsHistory() {
                       accent="emerald"
                       expandedContent={null}
                     >
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         {/* Row 1: name + route + status */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <p className="text-[15px] font-bold text-on-surface leading-tight truncate">
-                              {item.material_name_th || formatMaterial(item.material_type)}
-                            </p>
-                            {hasValidCoordinates(myInfo?.lat, myInfo?.lng) && hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                              <RouteButton onClick={() => setRouteModal({ title: 'เส้นทางรับ-ส่งวัสดุ', stops: [
-                                { label: 'ฉัน (คลังโลจิสติกส์)', sublabel: null, lat: myInfo!.lat!, lng: myInfo!.lng!, icon: 'me' },
-                                { label: 'เกษตรกร (จุดรับวัสดุ)', sublabel: item.pickup_location_text, lat: item.pickup_lat!, lng: item.pickup_lng!, icon: 'farmer' },
-                                ...(hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng) ? [{ label: `โรงงาน (${item.destination_factory_name_th ?? 'ปลายทาง'})`, sublabel: item.destination_factory_location_text ?? null, lat: item.destination_factory_lat!, lng: item.destination_factory_lng!, icon: 'factory' as const }] : []),
-                              ] })} />
-                            )}
-                          </div>
-                          <StatusBadge status={item.status} label="ส่งถึงโรงงานแล้ว" size="sm" />
-                        </div>
-                        {/* Row 2: qty + date + factory chips */}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                            {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
-                          </span>
-                          <span className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
-                            <CalendarRange className="h-3 w-3 text-stone-400" />
-                            นัดรับ {formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}
-                          </span>
-                          {item.destination_factory_name_th && (
-                            <span className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
-                              <Factory className="h-3 w-3 text-stone-400" />
-                              {item.destination_factory_name_th}
-                            </span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="text-sm font-semibold text-on-surface leading-tight truncate">
+                            {item.material_name_th || formatMaterial(item.material_type)}
+                          </p>
+                          {hasValidCoordinates(myInfo?.lat, myInfo?.lng) && hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                            <RouteButton onClick={() => setRouteModal({ title: 'เส้นทางรับ-ส่งวัสดุ', stops: [
+                              { label: 'ฉัน (คลังโลจิสติกส์)', sublabel: null, lat: myInfo!.lat!, lng: myInfo!.lng!, icon: 'me' },
+                              { label: 'เกษตรกร (จุดรับวัสดุ)', sublabel: item.pickup_location_text, lat: item.pickup_lat!, lng: item.pickup_lng!, icon: 'farmer' },
+                              ...(hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng) ? [{ label: `โรงงาน (${item.destination_factory_name_th ?? 'ปลายทาง'})`, sublabel: item.destination_factory_location_text ?? null, lat: item.destination_factory_lat!, lng: item.destination_factory_lng!, icon: 'factory' as const }] : []),
+                            ] })} />
                           )}
+                          <span className="ml-auto shrink-0"><StatusBadge status={item.status} label="ส่งถึงโรงงานแล้ว" size="sm" /></span>
                         </div>
-                        {/* Row 3: farmer + location (dimmed) + copy/pdf */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-stone-400 min-w-0">
+                        {/* Row 2: all meta + actions inline */}
+                        <div className="flex items-center gap-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400 min-w-0 flex-1">
+                            <span className="font-bold text-emerald-700">{Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</span>
+                            <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดรับ {formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}</span>
+                            {item.destination_factory_name_th && (
+                              <span className="flex items-center gap-0.5"><Factory className="h-3 w-3" />{item.destination_factory_name_th}</span>
+                            )}
                             {item.farmer_display_name && (
-                              <span className="flex items-center gap-1">
+                              <span className="flex items-center gap-0.5">
                                 <User className="h-3 w-3" />{item.farmer_display_name}
                                 {item.farmer_phone && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{item.farmer_phone}</span>}
                               </span>
                             )}
                             {item.pickup_location_text && (
-                              <span className="flex items-center gap-1 min-w-0">
+                              <span className="flex items-center gap-0.5 min-w-0">
                                 <MapPin className="h-3 w-3 shrink-0" />
                                 <span className="truncate">{item.pickup_location_text}</span>
                                 {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
@@ -493,14 +514,16 @@ export default function LogisticsHistory() {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <button type="button" onClick={handleCopy} disabled={copiedId === item.id}
-                              className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40 transition-colors">
-                              {copiedId === item.id ? <CheckCheck className="h-4 w-4 text-emerald-500" /> : <ClipboardCopy className="h-4 w-4" />}
+                          <div className="flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <button type="button" onClick={copyLoadingId === item.id || copiedId === item.id ? undefined : handleCopy}
+                              disabled={copyLoadingId === item.id || copiedId === item.id}
+                              className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40 transition-colors">
+                              {copyLoadingId === item.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : copiedId === item.id ? <CheckCheck className="h-3.5 w-3.5 text-emerald-500" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
                             </button>
-                            <button type="button" onClick={() => generatePickupJobPdf(item)}
-                              className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors">
-                              <Download className="h-4 w-4" />
+                            <button type="button" disabled={pdfLoadingId === item.id}
+                              onClick={pdfLoadingId === item.id ? undefined : () => { setPdfLoadingId(item.id); void getPickupRouteSegments().then(segs => { generatePickupJobPdf(item, segs); setPdfLoadingId(null); }); }}
+                              className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40 transition-colors">
+                              {pdfLoadingId === item.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                             </button>
                           </div>
                         </div>
@@ -515,7 +538,7 @@ export default function LogisticsHistory() {
 
         {/* ── Reward delivery history ── */}
         {activeTab === 'reward' && (
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {!isLoading && completedDeliveryJobs.length > 0 && (
               <SortHeaderBar
                 cols={[
@@ -533,7 +556,21 @@ export default function LogisticsHistory() {
             ) : (
               completedDeliveryJobs.map((item) => {
                 const isExp = expandedId === item.id;
-                const handleCopy = () => {
+                const getDeliveryRouteSegments = async () => {
+                  const segments: Array<{ label: string; distanceKm: number | null }> = [];
+                  const hasMe = hasValidCoordinates(myInfo?.lat, myInfo?.lng);
+                  const hasFarmer = hasValidCoordinates(item.pickup_lat, item.pickup_lng);
+                  if (hasMe && hasFarmer) {
+                    const km = await fetchRoadDistanceKm(myInfo!.lat!, myInfo!.lng!, item.pickup_lat!, item.pickup_lng!);
+                    segments.push({ label: 'ฉัน → จุดส่งมอบ (เกษตรกร)', distanceKm: km });
+                  }
+                  return segments;
+                };
+                const handleCopy = async () => {
+                  setCopyLoadingId(item.id);
+                  const segments = await getDeliveryRouteSegments();
+                  setCopyLoadingId(null);
+                  const hasDistance = segments.length > 0;
                   const lines = [
                     `[ใบส่งรางวัล AREX] เลขที่ ${item.id.slice(0, 8).toUpperCase()}`,
                     `สถานะ: ส่งมอบสำเร็จ`,
@@ -546,6 +583,9 @@ export default function LogisticsHistory() {
                     `จุดส่งมอบ: ${item.pickup_location_text || '-'}`,
                     hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? `แผนที่จุดส่ง: ${buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}` : null,
                     `วันนัดส่ง: ${formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}`,
+                    hasDistance ? `` : null,
+                    hasDistance ? `--- ระยะทาง (ทางถนน) ---` : null,
+                    ...segments.map(s => s.distanceKm !== null ? `${s.label}: ${s.distanceKm.toFixed(1)} กม.` : `${s.label}: ไม่สามารถคำนวณได้`),
                   ].filter((l) => l !== null).join('\n');
                   void copyToClipboard(lines).then(() => { setCopiedId(item.id); setTimeout(() => setCopiedId(null), 1500); });
                 };
@@ -557,43 +597,33 @@ export default function LogisticsHistory() {
                       accent="violet"
                       expandedContent={null}
                     >
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         {/* Row 1: name + route + status */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <p className="text-[15px] font-bold text-on-surface leading-tight truncate">
-                              {item.reward_name_th ?? 'รางวัล'}
-                            </p>
-                            {hasValidCoordinates(myInfo?.lat, myInfo?.lng) && hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                              <RouteButton onClick={() => setRouteModal({ title: 'เส้นทางส่งรางวัล', stops: [
-                                { label: 'ฉัน (คลังโลจิสติกส์)', sublabel: null, lat: myInfo!.lat!, lng: myInfo!.lng!, icon: 'me' },
-                                { label: 'เกษตรกร (จุดส่งรางวัล)', sublabel: item.pickup_location_text, lat: item.pickup_lat!, lng: item.pickup_lng!, icon: 'farmer' },
-                              ] })} />
-                            )}
-                          </div>
-                          <StatusBadge status={item.status} label="ส่งมอบสำเร็จ" size="sm" />
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="text-sm font-semibold text-on-surface leading-tight truncate">
+                            {item.reward_name_th ?? 'รางวัล'}
+                          </p>
+                          {hasValidCoordinates(myInfo?.lat, myInfo?.lng) && hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                            <RouteButton onClick={() => setRouteModal({ title: 'เส้นทางส่งรางวัล', stops: [
+                              { label: 'ฉัน (คลังโลจิสติกส์)', sublabel: null, lat: myInfo!.lat!, lng: myInfo!.lng!, icon: 'me' },
+                              { label: 'เกษตรกร (จุดส่งรางวัล)', sublabel: item.pickup_location_text, lat: item.pickup_lat!, lng: item.pickup_lng!, icon: 'farmer' },
+                            ] })} />
+                          )}
+                          <span className="ml-auto shrink-0"><StatusBadge status={item.status} label="ส่งมอบสำเร็จ" size="sm" /></span>
                         </div>
-                        {/* Row 2: qty + date chips */}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-md bg-violet-50 px-2 py-0.5 text-xs font-bold text-violet-700">
-                            {Number(item.quantity).toLocaleString('th-TH')} ชิ้น
-                          </span>
-                          <span className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
-                            <CalendarRange className="h-3 w-3 text-stone-400" />
-                            นัดส่ง {formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}
-                          </span>
-                        </div>
-                        {/* Row 3: farmer + location (dimmed) + copy/pdf */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-stone-400 min-w-0">
+                        {/* Row 2: all meta + actions inline */}
+                        <div className="flex items-center gap-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400 min-w-0 flex-1">
+                            <span className="font-bold text-violet-700">{Number(item.quantity).toLocaleString('th-TH')} ชิ้น</span>
+                            <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดส่ง {formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}</span>
                             {item.farmer_display_name && (
-                              <span className="flex items-center gap-1">
+                              <span className="flex items-center gap-0.5">
                                 <User className="h-3 w-3" />{item.farmer_display_name}
                                 {item.farmer_phone && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{item.farmer_phone}</span>}
                               </span>
                             )}
                             {item.pickup_location_text && (
-                              <span className="flex items-center gap-1 min-w-0">
+                              <span className="flex items-center gap-0.5 min-w-0">
                                 <MapPin className="h-3 w-3 shrink-0" />
                                 <span className="truncate">{item.pickup_location_text}</span>
                                 {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
@@ -603,14 +633,16 @@ export default function LogisticsHistory() {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <button type="button" onClick={handleCopy} disabled={copiedId === item.id}
-                              className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40 transition-colors">
-                              {copiedId === item.id ? <CheckCheck className="h-4 w-4 text-emerald-500" /> : <ClipboardCopy className="h-4 w-4" />}
+                          <div className="flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <button type="button" onClick={copyLoadingId === item.id || copiedId === item.id ? undefined : handleCopy}
+                              disabled={copyLoadingId === item.id || copiedId === item.id}
+                              className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40 transition-colors">
+                              {copyLoadingId === item.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : copiedId === item.id ? <CheckCheck className="h-3.5 w-3.5 text-emerald-500" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
                             </button>
-                            <button type="button" onClick={() => generateDeliveryJobPdf(item)}
-                              className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors">
-                              <Download className="h-4 w-4" />
+                            <button type="button" disabled={pdfLoadingId === item.id}
+                              onClick={pdfLoadingId === item.id ? undefined : () => { setPdfLoadingId(item.id); void getDeliveryRouteSegments().then(segs => { generateDeliveryJobPdf(item, segs); setPdfLoadingId(null); }); }}
+                              className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-40 transition-colors">
+                              {pdfLoadingId === item.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                             </button>
                           </div>
                         </div>
