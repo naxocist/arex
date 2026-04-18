@@ -12,6 +12,7 @@ import {
   Factory,
   Gift,
   MapPin,
+  Navigation,
   Phone,
   RefreshCw,
   Truck,
@@ -26,9 +27,11 @@ import { generatePickupJobPdf, generateDeliveryJobPdf } from '@/app/_lib/pdfGene
 import {
   ApiError,
   logisticsApi,
+  type LogisticsInfoItem,
   type LogisticsPickupJobItem,
   type LogisticsRewardDeliveryJobItem,
 } from '@/app/_lib/api';
+import { fetchRoadDistanceKm, formatKm, buildGoogleMapsDirectionsUrl } from '@/app/_lib/geo';
 
 function hasAccessToken(): boolean {
   if (typeof window === 'undefined') return false;
@@ -168,10 +171,104 @@ function SortHeaderBar<T extends string>({
   );
 }
 
+interface RouteStop { label: string; sublabel?: string | null; lat: number; lng: number; icon: 'me' | 'farmer' | 'factory' }
+
+function RouteModal({ stops, title, onClose }: { stops: RouteStop[]; title: string; onClose: () => void }) {
+  const [distances, setDistances] = React.useState<(number | null)[]>([]);
+
+  React.useEffect(() => {
+    const pairs = stops.slice(0, -1).map((s, i) =>
+      fetchRoadDistanceKm(s.lat, s.lng, stops[i + 1].lat, stops[i + 1].lng)
+    );
+    Promise.all(pairs).then(setDistances);
+  }, [stops]);
+
+  const total = distances.length > 0 && distances.every((d) => d !== null)
+    ? distances.reduce<number>((sum, d) => sum + (d ?? 0), 0)
+    : null;
+
+  const iconEl = (icon: RouteStop['icon']) => {
+    if (icon === 'me') return <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary"><User className="h-4 w-4" /></div>;
+    if (icon === 'farmer') return <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-700"><MapPin className="h-4 w-4" /></div>;
+    return <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-sky-700"><Factory className="h-4 w-4" /></div>;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="relative w-full max-w-sm rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Navigation className="h-4 w-4 text-primary" />
+            <span className="font-semibold text-on-surface text-sm">{title}</span>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 transition-colors">
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-0">
+          {stops.map((stop, i) => (
+            <div key={i}>
+              <div className="flex items-start gap-3">
+                {iconEl(stop.icon)}
+                <div className="flex-1 pt-1.5 min-w-0">
+                  <p className="text-sm font-semibold text-on-surface leading-tight">{stop.label}</p>
+                  {stop.sublabel && <p className="text-xs text-stone-400 truncate mt-0.5">{stop.sublabel}</p>}
+                </div>
+              </div>
+              {i < stops.length - 1 && (
+                <div className="flex items-stretch gap-3 my-0.5">
+                  <div className="flex w-9 justify-center"><div className="w-px flex-1 bg-stone-200" /></div>
+                  <div className="flex flex-1 items-center gap-2 py-1.5">
+                    {distances[i] !== undefined ? (
+                      distances[i] !== null ? (
+                        <>
+                          <span className="text-xs font-bold text-stone-700">{formatKm(distances[i]!)}</span>
+                          <span className="text-xs text-stone-400">ทางถนน</span>
+                          <a href={buildGoogleMapsDirectionsUrl(stop.lat, stop.lng, stops[i + 1].lat, stops[i + 1].lng)}
+                            target="_blank" rel="noopener noreferrer"
+                            className="ml-auto flex items-center gap-1 text-xs text-primary hover:underline shrink-0">
+                            <Navigation className="h-3 w-3" />เส้นทาง
+                          </a>
+                        </>
+                      ) : <span className="text-xs text-stone-400">ไม่สามารถคำนวณได้</span>
+                    ) : <span className="text-xs text-stone-400 animate-pulse">กำลังคำนวณ...</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        {total !== null && (
+          <div className="border-t border-stone-100 mx-5 py-3 flex items-center justify-between">
+            <span className="text-xs font-medium text-stone-500">ระยะทางรวม</span>
+            <span className="text-sm font-bold text-primary">{formatKm(total)}</span>
+          </div>
+        )}
+        <div className="h-2" />
+      </div>
+    </div>
+  );
+}
+
+function RouteButton({ onClick }: { onClick: () => void }) {
+  return (
+    <div role="button" tabIndex={0}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onClick(); } }}
+      className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-500 hover:bg-primary/10 hover:text-primary transition-colors shrink-0 cursor-pointer">
+      <Navigation className="h-3 w-3" />
+      ระยะทาง
+    </div>
+  );
+}
+
 export default function LogisticsHistory() {
   const reduceMotion = useReducedMotion();
   const [pickupJobs, setPickupJobs] = useState<LogisticsPickupJobItem[]>([]);
   const [deliveryJobs, setDeliveryJobs] = useState<LogisticsRewardDeliveryJobItem[]>([]);
+  const [myInfo, setMyInfo] = useState<LogisticsInfoItem | null>(null);
+  const [routeModal, setRouteModal] = useState<{ title: string; stops: RouteStop[] } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -218,12 +315,14 @@ export default function LogisticsHistory() {
     setIsLoading(true);
     setError(null);
     try {
-      const [pickupRes, deliveryRes] = await Promise.allSettled([
+      const [pickupRes, deliveryRes, myInfoRes] = await Promise.allSettled([
         logisticsApi.getPickupJobs({ forceRefresh }),
         logisticsApi.getRewardDeliveryJobs({ forceRefresh }),
+        logisticsApi.getMyInfo({ forceRefresh }),
       ]);
       if (pickupRes.status === 'fulfilled') setPickupJobs(pickupRes.value.jobs);
       if (deliveryRes.status === 'fulfilled') setDeliveryJobs(deliveryRes.value.jobs);
+      if (myInfoRes.status === 'fulfilled') setMyInfo(myInfoRes.value);
       if (pickupRes.status === 'rejected' && deliveryRes.status === 'rejected') {
         const e = pickupRes.reason;
         setError(e instanceof ApiError ? `โหลดข้อมูลไม่สำเร็จ: ${e.message}` : 'โหลดข้อมูลไม่สำเร็จ');
@@ -242,6 +341,7 @@ export default function LogisticsHistory() {
 
   return (
     <ErrorBoundary>
+      {routeModal && <RouteModal title={routeModal.title} stops={routeModal.stops} onClose={() => setRouteModal(null)} />}
       <div className="space-y-6 pb-10">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
@@ -341,11 +441,20 @@ export default function LogisticsHistory() {
                       expandedContent={null}
                     >
                       <div className="space-y-2">
-                        {/* Row 1: name + status */}
+                        {/* Row 1: name + route + status */}
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-[15px] font-bold text-on-surface leading-tight truncate">
-                            {item.material_name_th || formatMaterial(item.material_type)}
-                          </p>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className="text-[15px] font-bold text-on-surface leading-tight truncate">
+                              {item.material_name_th || formatMaterial(item.material_type)}
+                            </p>
+                            {hasValidCoordinates(myInfo?.lat, myInfo?.lng) && hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                              <RouteButton onClick={() => setRouteModal({ title: 'เส้นทางรับ-ส่งวัสดุ', stops: [
+                                { label: 'ฉัน (คลังโลจิสติกส์)', sublabel: null, lat: myInfo!.lat!, lng: myInfo!.lng!, icon: 'me' },
+                                { label: 'เกษตรกร (จุดรับวัสดุ)', sublabel: item.pickup_location_text, lat: item.pickup_lat!, lng: item.pickup_lng!, icon: 'farmer' },
+                                ...(hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng) ? [{ label: `โรงงาน (${item.destination_factory_name_th ?? 'ปลายทาง'})`, sublabel: item.destination_factory_location_text ?? null, lat: item.destination_factory_lat!, lng: item.destination_factory_lng!, icon: 'factory' as const }] : []),
+                              ] })} />
+                            )}
+                          </div>
                           <StatusBadge status={item.status} label="ส่งถึงโรงงานแล้ว" size="sm" />
                         </div>
                         {/* Row 2: qty + date + factory chips */}
@@ -449,11 +558,19 @@ export default function LogisticsHistory() {
                       expandedContent={null}
                     >
                       <div className="space-y-2">
-                        {/* Row 1: name + status */}
+                        {/* Row 1: name + route + status */}
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-[15px] font-bold text-on-surface leading-tight truncate">
-                            {item.reward_name_th ?? 'รางวัล'}
-                          </p>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className="text-[15px] font-bold text-on-surface leading-tight truncate">
+                              {item.reward_name_th ?? 'รางวัล'}
+                            </p>
+                            {hasValidCoordinates(myInfo?.lat, myInfo?.lng) && hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                              <RouteButton onClick={() => setRouteModal({ title: 'เส้นทางส่งรางวัล', stops: [
+                                { label: 'ฉัน (คลังโลจิสติกส์)', sublabel: null, lat: myInfo!.lat!, lng: myInfo!.lng!, icon: 'me' },
+                                { label: 'เกษตรกร (จุดส่งรางวัล)', sublabel: item.pickup_location_text, lat: item.pickup_lat!, lng: item.pickup_lng!, icon: 'farmer' },
+                              ] })} />
+                            )}
+                          </div>
                           <StatusBadge status={item.status} label="ส่งมอบสำเร็จ" size="sm" />
                         </div>
                         {/* Row 2: qty + date chips */}

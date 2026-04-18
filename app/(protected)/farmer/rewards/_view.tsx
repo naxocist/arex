@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
+  ArrowLeft,
   CheckCheck,
   ChevronDown,
   Clock3,
@@ -185,6 +186,7 @@ export default function FarmerRewards() {
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean; title: string; message: string; fields?: { label: string; value: string }[]; onConfirm: () => void;
+    _back?: { reward: FarmerRewardItem; locationText: string; lat: number | null; lng: number | null };
   }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
   const [locationPicker, setLocationPicker] = useState<{
@@ -264,6 +266,7 @@ export default function FarmerRewards() {
         { label: 'แต้มคงเหลือหลังแลก', value: `${after.toLocaleString('th-TH')} PMUC Coin` },
         { label: 'สถานที่รับ', value: locationText || '(ไม่ระบุ)' },
       ],
+      _back: { reward, locationText, lat, lng },
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, open: false }));
         await submitRewardRequest(reward, rewardQty, locationText, lat, lng);
@@ -712,8 +715,6 @@ export default function FarmerRewards() {
           const stock = Number(reward.stock_qty) || 0;
           const outOfStock = stock <= 0;
           const unavailable = !reward.active || outOfStock;
-          const insufficient = availablePoints < pts * rewardQty;
-          const canApply = !insufficient && !unavailable;
           return (
             <>
               <motion.div
@@ -757,7 +758,7 @@ export default function FarmerRewards() {
                     <X className="h-5 w-5" />
                   </button>
                   {/* Insufficient overlay badge */}
-                  {insufficient && !unavailable && (
+                  {availablePoints < pts * rewardQty && !unavailable && (
                     <div className="absolute bottom-3 left-4 rounded-full bg-red-500/90 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
                       แต้มไม่พอ — ขาดอีก {(pts * rewardQty - availablePoints).toLocaleString('th-TH')} แต้ม
                     </div>
@@ -784,7 +785,6 @@ export default function FarmerRewards() {
                     const afterBalance = availablePoints - totalCost;
                     const insufficientQty = afterBalance < 0;
                     const maxQty = outOfStock ? 0 : Math.min(10, stock, pts > 0 && availablePoints > 0 ? Math.floor(availablePoints / pts) : 0);
-                    const canBuy = !unavailable && !insufficientQty && rewardQty >= 1;
                     return (
                       <div className="space-y-3">
                         {/* Quantity picker */}
@@ -867,7 +867,11 @@ export default function FarmerRewards() {
         confirmLabel="ยืนยัน"
         cancelLabel="ยกเลิก"
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+        onCancel={() => {
+          const back = confirmDialog._back;
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+          if (back) setLocationPicker({ open: true, reward: back.reward, locationText: back.locationText, lat: back.lat, lng: back.lng });
+        }}
       />
 
       {/* ── Location picker bottom sheet ── */}
@@ -891,9 +895,18 @@ export default function FarmerRewards() {
               transition={{ type: 'spring', stiffness: 320, damping: 34 }}
             >
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-100 bg-white px-5 py-4">
-                <div>
-                  <p className="text-base font-bold text-stone-900">ระบุสถานที่รับของรางวัล</p>
-                  <p className="text-xs text-stone-400">{locationPicker.reward?.name_th}</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null }); setSelectedReward(locationPicker.reward); }}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-500"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <div>
+                    <p className="text-base font-bold text-stone-900">ระบุสถานที่รับของรางวัล</p>
+                    <p className="text-xs text-stone-400">{locationPicker.reward?.name_th} · {rewardQty} ชิ้น</p>
+                  </div>
                 </div>
                 <button
                   type="button"
