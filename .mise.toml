@@ -71,7 +71,7 @@ run = "mise run db:dump:auth && mise run db:dump:public"
 
 [tasks."dev:up"]
 description = "Start Supabase and app containers"
-run = "supabase start --workdir backend && docker compose up --build --watch"
+run = "supabase start --workdir backend && docker compose up --build -d && docker compose watch"
 
 [tasks."dev:down"]
 description = "Stop app containers and Supabase"
