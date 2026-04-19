@@ -1,72 +1,34 @@
-# AREX Monorepo
+# PMUC Zero Burn to Earn
 
-This repository is a monorepo:
+A supply-chain platform that turns agricultural residue (rice straw, orchard waste, plastic) into PMUC coins — connecting farmers, logistics teams, factories, warehouses, and executives in a points-based circular economy.
 
-- Frontend (React + Vite): repository root
-- Backend (FastAPI): `backend/`
-- Supabase schema/migrations: `backend/supabase/`
+Farmers earn coins when factories confirm the weight of collected material. Coins can be redeemed for rewards delivered by logistics. Executives configure material types, point rates, and the rewards catalog.
 
-## Prerequisites
+---
 
-- `mise` installed
-- Docker Desktop (or compatible Docker runtime)
-- Supabase CLI installed (or managed by `mise`)
+## Stack
 
-## Environment Setup
+| Layer | Tech |
+|---|---|
+| Frontend | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 |
+| Backend | FastAPI (Python 3.11) · Pydantic v2 · supabase-py |
+| Database | Supabase (PostgreSQL) · RLS on all tables |
+| Dev tooling | mise · Docker Compose with watch |
+| Frontend deploy | Vercel (auto on push) |
+| Backend deploy | GCP Cloud Run via GitHub Actions |
 
-### Frontend env
+## Quick Start
 
-```bash
-cp .env.example .env.local
-```
-
-Set `VITE_API_BASE_URL` to your backend URL.
-
-### Backend env
+**Prerequisites:** `mise`, Docker Desktop
 
 ```bash
-cp backend/.env.example backend/.env
+mise run setup     # install deps (npm + uv)
+mise run dev:up    # start Supabase + containers with hot reload
 ```
 
-For local Supabase with backend running in Docker:
+Local URLs: frontend `http://localhost:3000` · API `http://localhost:8000/api/v1` · Supabase Studio `http://127.0.0.1:54323`
 
-- `SUPABASE_URL=http://host.docker.internal:54321`
-- keys come from `mise run db:status`
-
-## One-command Developer Workflow
-
-All common operations are exposed as `mise` tasks:
-
-- `mise run setup` - install frontend and backend dependencies
-- `mise run dev:up` - start Supabase local stack + backend/frontend containers
-- `mise run dev:down` - stop containers and Supabase stack
-- `mise run db:status` - print local Supabase endpoints and keys
-- `mise run db:reset` - reset and migrate local database
-- `mise run db:migrate:new -- feature_name` - create a migration file
-- `mise run logs:frontend` / `mise run logs:backend` - tail service logs
-- `mise run check` - run frontend type-check and backend compile checks
-
-## Local URLs
-
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:8000/api/v1`
-- Supabase API: `http://localhost:54321`
-- Supabase Studio: `http://127.0.0.1:54323`
-
-## Deployment Targets
-
-- Frontend: Vercel
-- Backend: Google Cloud Run
-
-Manual deployment:
-
-- Frontend: use Vercel CLI or Vercel dashboard
-- Backend: `gcloud builds submit backend --config backend/cloudbuild.yaml`
-
-Frontend production env on Vercel:
-
-- `VITE_API_BASE_URL=https://<your-cloud-run-domain>/api/v1`
-
-Backend production env on Cloud Run is set by `backend/cloudbuild.yaml` (`--set-env-vars` + `--set-secrets`).
-
-See `backend/README.md` for backend runtime details and `backend/supabase/README.md` for database/auth workflows.
+Reset DB + seed demo data:
+```bash
+mise run db:reset
+```
