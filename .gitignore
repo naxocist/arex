@@ -4,6 +4,7 @@ build/
 dist/
 .next/
 coverage/
+tsconfig.tsbuildinfo
 
 
 # Logs
@@ -43,7 +44,8 @@ venv/
 # Supabase local state and dumps
 backend/supabase/.branches/
 backend/supabase/.temp/
-backend/supabase/dumps/*.sql
+backend/supabase/dumps/
+backend/supabase/snippets/
 
-# Production seed contains real passwords — never commit
+# Production seed
 backend/supabase/seeds/seed.prod.sql
