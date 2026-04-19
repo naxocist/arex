@@ -465,7 +465,7 @@ export default function FarmerHome() {
                           {/* Row 4: pickup window (when scheduled/in-transit) */}
                           {showPickupDate && (
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200 px-3 py-1 text-xs font-semibold text-sky-700">
-                              📅 นัดรับ {pickupWindow}
+                              🗒 นัดรับ {pickupWindow}
                             </span>
                           )}
 

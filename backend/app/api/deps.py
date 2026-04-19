@@ -9,6 +9,9 @@ from app.models.auth import AuthenticatedUser, Role
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+_MAX_TOKEN_LENGTH = 4096
+
+
 def get_bearer_token(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> str:
@@ -16,6 +19,11 @@ def get_bearer_token(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing bearer token",
+        )
+    if len(credentials.credentials) > _MAX_TOKEN_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
         )
     return credentials.credentials
 
