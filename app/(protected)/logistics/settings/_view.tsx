@@ -8,6 +8,7 @@ import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
 import { ApiError, logisticsApi } from '@/app/_lib/api';
+import { clearApiCache } from '@/app/_lib/api/core';
 
 function hasAccessToken(): boolean {
   if (typeof window === 'undefined') return false;
@@ -78,6 +79,7 @@ export default function LogisticsSettings() {
         lat: typeof updated.lat === 'number' ? updated.lat : null,
         lng: typeof updated.lng === 'number' ? updated.lng : null,
       });
+      clearApiCache();
       setMessage('บันทึกข้อมูลทีมขนส่งสำเร็จแล้ว');
     } catch (error) {
       setMessage(error instanceof ApiError ? `บันทึกไม่สำเร็จ: ${error.message}` : 'บันทึกไม่สำเร็จ');

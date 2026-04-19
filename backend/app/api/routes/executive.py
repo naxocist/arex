@@ -6,7 +6,6 @@ from app.api.deps import require_roles
 from app.core.errors import WorkflowError
 from app.models.auth import AuthenticatedUser, Role
 from app.models.workflow import (
-    UpsertMaterialPointRuleRequest,
     UpsertMaterialTypeRequest,
     UpsertMeasurementUnitRequest,
 )
@@ -158,47 +157,6 @@ def update_measurement_unit(
         ) from exc
 
 
-@router.get("/material-point-rules")
-def list_material_point_rules(
-    current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
-    ),
-    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
-) -> dict[str, Any]:
-    try:
-        rules = workflow_service.list_material_point_rules()
-        return {
-            "rules": rules,
-            "formula": "max(floor(weight_kg * points_per_kg), 1)",
-            "actor": current_user.role.value,
-        }
-    except WorkflowError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
-
-
-@router.put("/material-point-rules/{material_code}")
-def upsert_material_point_rule(
-    material_code: str,
-    payload: UpsertMaterialPointRuleRequest,
-    current_user: AuthenticatedUser = Depends(
-        require_roles(Role.EXECUTIVE, Role.FACTORY, Role.ADMIN)
-    ),
-    workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
-) -> dict[str, Any]:
-    try:
-        rule = workflow_service.upsert_material_point_rule(material_code, payload)
-        return {
-            "message": "Material point rule updated",
-            "rule": rule,
-            "actor": current_user.role.value,
-        }
-    except WorkflowError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
-
 
 @router.get("/rewards")
 def list_rewards(
@@ -208,7 +166,7 @@ def list_rewards(
     workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
     try:
-        rewards = workflow_service.list_all_rewards_catalog()
+        rewards = workflow_service.list_all_rewards()
         return {
             "rewards": rewards,
             "actor": current_user.role.value,

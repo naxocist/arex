@@ -11,7 +11,6 @@ import {
   executiveApi,
   uploadRewardImage,
   deleteRewardImage,
-  type ExecutiveMaterialPointRuleItem,
   type ExecutiveMaterialTypeItem,
   type ExecutiveMeasurementUnitItem,
   type FarmerRewardItem,
@@ -34,28 +33,24 @@ interface UnitDraftRow {
 }
 
 interface NewMaterialDraft {
-  code: string;
   name_th: string;
   active: boolean;
   points_per_kg: string;
 }
 
 interface NewUnitDraft {
-  code: string;
   name_th: string;
   to_kg_factor: string;
   active: boolean;
 }
 
 const defaultNewMaterial: NewMaterialDraft = {
-  code: '',
   name_th: '',
   active: true,
   points_per_kg: '',
 };
 
 const defaultNewUnit: NewUnitDraft = {
-  code: '',
   name_th: '',
   to_kg_factor: '',
   active: true,
@@ -103,20 +98,13 @@ function parsePositiveNumber(value: string, errorMessage: string): number {
   return parsedValue;
 }
 
-function mergeMaterialRows(
-  materials: ExecutiveMaterialTypeItem[],
-  pointRules: ExecutiveMaterialPointRuleItem[],
-): MaterialDraftRow[] {
-  const pointsByMaterial = new Map(
-    pointRules.map((rule) => [rule.material_type, rule.points_per_kg === null ? '' : String(rule.points_per_kg)]),
-  );
-
+function mergeMaterialRows(materials: ExecutiveMaterialTypeItem[]): MaterialDraftRow[] {
   return materials.map((item) => ({
     originalCode: item.code,
     code: item.code,
     name_th: item.name_th,
     active: item.active,
-    points_per_kg: pointsByMaterial.get(item.code) ?? '',
+    points_per_kg: item.points_per_kg === null ? '' : String(item.points_per_kg),
   }));
 }
 
@@ -145,21 +133,13 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
   const loadConfiguration = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      const requests: Promise<unknown>[] = [
+      const [materialResponse, unitResponse, rewardResponse] = await Promise.all([
         executiveApi.listMaterialTypes({ forceRefresh }),
         executiveApi.listMeasurementUnits({ forceRefresh }),
-        executiveApi.listMaterialPointRules({ forceRefresh }),
         executiveApi.listRewards({ forceRefresh }),
-      ];
-      const [materialResponse, unitResponse, pointRuleResponse, rewardResponse] =
-        await Promise.all(requests) as [
-          Awaited<ReturnType<typeof executiveApi.listMaterialTypes>>,
-          Awaited<ReturnType<typeof executiveApi.listMeasurementUnits>>,
-          Awaited<ReturnType<typeof executiveApi.listMaterialPointRules>>,
-          Awaited<ReturnType<typeof executiveApi.listRewards>> | undefined,
-        ];
+      ]);
 
-      setMaterialRows(mergeMaterialRows(materialResponse.material_types, pointRuleResponse.rules));
+      setMaterialRows(mergeMaterialRows(materialResponse.material_types));
       setUnitRows(
         unitResponse.units.map((item: ExecutiveMeasurementUnitItem) => ({
           originalCode: item.code,
@@ -169,7 +149,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
           active: item.active,
         })),
       );
-      if (rewardResponse) {
+      if (rewardResponse?.rewards) {
         setRewardRows(
           rewardResponse.rewards.map((item: FarmerRewardItem) => ({
             id: item.id,
@@ -208,10 +188,9 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
   };
 
   const handleCreateMaterial = async () => {
-    const code = newMaterial.code.trim();
     const name = newMaterial.name_th.trim();
-    if (!code || !name) {
-      setMessage('กรุณาระบุรหัสและชื่อประเภทวัสดุให้ครบ');
+    if (!name) {
+      setMessage('กรุณาระบุชื่อประเภทวัสดุ');
       return;
     }
 
@@ -219,11 +198,8 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
       const pointsPerKg = parsePositiveNumber(newMaterial.points_per_kg, 'กรุณาระบุแต้มต่อกิโลกรัมให้เป็นตัวเลขมากกว่า 0');
       setSavingKey('material:new');
       await executiveApi.createMaterialType({
-        code,
         name_th: name,
         active: newMaterial.active,
-      });
-      await executiveApi.upsertMaterialPointRule(code, {
         points_per_kg: pointsPerKg,
       });
       setIsAddingMaterial(false);
@@ -242,10 +218,9 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
   };
 
   const handleCreateUnit = async () => {
-    const code = newUnit.code.trim();
     const name = newUnit.name_th.trim();
-    if (!code || !name) {
-      setMessage('กรุณาระบุรหัสและชื่อหน่วยให้ครบ');
+    if (!name) {
+      setMessage('กรุณาระบุชื่อหน่วย');
       return;
     }
 
@@ -259,7 +234,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
     setSavingKey('unit:new');
     try {
       await executiveApi.createMeasurementUnit({
-        code,
         name_th: name,
         to_kg_factor: factorValue,
         active: newUnit.active,
@@ -280,10 +254,9 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
   };
 
   const saveMaterialRow = async (row: MaterialDraftRow) => {
-    const code = row.code.trim();
     const name = row.name_th.trim();
-    if (!code || !name) {
-      setMessage('กรุณาระบุรหัสและชื่อประเภทวัสดุให้ครบ');
+    if (!name) {
+      setMessage('กรุณาระบุชื่อประเภทวัสดุ');
       return;
     }
 
@@ -292,11 +265,8 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
       const requestKey = `material:${row.originalCode}`;
       setSavingKey(requestKey);
       await executiveApi.updateMaterialType(row.originalCode, {
-        code,
         name_th: name,
         active: row.active,
-      });
-      await executiveApi.upsertMaterialPointRule(code, {
         points_per_kg: pointsPerKg,
       });
       await loadConfiguration(true);
@@ -313,10 +283,9 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
   };
 
   const saveUnitRow = async (row: UnitDraftRow) => {
-    const code = row.code.trim();
     const name = row.name_th.trim();
-    if (!code || !name) {
-      setMessage('กรุณาระบุรหัสและชื่อหน่วยให้ครบ');
+    if (!name) {
+      setMessage('กรุณาระบุชื่อหน่วย');
       return;
     }
 
@@ -331,7 +300,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
     setSavingKey(requestKey);
     try {
       await executiveApi.updateMeasurementUnit(row.originalCode, {
-        code,
         name_th: name,
         to_kg_factor: factorValue,
         active: row.active,
@@ -580,16 +548,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
               <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">เพิ่มประเภทวัสดุใหม่</p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">รหัสระบบ</label>
-                  <input
-                    value={newMaterial.code}
-                    onChange={(event) => setNewMaterial((prev) => ({ ...prev, code: event.target.value }))}
-                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 font-mono text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                    placeholder="เช่น rice_straw"
-                  />
-                  <p className="text-[11px] text-stone-400">ภาษาอังกฤษ/ตัวเลข ไม่มีช่องว่าง</p>
-                </div>
-                <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">ชื่อวัสดุ</label>
                   <input
                     value={newMaterial.name_th}
@@ -648,7 +606,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
 
           <div>
             <div className="hidden md:flex md:items-center md:gap-3 px-2 pb-2 border-b border-stone-100">
-              <span className="w-20 shrink-0 text-xs font-semibold text-stone-600">รหัส</span>
               <span className="flex-1 text-xs font-semibold text-stone-600">ชื่อวัสดุ</span>
               <span className="w-24 shrink-0 flex flex-col gap-0.5">
                 <span className="text-xs font-semibold text-stone-600">แต้ม / กก.</span>
@@ -662,7 +619,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
               return (
                 <div key={row.originalCode} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
                   <div className="flex flex-1 items-center gap-3">
-                    <span className="w-20 shrink-0 font-mono text-xs text-stone-400 truncate" title={row.code}>{row.code}</span>
                     <input
                       value={row.name_th}
                       onChange={(event) => updateMaterialRow(index, { name_th: event.target.value })}
@@ -728,16 +684,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
               <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">เพิ่มหน่วยวัดใหม่</p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">รหัสระบบ</label>
-                  <input
-                    value={newUnit.code}
-                    onChange={(event) => setNewUnit((prev) => ({ ...prev, code: event.target.value }))}
-                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 font-mono text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                    placeholder="เช่น kilogram"
-                  />
-                  <p className="text-[11px] text-stone-400">ภาษาอังกฤษ/ตัวเลข ไม่มีช่องว่าง</p>
-                </div>
-                <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">ชื่อหน่วย</label>
                   <input
                     value={newUnit.name_th}
@@ -796,7 +742,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
 
           <div>
             <div className="hidden md:flex md:items-center md:gap-3 px-2 pb-2 border-b border-stone-100">
-              <span className="w-20 shrink-0 text-xs font-semibold text-stone-600">รหัส</span>
               <span className="flex-1 text-xs font-semibold text-stone-600">ชื่อหน่วย</span>
               <span className="w-24 shrink-0 flex flex-col gap-0.5">
                 <span className="text-xs font-semibold text-stone-600">เท่ากับกี่ กก.</span>
@@ -810,7 +755,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
               return (
                 <div key={row.originalCode} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
                   <div className="flex flex-1 items-center gap-3">
-                    <span className="w-20 shrink-0 font-mono text-xs text-stone-400 truncate" title={row.code}>{row.code}</span>
                     <input
                       value={row.name_th}
                       onChange={(event) => updateUnitRow(index, { name_th: event.target.value })}

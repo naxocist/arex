@@ -16,7 +16,6 @@ import {
   Pencil,
   Phone,
   RefreshCw,
-  Route,
   Truck,
   User,
 } from 'lucide-react';
@@ -37,7 +36,7 @@ import {
   type LogisticsPickupQueueItem,
   type LogisticsRewardDeliveryJobItem,
 } from '@/app/_lib/api';
-import { fetchRoadDistanceKm, formatKm, buildGoogleMapsDirectionsUrl } from '@/app/_lib/geo';
+import { formatKm } from '@/app/_lib/geo';
 
 /* ── helpers ── */
 function hasAccessToken(): boolean {
@@ -103,6 +102,73 @@ function hasValidCoordinates(lat: number | null | undefined, lng: number | null 
 
 function buildGoogleMapsUrl(lat: number, lng: number): string {
   return `https://www.google.com/maps?q=${lat},${lng}`;
+}
+
+interface RouteNode { icon: React.ReactNode; label: string; mapHref?: string }
+interface RouteLeg { km: number; href?: string }
+
+function DistModeChips<T extends string>({ options, value, onChange }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+  return (
+    <span className="inline-flex items-center gap-0.5 rounded-lg bg-stone-100 p-0.5" onClick={(e) => e.stopPropagation()}>
+      {options.map((opt) => (
+        <button key={opt.value} type="button" onClick={() => onChange(opt.value)}
+          className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors ${value === opt.value ? 'bg-white text-primary shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}>
+          {opt.label}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+function RouteStepper({ nodes, legs }: { nodes: RouteNode[]; legs: RouteLeg[] }) {
+  return (
+    <span className="inline-flex items-center gap-0.5 shrink-0">
+      {nodes.map((node, i) => (
+        <React.Fragment key={i}>
+          <span className="inline-flex items-center gap-0.5 text-xs text-stone-400">
+            {node.icon}
+            {node.mapHref ? (
+              <a href={node.mapHref} target="_blank" rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="leading-none hover:text-primary hover:underline transition-colors"
+              >{node.label}</a>
+            ) : (
+              <span className="leading-none">{node.label}</span>
+            )}
+          </span>
+          {i < legs.length && (
+            <span className="inline-flex items-center gap-0.5">
+              <span className="text-stone-300 mx-0.5 leading-none">›</span>
+              {legs[i].href ? (
+                <a
+                  href={legs[i].href}
+                  target="_blank" rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary hover:bg-primary/20 transition-colors leading-none"
+                >{legs[i].km % 1 === 0 ? `${legs[i].km} กม.` : `${legs[i].km.toFixed(1)} กม.`}</a>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-stone-100 px-1.5 py-0.5 text-xs font-bold text-stone-500 leading-none">
+                  {legs[i].km % 1 === 0 ? `${legs[i].km} กม.` : `${legs[i].km.toFixed(1)} กม.`}
+                </span>
+              )}
+              <span className="text-stone-300 mx-0.5 leading-none">›</span>
+            </span>
+          )}
+        </React.Fragment>
+      ))}
+    </span>
+  );
+}
+
+function buildGoogleMapsDirectionsUrl(
+  waypoints: { lat: number; lng: number }[]
+): string {
+  if (waypoints.length < 2) return '';
+  const origin = `${waypoints[0].lat},${waypoints[0].lng}`;
+  const destination = `${waypoints[waypoints.length - 1].lat},${waypoints[waypoints.length - 1].lng}`;
+  const mid = waypoints.slice(1, -1).map((w) => `${w.lat},${w.lng}`).join('|');
+  const base = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+  return mid ? `${base}&waypoints=${mid}` : base;
 }
 
 function copyToClipboard(text: string): Promise<void> {
@@ -215,7 +281,7 @@ function SortHeaderBar<T extends string>({
   sort,
   onSort,
 }: {
-  cols: { key: T; label: string; dirLabels?: [string, string] }[];
+  cols: { key: T; label: string; dirLabels?: [string, string]; activeExtra?: React.ReactNode }[];
   sort: { key: T; dir: SortDir };
   onSort: (key: T) => void;
 }) {
@@ -225,8 +291,8 @@ function SortHeaderBar<T extends string>({
         const active = sort.key === col.key;
         const [ascLabel, descLabel] = col.dirLabels ?? ['ก่อน', 'หลัง'];
         return (
+          <React.Fragment key={col.key}>
           <button
-            key={col.key}
             type="button"
             onClick={() => onSort(col.key)}
             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
@@ -242,6 +308,8 @@ function SortHeaderBar<T extends string>({
               <ArrowUpDown className="h-3 w-3 opacity-40" />
             )}
           </button>
+          {active && col.activeExtra && col.activeExtra}
+          </React.Fragment>
         );
       })}
       <span className="ml-auto text-[11px] text-stone-400 hidden sm:inline">กดชื่อคอลัมน์เพื่อเรียงลำดับ</span>
@@ -276,113 +344,6 @@ function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onCo
   );
 }
 
-/* ── Route Distance Modal ── */
-interface RouteStop {
-  label: string;
-  sublabel?: string | null;
-  lat: number;
-  lng: number;
-  icon: 'me' | 'farmer' | 'factory';
-}
-
-function RouteModal({ stops, title, onClose }: { stops: RouteStop[]; title: string; onClose: () => void }) {
-  const [distances, setDistances] = useState<(number | null)[]>([]);
-
-  useEffect(() => {
-    const pairs = stops.slice(0, -1).map((s, i) =>
-      fetchRoadDistanceKm(s.lat, s.lng, stops[i + 1].lat, stops[i + 1].lng)
-    );
-    Promise.all(pairs).then(setDistances);
-  }, [stops]);
-
-  const total = distances.every((d) => d !== null) && distances.length > 0
-    ? distances.reduce<number>((sum, d) => sum + (d ?? 0), 0)
-    : null;
-
-  const iconEl = (icon: RouteStop['icon']) => {
-    if (icon === 'me') return <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary"><User className="h-4 w-4" /></div>;
-    if (icon === 'farmer') return <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-700"><MapPin className="h-4 w-4" /></div>;
-    return <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-sky-700"><Factory className="h-4 w-4" /></div>;
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative w-full max-w-sm rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <Navigation className="h-4 w-4 text-primary" />
-            <span className="font-semibold text-on-surface text-sm">{title}</span>
-          </div>
-          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 transition-colors">
-            <ChevronDown className="h-4 w-4" />
-          </button>
-        </div>
-        {/* Stops */}
-        <div className="px-5 py-4 space-y-0">
-          {stops.map((stop, i) => (
-            <div key={i}>
-              <div className="flex items-start gap-3">
-                {iconEl(stop.icon)}
-                <div className="flex-1 pt-1.5 min-w-0">
-                  <p className="text-sm font-semibold text-on-surface leading-tight">{stop.label}</p>
-                  {stop.sublabel && <p className="text-xs text-stone-400 truncate mt-0.5">{stop.sublabel}</p>}
-                </div>
-              </div>
-              {i < stops.length - 1 && (
-                <div className="flex items-stretch gap-3 my-0.5">
-                  <div className="flex w-9 justify-center">
-                    <div className="w-px flex-1 bg-stone-200" />
-                  </div>
-                  <div className="flex flex-1 items-center gap-2 py-1.5">
-                    {distances[i] !== undefined ? (
-                      distances[i] !== null ? (
-                        <>
-                          <span className="text-xs font-bold text-stone-700">{formatKm(distances[i]!)}</span>
-                          <span className="text-xs text-stone-400">ทางถนน</span>
-                          <a href={buildGoogleMapsDirectionsUrl(stop.lat, stop.lng, stops[i + 1].lat, stops[i + 1].lng)}
-                            target="_blank" rel="noopener noreferrer"
-                            className="ml-auto flex items-center gap-1 text-xs text-primary hover:underline shrink-0">
-                            <Navigation className="h-3 w-3" />เส้นทาง
-                          </a>
-                        </>
-                      ) : (
-                        <span className="text-xs text-stone-400">ไม่สามารถคำนวณได้</span>
-                      )
-                    ) : (
-                      <span className="text-xs text-stone-400 animate-pulse">กำลังคำนวณ...</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        {/* Total */}
-        {total !== null && (
-          <div className="border-t border-stone-100 mx-5 py-3 flex items-center justify-between">
-            <span className="text-xs font-medium text-stone-500">ระยะทางรวม</span>
-            <span className="text-sm font-bold text-primary">{formatKm(total)}</span>
-          </div>
-        )}
-        <div className="h-2" />
-      </div>
-    </div>
-  );
-}
-
-function RouteButton({ onClick }: { onClick: () => void }) {
-  return (
-    <div role="button" tabIndex={0}
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onClick(); } }}
-      className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-500 hover:bg-primary/10 hover:text-primary transition-colors shrink-0 cursor-pointer">
-      <Navigation className="h-3 w-3" />
-      ระยะทาง
-    </div>
-  );
-}
 
 export default function LogisticsTracking() {
   const reduceMotion = useReducedMotion();
@@ -404,6 +365,7 @@ export default function LogisticsTracking() {
   const [updatingDeliveryJobId, setUpdatingDeliveryJobId] = useState<string | null>(null);
   const [pickupRangeBySubmissionId, setPickupRangeBySubmissionId] = useState<Record<string, DateRangeValue>>({});
   const [destinationFactoryBySubmissionId, setDestinationFactoryBySubmissionId] = useState<Record<string, string>>({});
+  const [pickupQueueLeg2Km, setPickupQueueLeg2Km] = useState<Record<string, number | null>>({});
   const [deliveryRangeByRequestId, setDeliveryRangeByRequestId] = useState<Record<string, DateRangeValue>>({});
   const [activeTab, setActiveTab] = useState<LogisticsTab>('pickupQueue');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -411,7 +373,6 @@ export default function LogisticsTracking() {
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
-  const [routeModal, setRouteModal] = useState<{ title: string; stops: RouteStop[] } | null>(null);
   const [editingPickupJobId, setEditingPickupJobId] = useState<string | null>(null);
   const [editPickupRangeById, setEditPickupRangeById] = useState<Record<string, DateRangeValue>>({});
   const [editPickupFactoryById, setEditPickupFactoryById] = useState<Record<string, string>>({});
@@ -420,9 +381,11 @@ export default function LogisticsTracking() {
   const [editDeliveryRangeById, setEditDeliveryRangeById] = useState<Record<string, DateRangeValue>>({});
   const [reschedulingDeliveryJobId, setReschedulingDeliveryJobId] = useState<string | null>(null);
 
-  const [pickupQueueSort, setPickupQueueSort] = useState<{ key: 'created_at' | 'material' | 'weight'; dir: SortDir }>({ key: 'created_at', dir: 'desc' });
-  const [pickupJobSort, setPickupJobSort] = useState<{ key: 'planned_pickup_at' | 'material' | 'status' | 'weight'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'asc' });
-  const [rewardQueueSort, setRewardQueueSort] = useState<{ key: 'requested_points' | 'reward_name' | 'requested_at'; dir: SortDir }>({ key: 'requested_at', dir: 'asc' });
+  const [pickupQueueSort, setPickupQueueSort] = useState<{ key: 'created_at' | 'material' | 'weight' | 'distance'; dir: SortDir }>({ key: 'created_at', dir: 'desc' });
+  const [pickupQueueDistMode, setPickupQueueDistMode] = useState<'leg1' | 'leg2' | 'sum'>('leg1');
+  const [pickupJobSort, setPickupJobSort] = useState<{ key: 'planned_pickup_at' | 'material' | 'status' | 'weight' | 'distance'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'asc' });
+  const [pickupJobDistMode, setPickupJobDistMode] = useState<'leg1' | 'leg2' | 'sum'>('leg1');
+  const [rewardQueueSort, setRewardQueueSort] = useState<{ key: 'requested_points' | 'reward_name' | 'requested_at' | 'distance'; dir: SortDir }>({ key: 'requested_at', dir: 'asc' });
   const [deliveryJobSort, setDeliveryJobSort] = useState<{ key: 'planned_delivery_at' | 'status'; dir: SortDir }>({ key: 'planned_delivery_at', dir: 'asc' });
 
   const submittedQueue = useMemo(() => pickupQueue.filter((i) => i.status === 'submitted'), [pickupQueue]);
@@ -456,21 +419,42 @@ export default function LogisticsTracking() {
     const mul = pickupQueueSort.dir === 'asc' ? 1 : -1;
     if (pickupQueueSort.key === 'material') return mul * (a.material_type ?? '').localeCompare(b.material_type ?? '');
     if (pickupQueueSort.key === 'weight') return mul * (toKgForSort(a.quantity_value, a.quantity_unit) - toKgForSort(b.quantity_value, b.quantity_unit));
+    if (pickupQueueSort.key === 'distance') {
+      const getDist = (item: typeof a) => {
+        const l1 = item.distance_to_farmer_km ?? null;
+        const l2 = pickupQueueLeg2Km[item.id] ?? null;
+        if (pickupQueueDistMode === 'leg1') return l1 ?? Infinity;
+        if (pickupQueueDistMode === 'leg2') return l2 ?? Infinity;
+        return l1 != null && l2 != null ? l1 + l2 : l1 ?? Infinity;
+      };
+      return mul * (getDist(a) - getDist(b));
+    }
     return mul * (new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime());
-  }), [submittedQueue, pickupQueueSort]);
+  }), [submittedQueue, pickupQueueSort, pickupQueueDistMode, pickupQueueLeg2Km]);
 
   const sortedPickupJobs = useMemo(() => [...pickupJobs].filter((i) => i.status !== 'delivered_to_factory').sort((a, b) => {
     const mul = pickupJobSort.dir === 'asc' ? 1 : -1;
     if (pickupJobSort.key === 'material') return mul * (a.material_type ?? '').localeCompare(b.material_type ?? '');
     if (pickupJobSort.key === 'status') return mul * (a.status ?? '').localeCompare(b.status ?? '');
     if (pickupJobSort.key === 'weight') return mul * (toKgForSort(a.quantity_value, a.quantity_unit) - toKgForSort(b.quantity_value, b.quantity_unit));
+    if (pickupJobSort.key === 'distance') {
+      const getDist = (item: typeof a) => {
+        const l1 = item.distance_to_farmer_km ?? null;
+        const l2 = item.distance_farmer_to_factory_km ?? null;
+        if (pickupJobDistMode === 'leg1') return l1 ?? Infinity;
+        if (pickupJobDistMode === 'leg2') return l2 ?? Infinity;
+        return l1 != null && l2 != null ? l1 + l2 : l1 ?? l2 ?? Infinity;
+      };
+      return mul * (getDist(a) - getDist(b));
+    }
     return mul * (new Date(a.planned_pickup_at ?? 0).getTime() - new Date(b.planned_pickup_at ?? 0).getTime());
-  }), [pickupJobs, pickupJobSort]);
+  }), [pickupJobs, pickupJobSort, pickupJobDistMode]);
 
   const sortedRewardQueue = useMemo(() => [...approvedReadyToSchedule].sort((a, b) => {
     const mul = rewardQueueSort.dir === 'asc' ? 1 : -1;
     if (rewardQueueSort.key === 'reward_name') return mul * (a.reward_name_th ?? '').localeCompare(b.reward_name_th ?? '');
     if (rewardQueueSort.key === 'requested_at') return mul * (a.requested_at < b.requested_at ? -1 : a.requested_at > b.requested_at ? 1 : 0);
+    if (rewardQueueSort.key === 'distance') return mul * ((a.distance_to_farmer_km ?? Infinity) - (b.distance_to_farmer_km ?? Infinity));
     return mul * (Number(a.requested_points) - Number(b.requested_points));
   }), [approvedReadyToSchedule, rewardQueueSort]);
 
@@ -544,6 +528,24 @@ export default function LogisticsTracking() {
   };
 
   useEffect(() => { void loadAll(); }, []);
+
+  useEffect(() => {
+    const entries = Object.entries(destinationFactoryBySubmissionId);
+    if (!entries.length) return;
+    void (async () => {
+      for (const [submissionId, factoryId] of entries) {
+        if (!factoryId) continue;
+        const item = sortedPickupQueue.find((q) => q.id === submissionId);
+        const factory = factoryOptions.find((f) => f.id === factoryId);
+        if (!item || !factory || item.pickup_lat == null || item.pickup_lng == null || factory.lat == null || factory.lng == null) continue;
+        try {
+          const res = await logisticsApi.getRouteDistance(item.pickup_lat, item.pickup_lng, factory.lat as number, factory.lng as number);
+          setPickupQueueLeg2Km((prev) => ({ ...prev, [submissionId]: res.distance_km }));
+        } catch { /* ignore */ }
+      }
+    })();
+  }, [destinationFactoryBySubmissionId]);
+
 
   const handleSchedulePickup = async (submissionId: string) => {
     const range = pickupRangeBySubmissionId[submissionId] || { from: null, to: null };
@@ -675,7 +677,6 @@ export default function LogisticsTracking() {
           />
         )}
       </AnimatePresence>
-      {routeModal && <RouteModal title={routeModal.title} stops={routeModal.stops} onClose={() => setRouteModal(null)} />}
       <div className="space-y-6 pb-10">
         {/* ── Header ── */}
         <div className="flex items-start justify-between gap-4">
@@ -798,6 +799,8 @@ export default function LogisticsTracking() {
                       { key: 'created_at' as const, label: 'วันที่ส่ง', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
                       { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
                       { key: 'weight' as const, label: 'น้ำหนัก', dirLabels: ['น้อยก่อน', 'มากก่อน'] },
+                      { key: 'distance' as const, label: 'ระยะทาง', dirLabels: ['ใกล้ก่อน', 'ไกลก่อน'],
+                        activeExtra: <DistModeChips<'leg1'|'leg2'|'sum'> options={[{ value: 'leg1', label: 'ฉัน→เกษตรกร' }, { value: 'leg2', label: 'เกษตรกร→โรงงาน' }, { value: 'sum', label: 'รวมทั้งหมด' }]} value={pickupQueueDistMode} onChange={setPickupQueueDistMode} /> },
                     ]}
                     sort={pickupQueueSort}
                     onSort={(key) => toggleSort(pickupQueueSort, key, setPickupQueueSort)}
@@ -873,35 +876,40 @@ export default function LogisticsTracking() {
                         >
                           {/* Summary */}
                           <div className="space-y-1">
-                            {/* Row 1: name + route + qty */}
+                            {/* Row 1: name + distance + qty */}
                             <div className="flex items-center gap-2 min-w-0">
                               <p className="text-sm font-semibold text-on-surface leading-tight truncate">
                                 {item.material_name_th || formatMaterial(item.material_type)}
                               </p>
-                              {hasValidCoordinates(myInfo?.lat, myInfo?.lng) && hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                <RouteButton onClick={() => setRouteModal({ title: 'เส้นทางรับวัสดุ', stops: [
-                                  { label: 'ฉัน (คลังโลจิสติกส์)', sublabel: null, lat: myInfo!.lat!, lng: myInfo!.lng!, icon: 'me' },
-                                  { label: 'เกษตรกร (จุดรับวัสดุ)', sublabel: item.pickup_location_text, lat: item.pickup_lat!, lng: item.pickup_lng!, icon: 'farmer' },
-                                ] })} />
-                              )}
+                              {item.distance_to_farmer_km != null && (() => {
+                                const leg1Href = myInfo?.lat != null && myInfo?.lng != null && item.pickup_lat != null && item.pickup_lng != null
+                                  ? buildGoogleMapsDirectionsUrl([{ lat: myInfo.lat, lng: myInfo.lng }, { lat: item.pickup_lat, lng: item.pickup_lng }]) : undefined;
+                                const leg2Km = pickupQueueLeg2Km[item.id];
+                                const leg2Href = leg2Km != null && item.pickup_lat != null && item.pickup_lng != null && selFactory?.lat != null && selFactory?.lng != null
+                                  ? buildGoogleMapsDirectionsUrl([{ lat: item.pickup_lat, lng: item.pickup_lng }, { lat: selFactory.lat as number, lng: selFactory.lng as number }]) : undefined;
+                                const farmerMapHref = hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number) : undefined;
+                                const factoryMapHref = selFactory?.lat != null && selFactory?.lng != null ? buildGoogleMapsUrl(selFactory.lat as number, selFactory.lng as number) : undefined;
+                                const nodes: RouteNode[] = [
+                                  { icon: <Navigation className="h-3 w-3" />, label: 'ฉัน' },
+                                  { icon: <User className="h-3 w-3" />, label: 'เกษตรกร', mapHref: farmerMapHref },
+                                  ...(leg2Km != null ? [{ icon: <Factory className="h-3 w-3" />, label: selFactory?.name_th ?? 'โรงงาน', mapHref: factoryMapHref }] : []),
+                                ];
+                                const legs: RouteLeg[] = [
+                                  { km: item.distance_to_farmer_km!, href: leg1Href },
+                                  ...(leg2Km != null ? [{ km: leg2Km, href: leg2Href }] : []),
+                                ];
+                                return <RouteStepper nodes={nodes} legs={legs} />;
+                              })()}
                               <span className="ml-auto shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
                                 {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
                               </span>
                             </div>
-                            {/* Row 2: date + location inline */}
+                            {/* Row 2: date + location */}
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400">
-                              <span className="flex items-center gap-1">
-                                <CalendarRange className="h-3 w-3" />
-                                ส่งคำขอ {formatDateTime(item.created_at)}
-                              </span>
+                              <span className="flex items-center gap-1"><CalendarRange className="h-3 w-3" />ส่งคำขอ {formatDateTime(item.created_at)}</span>
                               {item.pickup_location_text && (
                                 <span className="flex items-center gap-1 min-w-0">
-                                  <MapPin className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{item.pickup_location_text}</span>
-                                  {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                    <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
-                                      className="shrink-0 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
-                                  )}
+                                  <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{item.pickup_location_text}</span>
                                 </span>
                               )}
                             </div>
@@ -927,6 +935,8 @@ export default function LogisticsTracking() {
                       { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
                       { key: 'weight' as const, label: 'น้ำหนัก', dirLabels: ['น้อยก่อน', 'มากก่อน'] },
                       { key: 'status' as const, label: 'สถานะ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+                      { key: 'distance' as const, label: 'ระยะทาง', dirLabels: ['ใกล้ก่อน', 'ไกลก่อน'],
+                        activeExtra: <DistModeChips<'leg1'|'leg2'|'sum'> options={[{ value: 'leg1', label: 'ฉัน→เกษตรกร' }, { value: 'leg2', label: 'เกษตรกร→โรงงาน' }, { value: 'sum', label: 'รวมทั้งหมด' }]} value={pickupJobDistMode} onChange={setPickupJobDistMode} /> },
                     ]}
                     sort={pickupJobSort}
                     onSort={(key) => toggleSort(pickupJobSort, key, setPickupJobSort)}
@@ -938,31 +948,26 @@ export default function LogisticsTracking() {
                   <EmptyState
                     title={loadIssues.pickupJobs ? 'ยังแสดงงานขนส่งวัสดุไม่ได้' : 'ยังไม่มีงานขนส่งวัสดุ'}
                     description={loadIssues.pickupJobs ? 'โปรดกดรีเฟรชอีกครั้ง' : 'เมื่อมีการจัดคิวรับวัสดุ รายการจะเริ่มแสดงในบอร์ดนี้'}
-                    icon={Route}
+                    icon={Truck}
                   />
                 ) : (
                   sortedPickupJobs.map((item) => {
                     const isExp = expandedId === item.id;
                     const isBusy = updatingPickupJobId === item.id;
                     const isLive = item.status === 'picked_up';
-                    const getPickupRouteSegments = async () => {
+                    const getPickupRouteSegments = () => {
                       const segments: Array<{ label: string; distanceKm: number | null }> = [];
-                      const hasMe = hasValidCoordinates(myInfo?.lat, myInfo?.lng);
-                      const hasFarmer = hasValidCoordinates(item.pickup_lat, item.pickup_lng);
-                      const hasFactory = hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng);
-                      if (hasMe && hasFarmer) {
-                        const km = await fetchRoadDistanceKm(myInfo!.lat!, myInfo!.lng!, item.pickup_lat!, item.pickup_lng!);
-                        segments.push({ label: 'ฉัน → จุดรับวัสดุ (เกษตรกร)', distanceKm: km });
+                      if (item.distance_to_farmer_km != null) {
+                        segments.push({ label: 'ฉัน → จุดรับวัสดุ (เกษตรกร)', distanceKm: item.distance_to_farmer_km });
                       }
-                      if (hasFarmer && hasFactory) {
-                        const km = await fetchRoadDistanceKm(item.pickup_lat!, item.pickup_lng!, item.destination_factory_lat!, item.destination_factory_lng!);
-                        segments.push({ label: `จุดรับวัสดุ → ${item.destination_factory_name_th ?? 'โรงงาน'}`, distanceKm: km });
+                      if (item.distance_farmer_to_factory_km != null) {
+                        segments.push({ label: `จุดรับวัสดุ → ${item.destination_factory_name_th ?? 'โรงงาน'}`, distanceKm: item.distance_farmer_to_factory_km });
                       }
                       return segments;
                     };
                     const handleCopy = async () => {
                       setCopyLoadingId(item.id);
-                      const segments = await getPickupRouteSegments();
+                      const segments = getPickupRouteSegments();
                       setCopyLoadingId(null);
                       const totalKm = segments.filter(s => s.distanceKm !== null).reduce((sum, s) => sum + (s.distanceKm ?? 0), 0);
                       const hasDistance = segments.length > 0;
@@ -1122,13 +1127,23 @@ export default function LogisticsTracking() {
                               <p className="text-sm font-semibold text-on-surface leading-tight truncate">
                                 {item.material_name_th || formatMaterial(item.material_type)}
                               </p>
-                              {hasValidCoordinates(myInfo?.lat, myInfo?.lng) && hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                <RouteButton onClick={() => setRouteModal({ title: 'เส้นทางรับ-ส่งวัสดุ', stops: [
-                                  { label: 'ฉัน (คลังโลจิสติกส์)', sublabel: null, lat: myInfo!.lat!, lng: myInfo!.lng!, icon: 'me' },
-                                  { label: 'เกษตรกร (จุดรับวัสดุ)', sublabel: item.pickup_location_text, lat: item.pickup_lat!, lng: item.pickup_lng!, icon: 'farmer' },
-                                  ...(hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng) ? [{ label: `โรงงาน (${item.destination_factory_name_th ?? 'ปลายทาง'})`, sublabel: item.destination_factory_location_text ?? null, lat: item.destination_factory_lat!, lng: item.destination_factory_lng!, icon: 'factory' as const }] : []),
-                                ] })} />
-                              )}
+                              {(item.distance_to_farmer_km != null || item.distance_farmer_to_factory_km != null) && (() => {
+                                const nodes: RouteNode[] = [{ icon: <Navigation className="h-3 w-3" />, label: 'ฉัน' }];
+                                const legs: RouteLeg[] = [];
+                                if (item.distance_to_farmer_km != null) {
+                                  const href = myInfo?.lat != null && myInfo?.lng != null && item.pickup_lat != null && item.pickup_lng != null
+                                    ? buildGoogleMapsDirectionsUrl([{ lat: myInfo.lat, lng: myInfo.lng }, { lat: item.pickup_lat, lng: item.pickup_lng }]) : undefined;
+                                  legs.push({ km: item.distance_to_farmer_km, href });
+                                  nodes.push({ icon: <User className="h-3 w-3" />, label: 'เกษตรกร', mapHref: hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number) : undefined });
+                                }
+                                if (item.distance_farmer_to_factory_km != null) {
+                                  const href = item.pickup_lat != null && item.pickup_lng != null && item.destination_factory_lat != null && item.destination_factory_lng != null
+                                    ? buildGoogleMapsDirectionsUrl([{ lat: item.pickup_lat, lng: item.pickup_lng }, { lat: item.destination_factory_lat, lng: item.destination_factory_lng }]) : undefined;
+                                  legs.push({ km: item.distance_farmer_to_factory_km, href });
+                                  nodes.push({ icon: <Factory className="h-3 w-3" />, label: item.destination_factory_name_th ?? 'โรงงาน', mapHref: hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng) ? buildGoogleMapsUrl(item.destination_factory_lat as number, item.destination_factory_lng as number) : undefined });
+                                }
+                                return <RouteStepper nodes={nodes} legs={legs} />;
+                              })()}
                               <span className="ml-auto shrink-0"><StatusBadge status={item.status} label={formatPickupJobStatus(item.status)} size="sm" /></span>
                             </div>
                             {/* Row 2: all meta + actions inline */}
@@ -1136,29 +1151,15 @@ export default function LogisticsTracking() {
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400 min-w-0 flex-1">
                                 <span className="font-bold text-sky-700">{Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</span>
                                 <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดรับ {formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}</span>
-                                {item.destination_factory_name_th && (
-                                  <span className="flex items-center gap-0.5">
-                                    <Factory className="h-3 w-3" />{item.destination_factory_name_th}
-                                    {hasValidCoordinates(item.destination_factory_lat, item.destination_factory_lng) && (
-                                      <a href={buildGoogleMapsUrl(item.destination_factory_lat as number, item.destination_factory_lng as number)} target="_blank" rel="noopener noreferrer"
-                                        className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
-                                    )}
-                                  </span>
-                                )}
                                 {item.farmer_display_name && (
                                   <span className="flex items-center gap-0.5">
                                     <User className="h-3 w-3" />{item.farmer_display_name}
-                                    {item.farmer_phone && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{item.farmer_phone}</span>}
+                                    {item.farmer_phone && <><Phone className="h-3 w-3" />{item.farmer_phone}</>}
                                   </span>
                                 )}
                                 {item.pickup_location_text && (
                                   <span className="flex items-center gap-0.5 min-w-0">
-                                    <MapPin className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">{item.pickup_location_text}</span>
-                                    {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                      <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
-                                        className="shrink-0 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
-                                    )}
+                                    <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{item.pickup_location_text}</span>
                                   </span>
                                 )}
                               </div>
@@ -1171,8 +1172,8 @@ export default function LogisticsTracking() {
                                   {copyLoadingId === item.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : copiedId === item.id ? <CheckCheck className="h-3.5 w-3.5 text-emerald-500" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
                                 </div>
                                 <div role="button" tabIndex={0}
-                                  onClick={pdfLoadingId === item.id ? undefined : () => { setPdfLoadingId(item.id); void getPickupRouteSegments().then(segs => { generatePickupJobPdf(item, segs); setPdfLoadingId(null); }); }}
-                                  onKeyDown={(e) => e.key === 'Enter' && !pdfLoadingId && (setPdfLoadingId(item.id), void getPickupRouteSegments().then(segs => { generatePickupJobPdf(item, segs); setPdfLoadingId(null); }))}
+                                  onClick={pdfLoadingId === item.id ? undefined : () => { generatePickupJobPdf(item, getPickupRouteSegments()); }}
+                                  onKeyDown={(e) => e.key === 'Enter' && !pdfLoadingId && generatePickupJobPdf(item, getPickupRouteSegments())}
                                   className={`flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors cursor-pointer ${pdfLoadingId === item.id ? 'opacity-40' : ''}`}>
                                   {pdfLoadingId === item.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                                 </div>
@@ -1201,6 +1202,7 @@ export default function LogisticsTracking() {
                       { key: 'requested_at' as const, label: 'วันที่ขอแลก', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
                       { key: 'requested_points' as const, label: 'แต้ม', dirLabels: ['น้อยก่อน', 'มากก่อน'] },
                       { key: 'reward_name' as const, label: 'ชื่อรางวัล', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+                      { key: 'distance' as const, label: 'ระยะทาง', dirLabels: ['ใกล้ก่อน', 'ไกลก่อน'] },
                     ]}
                     sort={rewardQueueSort}
                     onSort={(key) => toggleSort(rewardQueueSort, key, setRewardQueueSort)}
@@ -1248,17 +1250,20 @@ export default function LogisticsTracking() {
                           }
                         >
                           <div className="space-y-1">
-                            {/* Row 1: name + route + points badge */}
+                            {/* Row 1: name + distance + points badge */}
                             <div className="flex items-center gap-1.5 min-w-0">
                               <p className="text-sm font-semibold text-on-surface leading-tight truncate">
                                 {item.reward_name_th ?? 'รางวัล'}
                               </p>
-                              {hasValidCoordinates(myInfo?.lat, myInfo?.lng) && hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                <RouteButton onClick={() => setRouteModal({ title: 'เส้นทางส่งรางวัล', stops: [
-                                  { label: 'ฉัน (คลังโลจิสติกส์)', sublabel: null, lat: myInfo!.lat!, lng: myInfo!.lng!, icon: 'me' },
-                                  { label: 'เกษตรกร (จุดส่งรางวัล)', sublabel: item.pickup_location_text, lat: item.pickup_lat!, lng: item.pickup_lng!, icon: 'farmer' },
-                                ] })} />
-                              )}
+                              {item.distance_to_farmer_km != null && (() => {
+                                const href = myInfo?.lat != null && myInfo?.lng != null && item.pickup_lat != null && item.pickup_lng != null
+                                  ? buildGoogleMapsDirectionsUrl([{ lat: myInfo.lat, lng: myInfo.lng }, { lat: item.pickup_lat, lng: item.pickup_lng }]) : undefined;
+                                const farmerMapHref = hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number) : undefined;
+                                return <RouteStepper
+                                  nodes={[{ icon: <Navigation className="h-3 w-3" />, label: 'ฉัน' }, { icon: <User className="h-3 w-3" />, label: 'เกษตรกร', mapHref: farmerMapHref }]}
+                                  legs={[{ km: item.distance_to_farmer_km!, href }]}
+                                />;
+                              })()}
                               <span className="ml-auto shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-700">
                                 {Number(item.requested_points).toLocaleString('th-TH')} แต้ม
                               </span>
@@ -1270,17 +1275,12 @@ export default function LogisticsTracking() {
                               {item.farmer_display_name && (
                                 <span className="flex items-center gap-0.5">
                                   <User className="h-3 w-3" />{item.farmer_display_name}
-                                  {item.farmer_phone && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{item.farmer_phone}</span>}
+                                  {item.farmer_phone && <><Phone className="h-3 w-3" />{item.farmer_phone}</>}
                                 </span>
                               )}
                               {item.pickup_location_text && (
                                 <span className="flex items-center gap-0.5 min-w-0">
-                                  <MapPin className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{item.pickup_location_text}</span>
-                                  {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                    <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
-                                      className="shrink-0 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
-                                  )}
+                                  <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{item.pickup_location_text}</span>
                                 </span>
                               )}
                             </div>
@@ -1323,19 +1323,16 @@ export default function LogisticsTracking() {
                     const isExp = expandedId === item.id;
                     const isBusy = updatingDeliveryJobId === item.id;
                     const isOnRoute = item.status === 'out_for_delivery';
-                    const getDeliveryRouteSegments = async () => {
+                    const getDeliveryRouteSegments = () => {
                       const segments: Array<{ label: string; distanceKm: number | null }> = [];
-                      const hasMe = hasValidCoordinates(myInfo?.lat, myInfo?.lng);
-                      const hasFarmer = hasValidCoordinates(item.pickup_lat, item.pickup_lng);
-                      if (hasMe && hasFarmer) {
-                        const km = await fetchRoadDistanceKm(myInfo!.lat!, myInfo!.lng!, item.pickup_lat!, item.pickup_lng!);
-                        segments.push({ label: 'ฉัน → จุดส่งมอบ (เกษตรกร)', distanceKm: km });
+                      if (item.distance_to_farmer_km != null) {
+                        segments.push({ label: 'ฉัน → จุดส่งมอบ (เกษตรกร)', distanceKm: item.distance_to_farmer_km });
                       }
                       return segments;
                     };
                     const handleCopy = async () => {
                       setCopyLoadingId(item.id);
-                      const segments = await getDeliveryRouteSegments();
+                      const segments = getDeliveryRouteSegments();
                       setCopyLoadingId(null);
                       const hasDistance = segments.length > 0;
                       const lines = [
@@ -1472,12 +1469,15 @@ export default function LogisticsTracking() {
                               <p className="text-sm font-semibold text-on-surface leading-tight truncate">
                                 {item.reward_name_th ?? 'รางวัล'}
                               </p>
-                              {hasValidCoordinates(myInfo?.lat, myInfo?.lng) && hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                <RouteButton onClick={() => setRouteModal({ title: 'เส้นทางส่งรางวัล', stops: [
-                                  { label: 'ฉัน (คลังโลจิสติกส์)', sublabel: null, lat: myInfo!.lat!, lng: myInfo!.lng!, icon: 'me' },
-                                  { label: 'เกษตรกร (จุดส่งรางวัล)', sublabel: item.pickup_location_text, lat: item.pickup_lat!, lng: item.pickup_lng!, icon: 'farmer' },
-                                ] })} />
-                              )}
+                              {item.distance_to_farmer_km != null && (() => {
+                                const href = myInfo?.lat != null && myInfo?.lng != null && item.pickup_lat != null && item.pickup_lng != null
+                                  ? buildGoogleMapsDirectionsUrl([{ lat: myInfo.lat, lng: myInfo.lng }, { lat: item.pickup_lat, lng: item.pickup_lng }]) : undefined;
+                                const farmerMapHref = hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number) : undefined;
+                                return <RouteStepper
+                                  nodes={[{ icon: <Navigation className="h-3 w-3" />, label: 'ฉัน' }, { icon: <User className="h-3 w-3" />, label: 'เกษตรกร', mapHref: farmerMapHref }]}
+                                  legs={[{ km: item.distance_to_farmer_km, href }]}
+                                />;
+                              })()}
                               <span className="ml-auto shrink-0"><StatusBadge status={item.status} label={formatDeliveryStatus(item.status)} size="sm" /></span>
                             </div>
                             {/* Row 2: all meta + actions inline */}
@@ -1488,17 +1488,12 @@ export default function LogisticsTracking() {
                                 {item.farmer_display_name && (
                                   <span className="flex items-center gap-0.5">
                                     <User className="h-3 w-3" />{item.farmer_display_name}
-                                    {item.farmer_phone && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{item.farmer_phone}</span>}
+                                    {item.farmer_phone && <><Phone className="h-3 w-3" />{item.farmer_phone}</>}
                                   </span>
                                 )}
                                 {item.pickup_location_text && (
                                   <span className="flex items-center gap-0.5 min-w-0">
-                                    <MapPin className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">{item.pickup_location_text}</span>
-                                    {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
-                                      <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
-                                        className="shrink-0 text-primary hover:underline" onClick={(e) => e.stopPropagation()}>แผนที่</a>
-                                    )}
+                                    <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{item.pickup_location_text}</span>
                                   </span>
                                 )}
                               </div>
@@ -1511,8 +1506,8 @@ export default function LogisticsTracking() {
                                   {copyLoadingId === item.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : copiedId === item.id ? <CheckCheck className="h-3.5 w-3.5 text-emerald-500" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
                                 </div>
                                 <div role="button" tabIndex={0}
-                                  onClick={pdfLoadingId === item.id ? undefined : () => { setPdfLoadingId(item.id); void getDeliveryRouteSegments().then(segs => { generateDeliveryJobPdf(item, segs); setPdfLoadingId(null); }); }}
-                                  onKeyDown={(e) => e.key === 'Enter' && !pdfLoadingId && (setPdfLoadingId(item.id), void getDeliveryRouteSegments().then(segs => { generateDeliveryJobPdf(item, segs); setPdfLoadingId(null); }))}
+                                  onClick={pdfLoadingId === item.id ? undefined : () => { generateDeliveryJobPdf(item, getDeliveryRouteSegments()); }}
+                                  onKeyDown={(e) => e.key === 'Enter' && !pdfLoadingId && generateDeliveryJobPdf(item, getDeliveryRouteSegments())}
                                   className={`flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors cursor-pointer ${pdfLoadingId === item.id ? 'opacity-40' : ''}`}>
                                   {pdfLoadingId === item.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                                 </div>

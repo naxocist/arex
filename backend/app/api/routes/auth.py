@@ -260,9 +260,10 @@ def _register_user(
                     detail="Factory lat/lng must be provided together",
                 )
 
-            service_client.table("factories").insert(
+            service_client.table("org_accounts").insert(
                 {
-                    "factory_profile_id": created_user_id,
+                    "profile_id": created_user_id,
+                    "type": "factory",
                     "name_th": factory_payload.name_th.strip(),
                     "location_text": (
                         factory_payload.location_text.strip()
@@ -288,9 +289,10 @@ def _register_user(
                     detail="Logistics lat/lng must be provided together",
                 )
 
-            service_client.table("logistics_accounts").insert(
+            service_client.table("org_accounts").insert(
                 {
-                    "logistics_profile_id": created_user_id,
+                    "profile_id": created_user_id,
+                    "type": "logistics",
                     "name_th": logistics_payload.name_th.strip(),
                     "location_text": (
                         logistics_payload.location_text.strip()

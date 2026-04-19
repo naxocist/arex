@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from app.api.deps import require_roles
 from app.core.errors import WorkflowError
@@ -17,7 +17,7 @@ def get_pickup_queue(
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
-        queue = workflow_service.list_pickup_queue()
+        queue = workflow_service.list_pickup_queue(current_user.user_id)
         return {
             "queue": queue,
             "actor": current_user.role.value,
@@ -62,7 +62,7 @@ def get_approved_reward_requests(
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
-        queue = workflow_service.list_approved_reward_requests()
+        queue = workflow_service.list_approved_reward_requests(current_user.user_id)
         return {
             "queue": queue,
             "actor": current_user.role.value,
@@ -212,6 +212,22 @@ def mark_reward_delivered(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.get("/route-distance")
+def get_route_distance(
+    from_lat: float,
+    from_lng: float,
+    to_lat: float,
+    to_lng: float,
+    current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
+) -> dict[str, Any]:
+    try:
+        km = workflow_service.get_route_distance(from_lat, from_lng, to_lat, to_lng)
+        return {"distance_km": km}
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 @router.get("/me")
 def get_my_logistics(
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
@@ -226,10 +242,19 @@ def get_my_logistics(
 @router.put("/me")
 def update_my_logistics(
     payload: UpsertLogisticsInfoRequest,
+    background_tasks: BackgroundTasks,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
-        return workflow_service.update_logistics_for_profile(current_user.user_id, payload)
+        result = workflow_service.update_logistics_for_profile(current_user.user_id, payload)
+        if result.get("lat") is not None and result.get("lng") is not None:
+            background_tasks.add_task(
+                workflow_service._recalculate_distances_for_logistics,
+                current_user.user_id,
+                float(result["lat"]),
+                float(result["lng"]),
+            )
+        return result
     except WorkflowError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

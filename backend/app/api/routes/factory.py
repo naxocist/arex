@@ -1,12 +1,13 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from app.api.deps import require_roles
 from app.core.errors import WorkflowError
 from app.models.auth import AuthenticatedUser, Role
 from app.models.workflow import ConfirmFactoryIntakeRequest, UpsertFactoryInfoRequest
 from app.services.factory_service import FactoryService, get_factory_service
+from app.services.logistics_service import LogisticsService, get_logistics_service
 
 router = APIRouter(prefix="/factory", tags=["factory"])
 
@@ -37,11 +38,21 @@ def get_my_factory(
 @router.put("/me")
 def update_my_factory(
     payload: UpsertFactoryInfoRequest,
+    background_tasks: BackgroundTasks,
     current_user: AuthenticatedUser = Depends(require_roles(Role.FACTORY)),
     workflow_service: FactoryService = Depends(get_factory_service),
+    logistics_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
     try:
-        return workflow_service.update_factory_for_profile(current_user.user_id, payload)
+        result = workflow_service.update_factory_for_profile(current_user.user_id, payload)
+        if result.get("lat") is not None and result.get("lng") is not None:
+            background_tasks.add_task(
+                logistics_service._recalculate_distances_for_factory,
+                str(result["id"]),
+                float(result["lat"]),
+                float(result["lng"]),
+            )
+        return result
     except WorkflowError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

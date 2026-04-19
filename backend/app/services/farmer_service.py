@@ -89,7 +89,7 @@ class FarmerService(BaseService):
                 raise WorkflowError("Pickup location coordinates are required")
 
             submission = _first_row(
-                self.client.table("material_submissions")
+                self.client.table("submissions")
                 .insert({
                     "farmer_profile_id": farmer_profile_id,
                     "material_type": material_code,
@@ -124,7 +124,7 @@ class FarmerService(BaseService):
     def list_farmer_submissions(self, farmer_profile_id: str) -> list[dict[str, Any]]:
         try:
             submissions = (
-                self.client.table("material_submissions")
+                self.client.table("submissions")
                 .select(
                     "id, material_type, quantity_value, quantity_unit, pickup_location_text, "
                     "pickup_lat, pickup_lng, status, created_at"
@@ -161,12 +161,12 @@ class FarmerService(BaseService):
                 if job.get("id") and job.get("submission_id")
             }
 
-            # Fetch factory_intakes for those pickup_jobs to get intake IDs
+            # Fetch intakes for those pickup_jobs to get intake IDs
             pickup_job_ids = list(job_id_to_submission_id.keys())
             points_by_submission: dict[str, int] = {}
             if pickup_job_ids:
                 intakes = (
-                    self.client.table("factory_intakes")
+                    self.client.table("intakes")
                     .select("id, pickup_job_id")
                     .in_("pickup_job_id", pickup_job_ids)
                     .execute()
@@ -246,7 +246,7 @@ class FarmerService(BaseService):
                     "id, reward_id, quantity, requested_points, status, requested_at, "
                     "warehouse_decision_at, rejection_reason, "
                     "delivery_location_text, delivery_lat, delivery_lng, "
-                    "reward_delivery_jobs(id, status, planned_delivery_at, delivery_window_end_at, "
+                    "delivery_jobs(id, status, planned_delivery_at, delivery_window_end_at, "
                     "out_for_delivery_at, delivered_at)"
                 )
                 .eq("farmer_profile_id", farmer_profile_id)

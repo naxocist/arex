@@ -17,9 +17,10 @@ class FactoryService(BaseService):
     def get_or_create_factory_for_profile(self, factory_profile_id: str) -> dict[str, Any]:
         try:
             rows = (
-                self.client.table("factories")
-                .select("id, factory_profile_id, name_th, location_text, lat, lng, active, created_at")
-                .eq("factory_profile_id", factory_profile_id)
+                self.client.table("org_accounts")
+                .select("id, profile_id, name_th, location_text, lat, lng, active, created_at")
+                .eq("profile_id", factory_profile_id)
+                .eq("type", "factory")
                 .limit(1)
                 .execute()
             ).data or []
@@ -39,8 +40,8 @@ class FactoryService(BaseService):
             display_name = str(profile_rows[0].get("display_name") or "").strip()
             default_name = display_name or f"โรงงาน {factory_profile_id[:8]}"
             return _first_row(
-                self.client.table("factories")
-                .insert({"factory_profile_id": factory_profile_id, "name_th": default_name, "active": True})
+                self.client.table("org_accounts")
+                .insert({"profile_id": factory_profile_id, "type": "factory", "name_th": default_name, "active": True})
                 .execute()
                 .data
             )
@@ -67,10 +68,11 @@ class FactoryService(BaseService):
 
             location_text = payload.location_text.strip() if payload.location_text else None
             return _first_row(
-                self.client.table("factories")
+                self.client.table("org_accounts")
                 .update({"name_th": name_th, "location_text": location_text, "lat": payload.lat, "lng": payload.lng})
                 .eq("id", factory_id)
-                .eq("factory_profile_id", factory_profile_id)
+                .eq("profile_id", factory_profile_id)
+                .eq("type", "factory")
                 .execute()
                 .data
             )
@@ -99,7 +101,7 @@ class FactoryService(BaseService):
             ).data or []
 
             factory_intakes = (
-                self.client.table("factory_intakes")
+                self.client.table("intakes")
                 .select("id, pickup_job_id, factory_profile_id, measured_weight_kg, discrepancy_note, status, confirmed_at")
                 .eq("factory_profile_id", factory_profile_id)
                 .order("confirmed_at", desc=True)
@@ -140,7 +142,7 @@ class FactoryService(BaseService):
             submissions_by_id: dict[str, dict[str, Any]] = {}
             if submission_ids:
                 submissions = (
-                    self.client.table("material_submissions")
+                    self.client.table("submissions")
                     .select("id, material_type, quantity_value, quantity_unit, pickup_location_text")
                     .in_("id", submission_ids)
                     .execute()

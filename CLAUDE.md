@@ -192,18 +192,24 @@ Admin manages account approvals.
 
 All passwords: `123456`
 
-| Email | Role |
-|---|---|
-| farmer@gmail.com | farmer |
-| farmer2@gmail.com | farmer |
-| logistics@gmail.com | logistics |
-| factory@gmail.com | factory |
-| warehouse@gmail.com | warehouse |
-| executive@gmail.com | executive |
-| demo_farmer1@arex.local | farmer (D-06 demo) |
-| demo_logistics@arex.local | logistics (D-06 demo) |
-| demo_factory@arex.local | factory (D-06 demo) |
-| demo_warehouse@arex.local | warehouse (D-06 demo) |
+| Email | Role | Notes |
+|---|---|---|
+| farmer@gmail.com | farmer | submissions in every status, reward requests in every status |
+| farmer2@gmail.com | farmer | delivery jobs in every status |
+| farmer3@gmail.com | farmer | complete end-to-end flow (points_credited + reward delivered) |
+| logistics@gmail.com | logistics | handles สระบุรี / central region jobs |
+| logistics2@gmail.com | logistics | handles ลพบุรี / เชียงใหม่ region jobs |
+| factory@gmail.com | factory | สระบุรี factory |
+| factory2@gmail.com | factory | ชัยนาท factory |
+| warehouse@gmail.com | warehouse | |
+| executive@gmail.com | executive | |
+| admin@gmail.com | admin | sees 3 pending approvals (2 farmers + 1 logistics) |
+| demo_farmer1@arex.local | farmer | D-06 demo — points credited + reward delivered |
+| demo_farmer2@arex.local | farmer | D-06 demo — points credited + reward pending |
+| demo_farmer3@arex.local | farmer | D-06 demo — submitted submission |
+| demo_logistics@arex.local | logistics | D-06 demo — เชียงใหม่ |
+| demo_factory@arex.local | factory | D-06 demo — มช. factory |
+| demo_warehouse@arex.local | warehouse | D-06 demo |
 
 ## Local URLs
 

@@ -15,7 +15,7 @@ class ExecutiveService(BaseService):
     def get_executive_overview(self) -> dict[str, Any]:
         try:
             submissions = (
-                self.client.table("material_submissions")
+                self.client.table("submissions")
                 .select("id, farmer_profile_id, material_type, quantity_value, quantity_unit, status")
                 .execute()
             ).data or []
@@ -30,8 +30,8 @@ class ExecutiveService(BaseService):
             points_ledger = (
                 self.client.table("points_ledger").select("entry_type, points_amount").execute()
             ).data or []
-            factory_intakes = (
-                self.client.table("factory_intakes").select("measured_weight_kg").execute()
+            intakes = (
+                self.client.table("intakes").select("measured_weight_kg").execute()
             ).data or []
             units = (
                 self.client.table("measurement_units").select("code, to_kg_factor").execute()
@@ -132,7 +132,7 @@ class ExecutiveService(BaseService):
                 if r.get("entry_type") == "reward_release"
             )
 
-            factory_confirmed_weight_kg_total = sum(_to_float(r.get("measured_weight_kg")) for r in factory_intakes)
+            factory_confirmed_weight_kg_total = sum(_to_float(r.get("measured_weight_kg")) for r in intakes)
             pickup_jobs_status_summary = {
                 "pickup_scheduled": sum(1 for r in pickup_jobs if r.get("status") == "pickup_scheduled"),
                 "picked_up": sum(1 for r in pickup_jobs if r.get("status") == "picked_up"),

@@ -1,5 +1,5 @@
 import { apiRequest, type RequestBehaviorOptions } from './core';
-import type { ExecutiveOverview, ExecutiveMaterialTypeItem, ExecutiveMeasurementUnitItem, ExecutiveMaterialPointRuleItem, UpsertMaterialTypePayload, UpsertMeasurementUnitPayload, UpsertMaterialPointRulePayload, ImpactKpis, ValueChainItem, FarmerRewardItem } from './types';
+import type { ExecutiveOverview, ExecutiveMaterialTypeItem, ExecutiveMeasurementUnitItem, UpsertMaterialTypePayload, UpsertMeasurementUnitPayload, ImpactKpis, ValueChainItem, FarmerRewardItem } from './types';
 
 export const executiveApi = {
   getOverview: (options?: RequestBehaviorOptions) =>
@@ -16,10 +16,6 @@ export const executiveApi = {
     apiRequest<{ message: string; unit: ExecutiveMeasurementUnitItem; actor: string }>('/executive/measurement-units', { method: 'POST', body: JSON.stringify(payload) }),
   updateMeasurementUnit: (unitCode: string, payload: UpsertMeasurementUnitPayload) =>
     apiRequest<{ message: string; unit: ExecutiveMeasurementUnitItem; actor: string }>(`/executive/measurement-units/${encodeURIComponent(unitCode)}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  listMaterialPointRules: (options?: RequestBehaviorOptions) =>
-    apiRequest<{ rules: ExecutiveMaterialPointRuleItem[]; formula: string; actor: string }>('/executive/material-point-rules', options),
-  upsertMaterialPointRule: (materialCode: string, payload: UpsertMaterialPointRulePayload) =>
-    apiRequest<{ message: string; rule: { material_type: string; points_per_kg: number }; actor: string }>(`/executive/material-point-rules/${encodeURIComponent(materialCode)}`, { method: 'PUT', body: JSON.stringify(payload) }),
   getImpactKpis: (options?: RequestBehaviorOptions) =>
     apiRequest<{ impact_kpis: ImpactKpis; actor: string }>('/executive/impact-kpis', options),
   listValueChain: (options?: RequestBehaviorOptions) =>

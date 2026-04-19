@@ -109,7 +109,7 @@ def list_rewards(
     workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
 ) -> dict[str, Any]:
     try:
-        rewards = workflow_service.list_rewards_catalog()
+        rewards = workflow_service.list_rewards()
         return {
             "rewards": rewards,
             "actor": current_user.role.value,

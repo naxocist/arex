@@ -64,13 +64,12 @@ class RejectRewardRequest(BaseModel):
 
 
 class UpsertMaterialTypeRequest(BaseModel):
-    code: str = Field(min_length=1, max_length=50)
     name_th: str = Field(min_length=1, max_length=255)
     active: bool = True
+    points_per_kg: float | None = Field(default=None, gt=0, le=10_000)
 
 
 class UpsertMeasurementUnitRequest(BaseModel):
-    code: str = Field(min_length=1, max_length=50)
     name_th: str = Field(min_length=1, max_length=255)
     to_kg_factor: float | None = Field(default=None, gt=0, le=100_000)
     active: bool = True
@@ -82,9 +81,6 @@ class UpsertLogisticsInfoRequest(BaseModel):
     lat: float | None = Field(default=None, ge=-90, le=90)
     lng: float | None = Field(default=None, ge=-180, le=180)
 
-
-class UpsertMaterialPointRuleRequest(BaseModel):
-    points_per_kg: float = Field(gt=0, le=10_000)
 
 
 class UpdateFarmerProfileRequest(BaseModel):

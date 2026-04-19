@@ -10,7 +10,7 @@ import EmptyState from '@/app/_components/EmptyState';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import SectionCard from '@/app/_components/SectionCard';
 import { SkeletonStatCard } from '@/app/_components/Skeleton';
-import { ApiError, executiveApi, type ExecutiveOverview, type ImpactKpis, type ValueChainItem } from '@/app/_lib/api';
+import { ApiError, executiveApi, type ExecutiveOverview, type ValueChainItem } from '@/app/_lib/api';
 
 function formatNumber(value: number): string {
   return value.toLocaleString('th-TH');
@@ -63,7 +63,6 @@ function DonutCenterLabel({ cx, cy, innerLabel, innerValue }: DonutLabelProps) {
 
 export default function OverviewDashboard() {
   const [overview, setOverview] = useState<ExecutiveOverview | null>(null);
-  const [impactKpis, setImpactKpis] = useState<ImpactKpis | null>(null);
   const [valueChain, setValueChain] = useState<ValueChainItem[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -108,13 +107,11 @@ export default function OverviewDashboard() {
   const loadOverview = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      const [overviewRes, impactRes, valueChainRes] = await Promise.all([
+      const [overviewRes, valueChainRes] = await Promise.all([
         executiveApi.getOverview({ forceRefresh }),
-        executiveApi.getImpactKpis({ forceRefresh }),
         executiveApi.listValueChain({ forceRefresh }),
       ]);
       setOverview(overviewRes.overview);
-      setImpactKpis(impactRes.impact_kpis);
       setValueChain(valueChainRes.value_chain);
       setMessage(null);
     } catch (error) {
@@ -168,35 +165,27 @@ export default function OverviewDashboard() {
               {Array.from({ length: 3 }).map((_, i) => <SkeletonStatCard key={i} />)}
             </div>
           ) : (() => {
-            const hasBaseline = impactKpis?.has_baseline;
-            // Estimated values derived from operational data
-            const estHotspots = metrics.submissionsTotal;
-            const estIncomePerFarmer = metrics.uniqueFarmersTotal > 0
-              ? Math.round(metrics.pointsSpent / metrics.uniqueFarmersTotal)
+            const avgIncomePerFarmer = metrics.uniqueFarmersTotal > 0
+              ? Math.round(metrics.pointsCredited / metrics.uniqueFarmersTotal)
               : 0;
             return (
             <div className="grid gap-4 sm:grid-cols-3">
               {/* Hotspot */}
-              <div className={`relative overflow-hidden rounded-3xl border p-5 bg-gradient-to-br from-rose-50 to-white ${hasBaseline ? 'border-rose-100' : 'border-dashed border-rose-200'}`}>
+              <div className="relative overflow-hidden rounded-3xl border border-rose-100 p-5 bg-gradient-to-br from-rose-50 to-white">
                 <div className="absolute right-4 top-4 rounded-full bg-rose-100 p-2.5">
                   <Flame className="h-5 w-5 text-rose-500" />
                 </div>
-                {!hasBaseline && <span className="mb-2 inline-block rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-600">ประมาณการ</span>}
                 <p className="text-xs font-semibold uppercase tracking-widest text-rose-500">จุดเผา Hotspot ป้องกัน</p>
-                <p className="mt-3 text-4xl font-semibold tracking-tight text-stone-900">
-                  {hasBaseline ? formatNumber(impactKpis!.hotspot_count_baseline ?? 0) : formatNumber(estHotspots)}
-                </p>
-                <p className="mt-1 text-xs text-stone-500">
-                  {hasBaseline ? 'จุดเผาไหม้ที่ตรวจพบ (ข้อมูล Baseline)' : 'จุดเผาที่ป้องกันได้ (รายการ)'}
-                </p>
-                {!hasBaseline && <p className="mt-2 text-[10px] text-stone-400">สูตร: 1 การส่งวัสดุ ≈ 1 จุดเผาที่ป้องกัน</p>}
+                <p className="mt-3 text-4xl font-semibold tracking-tight text-stone-900">{formatNumber(metrics.submissionsTotal)}</p>
+                <p className="mt-1 text-xs text-stone-500">รายการส่งวัสดุในระบบ</p>
+                <p className="mt-2 text-[10px] text-stone-400">1 รายการส่งวัสดุ ≈ 1 จุดเผาที่เลือกไม่เผา</p>
               </div>
 
               {/* CO2 */}
               <button
                 type="button"
                 onClick={() => setCo2ModalOpen(true)}
-                className={`relative overflow-hidden rounded-3xl border p-5 bg-gradient-to-br from-emerald-50 to-white text-left transition hover:shadow-md hover:brightness-[0.98] ${hasBaseline ? 'border-emerald-100' : 'border-dashed border-emerald-200'}`}
+                className="relative overflow-hidden rounded-3xl border border-emerald-100 p-5 bg-gradient-to-br from-emerald-50 to-white text-left transition hover:shadow-md hover:brightness-[0.98]"
               >
                 <div className="absolute right-4 top-4 flex items-center gap-1.5">
                   <Info className="h-3.5 w-3.5 text-emerald-400" />
@@ -204,44 +193,29 @@ export default function OverviewDashboard() {
                     <Leaf className="h-5 w-5 text-emerald-600" />
                   </div>
                 </div>
-                {!hasBaseline && <span className="mb-2 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">ประมาณการ</span>}
                 <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">CO₂ หลีกเลี่ยงได้</p>
-                {hasBaseline ? (
-                  <>
-                    <p className="mt-3 text-4xl font-semibold tracking-tight text-stone-900">{formatNumber(Number((impactKpis!.co2_kg_baseline ?? 0).toFixed(0)))}</p>
-                    <p className="mt-1 text-xs text-stone-500">กิโลกรัม CO₂ (ข้อมูล Baseline)</p>
-                  </>
-                ) : (
-                  <div className="mt-3 space-y-2">
-                    <div className="rounded-xl bg-white/70 px-3 py-2 ring-1 ring-emerald-100">
-                      <p className="text-2xl font-semibold tracking-tight text-stone-900">{formatNumber(estCo2Kg)} <span className="text-sm font-normal text-stone-500">กก.</span></p>
-                      <p className="mt-0.5 text-[10px] leading-snug text-stone-500">คาร์บอนที่หลีกเลี่ยงได้ (gross) × 1.47</p>
-                    </div>
-                    <div className="rounded-xl bg-white/70 px-3 py-2 ring-1 ring-emerald-100">
-                      <p className="text-2xl font-semibold tracking-tight text-stone-900">{formatNumber(Math.round(metrics.confirmedWeightKg * 0.088))} <span className="text-sm font-normal text-stone-500">กก. CO₂eq</span></p>
-                      <p className="mt-0.5 text-[10px] leading-snug text-stone-500">CH₄+N₂O (GHG inventory) × 0.088</p>
-                    </div>
+                <div className="mt-3 space-y-2">
+                  <div className="rounded-xl bg-white/70 px-3 py-2 ring-1 ring-emerald-100">
+                    <p className="text-2xl font-semibold tracking-tight text-stone-900">{formatNumber(estCo2Kg)} <span className="text-sm font-normal text-stone-500">กก.</span></p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-stone-500">คาร์บอนที่หลีกเลี่ยงได้ (gross) × 1.47</p>
                   </div>
-                )}
+                  <div className="rounded-xl bg-white/70 px-3 py-2 ring-1 ring-emerald-100">
+                    <p className="text-2xl font-semibold tracking-tight text-stone-900">{formatNumber(Math.round(metrics.confirmedWeightKg * 0.088))} <span className="text-sm font-normal text-stone-500">กก. CO₂eq</span></p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-stone-500">CH₄+N₂O (GHG inventory) × 0.088</p>
+                  </div>
+                </div>
                 <p className="mt-3 text-[10px] text-emerald-500">คลิกเพื่อดูวิธีคำนวณ →</p>
               </button>
 
               {/* Income */}
-              <div className={`relative overflow-hidden rounded-3xl border p-5 bg-gradient-to-br from-amber-50 to-white ${hasBaseline ? 'border-amber-100' : 'border-dashed border-amber-200'}`}>
+              <div className="relative overflow-hidden rounded-3xl border border-amber-100 p-5 bg-gradient-to-br from-amber-50 to-white">
                 <div className="absolute right-4 top-4 rounded-full bg-amber-100 p-2.5">
                   <Wallet className="h-5 w-5 text-amber-500" />
                 </div>
-                {!hasBaseline && <span className="mb-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">ประมาณการ</span>}
                 <p className="text-xs font-semibold uppercase tracking-widest text-amber-600">รายได้เกษตรกร</p>
-                <p className="mt-3 text-4xl font-semibold tracking-tight text-stone-900">
-                  {hasBaseline
-                    ? `฿${formatNumber(Number((impactKpis!.avg_income_baht_per_household ?? 0).toFixed(0)))}`
-                    : `฿${formatNumber(estIncomePerFarmer)}`}
-                </p>
-                <p className="mt-1 text-xs text-stone-500">
-                  {hasBaseline ? 'บาท/ครัวเรือน (ข้อมูล Baseline)' : 'บาท/เกษตรกร เฉลี่ย (ประมาณ)'}
-                </p>
-                {!hasBaseline && <p className="mt-2 text-[10px] text-stone-400">สูตร: แต้มที่ใช้แลกรางวัลแล้ว ÷ จำนวนเกษตรกร (1 แต้ม = 1 ฿) — ไม่นับแต้มที่ยังไม่ได้ใช้</p>}
+                <p className="mt-3 text-4xl font-semibold tracking-tight text-stone-900">฿{formatNumber(avgIncomePerFarmer)}</p>
+                <p className="mt-1 text-xs text-stone-500">บาท/เกษตรกร เฉลี่ย</p>
+                <p className="mt-2 text-[10px] text-stone-400">แต้มที่ได้รับทั้งหมด ÷ จำนวนเกษตรกร (1 แต้ม ≈ 1 ฿)</p>
               </div>
             </div>
             );

@@ -15,7 +15,7 @@ class WarehouseService(BaseService):
         rewards_by_id: dict[str, dict[str, Any]] = {}
         if reward_ids:
             for row in (
-                self.client.table("rewards_catalog")
+                self.client.table("rewards")
                 .select("id, name_th, description_th, points_cost")
                 .in_("id", reward_ids)
                 .execute()

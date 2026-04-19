@@ -5,10 +5,10 @@ from app.services._base import BaseService, _first_row
 
 
 class RewardsService(BaseService):
-    def list_rewards_catalog(self) -> list[dict[str, Any]]:
+    def list_rewards(self) -> list[dict[str, Any]]:
         try:
             return (
-                self.client.table("rewards_catalog")
+                self.client.table("rewards")
                 .select("id, name_th, description_th, points_cost, stock_qty, active, image_url")
                 .eq("active", True)
                 .gt("stock_qty", 0)
@@ -18,10 +18,10 @@ class RewardsService(BaseService):
         except Exception as exc:
             raise WorkflowError(f"Failed to list rewards catalog: {exc}") from exc
 
-    def list_all_rewards_catalog(self) -> list[dict[str, Any]]:
+    def list_all_rewards(self) -> list[dict[str, Any]]:
         try:
             return (
-                self.client.table("rewards_catalog")
+                self.client.table("rewards")
                 .select("id, name_th, description_th, points_cost, stock_qty, active, image_url, created_at, updated_at")
                 .order("points_cost", desc=False)
                 .execute()
@@ -54,7 +54,7 @@ class RewardsService(BaseService):
                 insert_data["image_url"] = payload["image_url"] or None
 
             return _first_row(
-                self.client.table("rewards_catalog").insert(insert_data).execute().data
+                self.client.table("rewards").insert(insert_data).execute().data
             )
         except WorkflowError:
             raise
@@ -94,10 +94,10 @@ class RewardsService(BaseService):
             if not update_data:
                 raise WorkflowError("No fields to update")
 
-            self.client.table("rewards_catalog").update(update_data).eq("id", reward_id).execute()
+            self.client.table("rewards").update(update_data).eq("id", reward_id).execute()
 
             updated = (
-                self.client.table("rewards_catalog")
+                self.client.table("rewards")
                 .select("id, name_th, description_th, points_cost, stock_qty, active, image_url, created_at, updated_at")
                 .eq("id", reward_id)
                 .limit(1)

@@ -28,6 +28,8 @@ export const logisticsApi = {
     apiRequest(`/logistics/pickup-jobs/${pickupJobId}/reschedule`, { method: 'PATCH', body: JSON.stringify(payload) }),
   rescheduleDeliveryJob: (deliveryJobId: string, payload: ScheduleRewardDeliveryPayload) =>
     apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/reschedule`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  getRouteDistance: (fromLat: number, fromLng: number, toLat: number, toLng: number) =>
+    apiRequest<{ distance_km: number | null }>(`/logistics/route-distance?from_lat=${fromLat}&from_lng=${fromLng}&to_lat=${toLat}&to_lng=${toLng}`),
   getMyInfo: (options?: RequestBehaviorOptions) =>
     apiRequest<LogisticsInfoItem>('/logistics/me', options),
   updateMyInfo: (payload: UpsertLogisticsInfoPayload) =>
