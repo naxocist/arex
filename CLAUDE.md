@@ -1,16 +1,84 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+# Project: AREX Platform
+
+Agricultural residue exchange platform connecting farmers, logistics, factories, warehouses, and executives in a points-based supply chain.
 
 ## Commands
 
-All common operations run via `mise` from the repo root.
+All common operations via `mise` from repo root:
 
 ```bash
 mise run setup              # npm install + uv sync
-mise run dev:up             # start Supabase stack + all containers (Docker watch)
+mise run dev:up             # start Supabase stack + Docker containers with watch
 mise run dev:down           # stop containers + Supabase
-mise run db:reset           # reset DB, reapply all migrations, run seed.sql
+mise run db:reset           # reset DB, reapply all migrations, run seed
 mise run db:status          # print local Supabase URLs and keys
 mise run db:migrate:new -- name   # create a new migration file
 mise run check              # tsc --noEmit + npm run build + python compileall
@@ -28,56 +96,99 @@ TypeScript check only:
 npx tsc --noEmit
 ```
 
+## Tech Stack
+
+### Frontend
+- **Next.js 16** (App Router) + **React 19** + **TypeScript 5.8**
+- **Tailwind CSS v4** (PostCSS plugin, no config file)
+- **lucide-react** for icons (minimal, monochrome style preferred)
+- **recharts** for charts
+- **react-leaflet** + **leaflet** for maps
+- **motion** for animations
+- **jspdf** for PDF generation
+- **react-day-picker** for date inputs
+
+### Backend
+- **FastAPI** (Python 3.11+) managed by **uv**
+- **Pydantic v2** + **pydantic-settings** for config/models
+- **supabase-py** client for all DB operations
+- **uvicorn** ASGI server
+
+### Database
+- **Supabase** (PostgreSQL) with RLS enabled on all public tables
+- Local dev via Supabase CLI (`supabase start --workdir backend`)
+- Migrations in `backend/supabase/migrations/` — schema DDL only, no data
+- Seed data in `backend/supabase/seeds/seed.sql` (local) and `seed.prod.sql` (prod)
+
+### Dev Tooling
+- **mise** — task runner + tool version manager (Node 20, Python 3.11, uv, supabase CLI)
+- **Docker Compose** — containerized local dev with `docker compose watch` hot reload
+- Two containers: `frontend` (port 3000) and `backend` (port 8000)
+
 ## Architecture
 
 ### Monorepo layout
+```
+/                   Next.js 14 frontend (App Router)
+/backend            FastAPI backend (Python, managed by uv)
+/backend/supabase   Supabase migrations + seeds
+```
 
-- **`/`** — Next.js 14 (App Router) frontend
-- **`/backend`** — FastAPI backend (Python, managed by `uv`)
-- **`/backend/supabase`** — Supabase migrations + seed
+### Frontend structure
+- All authenticated pages under `app/(protected)/`
+- Role segments: `/farmer`, `/logistics`, `/factory`, `/warehouse`, `/executive`, `/admin`
+- Each role page renders a single `_views/` component — large single-file components owning data loading + state
+- `app/_lib/api/` — one file per role + core/auth/types. All HTTP calls go through `app/_lib/apiClient.ts`
+  - Handles token storage (localStorage), auto-refresh on 401, 5-min in-memory GET cache (`GET_RESPONSE_CACHE`)
+  - Pass `{ forceRefresh: true }` to bypass cache
+- `app/_components/` — shared UI primitives: `StatCard`, `SectionCard`, `AlertBanner`, `StatusBadge`, `Sidebar`, `Skeleton`, `EmptyState`, `ConfirmDialog`, `DateRangePicker`, `Pagination`, `PickupLocationMapPicker`, `FarmerProfileSheet`, `StatusStepper`, `ProtectedRoute`, `ErrorBoundary`, `AppLoadingOverlay`
+- `app/_contexts/` — `UserContext` (role from `localStorage AREX_AUTH_ROLE`), `FarmerProfileContext`
+- `app/_shared/` — shared page-level components like `OverviewDashboard`
 
-### Frontend
+### Backend structure
+```
+backend/app/
+  main.py           FastAPI app + CORS + router registration
+  core/config.py    Settings via pydantic-settings (reads .env.local)
+  api/
+    deps.py         get_current_user (JWT via Supabase), require_roles()
+    routes/         farmer.py, logistics.py, factory.py, warehouse.py,
+                    executive.py, admin.py, auth.py, health.py
+  services/
+    workflow_service.py   single service for all DB reads/writes
+    _base.py, farmer_service.py, logistics_service.py, factory_service.py,
+    warehouse_service.py, executive_service.py, rewards_service.py,
+    catalog_service.py
+  db/supabase.py    get_publishable_client() (auth), get_service_client() (DB, bypasses RLS)
+  models/
+    auth.py         AuthenticatedUser, Role enum
+    workflow.py     all request/response Pydantic shapes
+```
 
-- Next.js App Router. All authenticated pages live under `app/(protected)/`.
-- Route segments map to roles: `/farmer`, `/logistics`, `/factory`, `/warehouse`, `/executive`.
-- Each role page renders a single `_views/` component. Views are large single-file components that own their own data loading and state.
-- `app/_lib/apiClient.ts` is the only HTTP layer — all API calls go through it. It handles token storage (localStorage), auto-refresh on 401, and a 5-minute in-memory GET cache (`GET_RESPONSE_CACHE`). Pass `{ forceRefresh: true }` to bypass cache.
-- Role is stored in `UserContext` (initialized from localStorage `AREX_AUTH_ROLE`). After login the role drives which `(protected)/[role]/page.tsx` the user lands on.
-- `app/_components/` holds shared UI primitives (StatCard, SectionCard, AlertBanner, etc.). Do not put business logic here.
+All routes are under `/api/v1`. `WorkflowError` → 400 in routes. Routes never touch DB directly.
 
-### Backend
-
-All routes are under `/api/v1`. The stack:
-
-1. **`app/api/deps.py`** — `get_current_user` validates the Bearer JWT via Supabase publishable client, extracts role from `app_metadata` or falls back to `profiles` table. `require_roles(*roles)` is the FastAPI dependency used in every protected route.
-2. **`app/api/routes/`** — one file per role (`farmer.py`, `logistics.py`, `factory.py`, `warehouse.py`, `executive.py`) plus `auth.py` and `health.py`.
-3. **`app/services/workflow_service.py`** — single service class injected into routes via `get_workflow_service`. All DB reads/writes go here using the Supabase Python client (service role). No raw SQL — uses `.table().select().execute()` pattern.
-4. **`app/db/supabase.py`** — two clients: `get_publishable_client()` (for auth token validation) and `get_service_client()` (for all DB operations, bypasses RLS).
-5. **`app/models/`** — Pydantic models: `auth.py` for `AuthenticatedUser` + `Role` enum; `workflow.py` for request/response shapes.
-
-Errors from `WorkflowService` raise `WorkflowError` (caught in routes and converted to 400). Routes never call the DB directly.
-
-### Database
-
-- Supabase Postgres with RLS enabled on all public tables.
-- **Migrations** in `backend/supabase/migrations/` are schema-only SQL (DDL). Named `YYYYMMDDHHMMSS_description.sql`.
-- **`backend/supabase/seed.sql`** contains all seed data — runs after every `db:reset`. Includes demo auth users, master data (material types, units, point rules, rewards, factories), value chain mappings, and Demo D-06 pilot data block.
-- Never put INSERT/UPDATE data in migrations. Migrations = schema only.
-
-### Key domain concepts
-
-- **Points (PMUC coins)**: `material_point_rules.points_per_kg` × confirmed `measured_weight_kg` = coins credited. Each material type has its own rate (rice_straw=1.0, orchard_residue=3.125, plastic_waste=12.5 pt/kg).
-- **Rewards**: fixed `points_cost` in `rewards_catalog`. Farmers redeem via `reward_requests` → warehouse approves → logistics delivers.
-- **Points ledger**: `points_ledger` table with entry types `intake_credit`, `reward_reserve`, `reward_release`, `reward_spend`, `adjustment`. Balance = sum of all entries for a farmer.
-- **Factories**: `is_focal_point = true` marks CMU (มช.) as the northern hub. Shown as a badge in logistics view.
-- **Pickup flow**: `material_submissions` → `pickup_jobs` (logistics schedules/picks up/delivers) → `factory_intakes` (factory confirms weight) → `points_ledger` credit.
-- **Reward flow**: farmer requests → `reward_requests` (warehouse approves) → `reward_delivery_jobs` (logistics delivers) → points debited.
+### Domain concepts
+- **Points (PMUC coins)**: `material_point_rules.points_per_kg` × confirmed `measured_weight_kg`
+  - rice_straw = 1.0 pt/kg, orchard_residue = 3.125 pt/kg, plastic_waste = 12.5 pt/kg
+- **Points ledger**: `points_ledger` table with types `intake_credit`, `reward_reserve`, `reward_release`, `reward_spend`, `adjustment`
+- **Rewards**: fixed `points_cost` in `rewards_catalog`. Farmer redeems → warehouse approves → logistics delivers
+- **Factories**: `is_focal_point = true` marks CMU (มช.) as northern hub
+- **Pickup flow**: `material_submissions` → `pickup_jobs` (logistics) → `factory_intakes` (factory confirms weight) → `points_ledger` credit
+- **Reward flow**: farmer requests → `reward_requests` (warehouse approves) → `reward_delivery_jobs` (logistics delivers) → points debited
 
 ### Roles
+`farmer`, `logistics`, `factory`, `warehouse`, `executive`, `admin`
+Role stored in `auth.users.app_metadata.role` and mirrored in `profiles.role`.
+Executive manages material types, point rules, measurement units, rewards catalog via Settings UI.
+Admin manages account approvals.
 
-`farmer`, `logistics`, `factory`, `warehouse`, `executive`. Role is stored in `auth.users.app_metadata.role` and mirrored in `profiles.role`. Executive can manage material types, point rules, measurement units, and rewards catalog via the Settings UI.
+### Self-registration
+`farmer`, `logistics`, `factory` support self-registration:
+- `POST /api/v1/auth/register/farmer`
+- `POST /api/v1/auth/register/logistics`
+- `POST /api/v1/auth/register/factory`
 
-## Local dev accounts (after db:reset)
+## Local Dev Accounts (after db:reset)
 
 All passwords: `123456`
 
@@ -100,19 +211,68 @@ All passwords: `123456`
 - Backend API: `http://localhost:8000/api/v1`
 - Supabase Studio: `http://127.0.0.1:54323`
 
+## Backend Env Vars (`.env.local`)
+
+```
+APP_NAME=AREX Backend API
+ENVIRONMENT=development
+DEBUG=true
+API_PREFIX=/api/v1
+CORS_ORIGINS=["http://localhost:3000"]
+SUPABASE_URL=<local supabase url>
+SUPABASE_PUBLISHABLE_KEY=<anon key>
+SUPABASE_SECRET_KEY=<service role key>
+SUPABASE_LEGACY_SERVICE_ROLE_JWT=<optional legacy jwt>
+```
+
 ## Deployment
 
-- Frontend: Vercel (`vercel.json` at root)
-- Backend: Google Cloud Run (`backend/cloudbuild.yaml`)
-- CI/CD: GitHub Actions in `.github/workflows/` — `deploy-backend.yml` (prod) and `deploy-backend-staging.yml` (staging)
-- Staging schema deploy: `mise run deploy:staging-safe` (applies migrations without data reset)
-- Backend env in prod is set via Cloud Build substitutions + Secret Manager secrets
+### Branch strategy
+```
+feature branch → merge to staging → test → merge to main → prod deploys
+```
 
-## Self-registration
+### Frontend — Vercel
+- Auto-deploys on every push: `main` → production, `staging` → preview
+- Env var `NEXT_PUBLIC_API_BASE_URL` set twice in Vercel dashboard: Production = prod Cloud Run URL, Preview = staging Cloud Run URL
+- Root directory: `/` (repo root). Ignore Vercel's offer to deploy `backend/`
 
-`farmer`, `logistics`, and `factory` roles support self-registration:
-- `POST /api/v1/auth/register/farmer`
-- `POST /api/v1/auth/register/logistics`
-- `POST /api/v1/auth/register/factory`
+### Backend — GCP Cloud Run
+- Region: `asia-southeast1`
+- Services: `arex-backend-prod` (main) and `arex-backend-staging` (staging)
+- Images stored in Artifact Registry, tagged by commit SHA
+- All app secrets (Supabase keys, CORS) stored in **GCP Secret Manager** — GitHub Actions never sees them
+- Cloud Run pulls secrets from Secret Manager at runtime
 
-Each creates a Supabase Auth user + `profiles` row (+ `factories` row for factory). Returns tokens immediately.
+### CI/CD — GitHub Actions
+- `deploy-backend.yml` — triggers on push to `main` touching `backend/`
+- `deploy-backend-staging.yml` — triggers on push to `staging` touching `backend/`
+- Pipeline: build Docker image → push to Artifact Registry → deploy to Cloud Run → smoke-check `/api/v1/health` (5 retries, rollback on failure) → upload deploy artifacts
+- Image tags: prod = `SHA`, staging = `SHA-staging` (both also tagged `latest`/`staging` as floating)
+- Concurrency locked per environment (no cancellation of in-flight deploys)
+
+### GitHub Actions secrets required
+| Secret | Value |
+|---|---|
+| `GCP_SA_KEY` | arex-github-deployer service account JSON key |
+| `GCP_PROJECT_ID` | GCP project ID |
+| `GCP_REGION` | e.g. `asia-southeast1` |
+
+### GCP Secret Manager keys
+`AREX_PROD_SUPABASE_URL`, `AREX_PROD_SUPABASE_PUBLISHABLE_KEY`, `AREX_PROD_SUPABASE_SECRET_KEY`, `AREX_PROD_CORS_ORIGINS`, `AREX_STAGING_*` equivalents
+
+### Database migrations for production
+```bash
+# After GCP + Supabase prod project are set up:
+mise run db:push:prod    # apply migrations
+mise run db:seed:prod    # apply reference data (safe to re-run, never wipes)
+```
+
+### Rotating secrets
+```bash
+echo -n "new_value" | gcloud secrets versions add SECRET_NAME --data-file=-
+gcloud run services update arex-backend-prod --region REGION \
+  --update-secrets "ENV_VAR=SECRET_NAME:latest"
+```
+
+See `DEPLOY.md` for full step-by-step first-deploy instructions.

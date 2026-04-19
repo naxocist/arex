@@ -342,18 +342,18 @@ export default function OverviewDashboard() {
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-3">
-                <div className="flex flex-col rounded-2xl border border-primary/20 bg-primary/5 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary/80">ส่งวัสดุทั้งหมด</p>
+                <div className="flex flex-col rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <p className="text-xs font-medium text-stone-400">ส่งวัสดุทั้งหมด</p>
                   <p className="mt-auto pt-3 text-2xl font-semibold text-stone-900">{formatNumber(metrics.submissionsTotal)}</p>
                   <p className="mt-1 text-xs text-stone-500">รายการ</p>
                 </div>
-                <div className="flex flex-col rounded-2xl border border-primary/20 bg-primary/5 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary/80">คำขอแลกรางวัล</p>
+                <div className="flex flex-col rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <p className="text-xs font-medium text-stone-400">คำขอแลกรางวัล</p>
                   <p className="mt-auto pt-3 text-2xl font-semibold text-stone-900">{formatNumber(metrics.rewardRequestsTotal)}</p>
                   <p className="mt-1 text-xs text-stone-500">รายการ</p>
                 </div>
-                <div className="flex flex-col rounded-2xl border border-primary/20 bg-primary/5 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary/80">เกษตรกร</p>
+                <div className="flex flex-col rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <p className="text-xs font-medium text-stone-400">เกษตรกร</p>
                   <p className="mt-auto pt-3 text-2xl font-semibold text-stone-900">{formatNumber(metrics.uniqueFarmersTotal)}</p>
                   <p className="mt-1 text-xs text-stone-500">ราย</p>
                 </div>
