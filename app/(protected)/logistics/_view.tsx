@@ -386,7 +386,7 @@ export default function LogisticsTracking() {
   const [pickupJobSort, setPickupJobSort] = useState<{ key: 'planned_pickup_at' | 'material' | 'status' | 'weight' | 'distance'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'asc' });
   const [pickupJobDistMode, setPickupJobDistMode] = useState<'leg1' | 'leg2' | 'sum'>('leg1');
   const [rewardQueueSort, setRewardQueueSort] = useState<{ key: 'requested_points' | 'reward_name' | 'requested_at' | 'distance'; dir: SortDir }>({ key: 'requested_at', dir: 'asc' });
-  const [deliveryJobSort, setDeliveryJobSort] = useState<{ key: 'planned_delivery_at' | 'status'; dir: SortDir }>({ key: 'planned_delivery_at', dir: 'asc' });
+  const [deliveryJobSort, setDeliveryJobSort] = useState<{ key: 'planned_delivery_at' | 'status' | 'reward_name' | 'distance'; dir: SortDir }>({ key: 'planned_delivery_at', dir: 'asc' });
 
   const submittedQueue = useMemo(() => pickupQueue.filter((i) => i.status === 'submitted'), [pickupQueue]);
 
@@ -461,6 +461,8 @@ export default function LogisticsTracking() {
   const sortedDeliveryJobs = useMemo(() => [...activeRewardDeliveryJobs].sort((a, b) => {
     const mul = deliveryJobSort.dir === 'asc' ? 1 : -1;
     if (deliveryJobSort.key === 'status') return mul * (a.status ?? '').localeCompare(b.status ?? '');
+    if (deliveryJobSort.key === 'reward_name') return mul * (a.reward_name_th ?? '').localeCompare(b.reward_name_th ?? '');
+    if (deliveryJobSort.key === 'distance') return mul * ((a.distance_to_farmer_km ?? Infinity) - (b.distance_to_farmer_km ?? Infinity));
     return mul * (new Date(a.planned_delivery_at ?? 0).getTime() - new Date(b.planned_delivery_at ?? 0).getTime());
   }), [activeRewardDeliveryJobs, deliveryJobSort]);
 
@@ -1304,6 +1306,8 @@ export default function LogisticsTracking() {
                   <SortHeaderBar
                     cols={[
                       { key: 'planned_delivery_at' as const, label: 'วันนัดส่ง', dirLabels: ['เร็วก่อน', 'ช้าก่อน'] },
+                      { key: 'reward_name' as const, label: 'ชื่อรางวัล', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+                      { key: 'distance' as const, label: 'ระยะทาง', dirLabels: ['ใกล้ก่อน', 'ไกลก่อน'] },
                       { key: 'status' as const, label: 'สถานะ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
                     ]}
                     sort={deliveryJobSort}
