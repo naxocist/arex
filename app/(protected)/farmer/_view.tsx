@@ -52,7 +52,7 @@ type SortKey = 'date_desc' | 'date_asc' | 'material';
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'date_desc', label: 'ล่าสุดก่อน' },
   { key: 'date_asc',  label: 'เก่าสุดก่อน' },
-  { key: 'material',  label: 'ชื่อวัสดุ ก–ฮ' },
+  { key: 'material',  label: 'ชื่อวัสดุ ก-ฮ' },
 ];
 
 function hasAccessToken(): boolean {
@@ -87,7 +87,7 @@ function formatPickupWindow(start: string | null | undefined, end: string | null
   const startStr = formatDate(start);
   if (!end) return startStr;
   const endStr = formatDate(end);
-  return startStr === endStr ? startStr : `${startStr} – ${endStr}`;
+  return startStr === endStr ? startStr : `${startStr} - ${endStr}`;
 }
 
 function fallbackThaiUnit(unitCode: string): string {
@@ -420,59 +420,57 @@ export default function FarmerHome() {
                   const showPickupDate = isActiveStatus && item.pickup_window_start_at;
 
                   return (
-                    <article key={item.id} className={`px-4 py-4 ${isCredited ? 'bg-emerald-50/30' : ''}`}>
-                      <div className="flex items-start gap-3">
+                    <article key={item.id} className={`px-4 py-2.5 ${isCredited ? 'bg-emerald-50/30' : ''}`}>
+                      <div className="flex items-start gap-2.5">
                         <StatusDot status={item.status} />
 
                         {/* Main content */}
-                        <div className="min-w-0 flex-1 space-y-2">
-                          {/* Row 1: name + map button */}
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-base font-bold text-stone-900 leading-snug">
-                              {materialNameByCode[item.material_type] ?? item.material_type}
-                            </p>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          {/* Row 1: name + submitted date + map button */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-baseline gap-2 min-w-0">
+                              <p className="text-sm font-bold text-stone-900 leading-snug truncate">
+                                {materialNameByCode[item.material_type] ?? item.material_type}
+                              </p>
+                              <span className="text-xs text-stone-400 shrink-0">ส่งเมื่อ {formatDateTime(item.created_at)}</span>
+                            </div>
                             {hasMap && (
                               <a
                                 href={`https://www.google.com/maps?q=${item.pickup_lat},${item.pickup_lng}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="shrink-0 flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700"
+                                className="shrink-0 flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700"
                               >
-                                <MapPin className="h-3.5 w-3.5" />
-                                แผนที่
+                                <MapPin className="h-3 w-3" />
+                                จุดนัดรับ
                               </a>
                             )}
                           </div>
 
-                          {/* Row 2: qty + points or status badge */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm text-stone-700 font-semibold">
+                          {/* Row 2: qty + badge/points + pickup window */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs text-stone-700 font-semibold">
                               {Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
                             </span>
                             {isCredited && item.credited_points != null ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black tabular-nums text-emerald-700">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-black tabular-nums text-emerald-700">
                                 <Coins className="h-3 w-3" />
                                 +{item.credited_points.toLocaleString('th-TH')} แต้ม
                               </span>
                             ) : (
                               <StatusBadge status={item.status} label={formatSubmissionStatus(item.status)} size="sm" />
                             )}
+                            {showPickupDate && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-xs font-semibold text-sky-700">
+                                🗒 นัดรับ {pickupWindow}
+                              </span>
+                            )}
                           </div>
-
-                          {/* Row 3: submitted date */}
-                          <p className="text-xs text-stone-400">ส่งรายการเมื่อ {formatDateTime(item.created_at)}</p>
-
-                          {/* Row 4: pickup window (when scheduled/in-transit) */}
-                          {showPickupDate && (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200 px-3 py-1 text-xs font-semibold text-sky-700">
-                              🗒 นัดรับ {pickupWindow}
-                            </span>
-                          )}
 
                           {/* pickup location text (no coords) */}
                           {!hasMap && item.pickup_location_text && (
                             <p className="flex items-center gap-1 text-xs text-stone-400">
-                              <MapPin className="h-3.5 w-3.5 shrink-0" />
+                              <MapPin className="h-3 w-3 shrink-0" />
                               {item.pickup_location_text}
                             </p>
                           )}

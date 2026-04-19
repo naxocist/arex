@@ -59,7 +59,7 @@ function formatDateRange(start: string | null | undefined, end: string | null | 
   const s = new Date(start).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
   if (!end) return s;
   const e = new Date(end).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
-  return s === e ? s : `${s} – ${e}`;
+  return s === e ? s : `${s} - ${e}`;
 }
 
 function hasValidCoordinates(lat: number | null | undefined, lng: number | null | undefined): boolean {

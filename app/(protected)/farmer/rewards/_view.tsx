@@ -77,13 +77,13 @@ function RewardImage({ src, alt, className }: { src: string | null; alt: string;
   const [errored, setErrored] = useState(false);
   if (src && !errored) {
     return (
-      <div className={`relative overflow-hidden bg-stone-100 ${className ?? ''}`}>
+      <div className={`relative overflow-hidden bg-stone-50 ${className ?? ''}`}>
         <Image
           src={src}
           alt={alt}
           fill
           unoptimized
-          className="object-cover"
+          className="object-contain p-3"
           onError={() => setErrored(true)}
           sizes="(max-width: 768px) 50vw, 200px"
         />
@@ -264,7 +264,7 @@ export default function FarmerRewards() {
         { label: 'จำนวน', value: `${rewardQty} ชิ้น` },
         { label: 'แต้มที่ใช้', value: `${totalCost.toLocaleString('th-TH')} PMUC Coin` },
         { label: 'แต้มคงเหลือหลังแลก', value: `${after.toLocaleString('th-TH')} PMUC Coin` },
-        { label: 'สถานที่รับ', value: locationText || '(ไม่ระบุ)' },
+        { label: 'สถานที่รับ', value: locationText },
       ],
       _back: { reward, locationText, lat, lng },
       onConfirm: async () => {
@@ -416,7 +416,7 @@ export default function FarmerRewards() {
                     <RewardImage
                       src={reward.image_url}
                       alt={reward.name_th}
-                      className="h-28 w-full sm:h-32"
+                      className="aspect-[4/3] w-full"
                     />
 
                     {/* Content */}
@@ -514,12 +514,7 @@ export default function FarmerRewards() {
                 exit={reduceMotion ? {} : { opacity: 0 }}
                 transition={{ duration: 0.15 }}
               >
-                {/* Sort hint */}
-                <div className="flex items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2">
-                  <span className="text-sm">💡</span>
-                  <p className="text-xs text-amber-700">กดชื่อคอลัมน์เพื่อเรียงลำดับ</p>
-                </div>
-                {/* Column headers */}
+                {/* Sort header */}
                 {(() => {
                   const handleSort = (col: ReqSortCol) => {
                     if (reqSortCol === col) setReqSortDir((d) => d === 'asc' ? 'desc' : 'asc');
@@ -530,14 +525,16 @@ export default function FarmerRewards() {
                       ? <span className="ml-1 whitespace-nowrap rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary leading-none">{reqSortDir === 'desc' ? labels[0] : labels[1]}</span>
                       : null;
                   return (
-                    <div className="grid grid-cols-[1fr_4.5rem_8rem] items-center border-b border-stone-100 bg-stone-50/60 px-4 py-2 text-xs font-semibold text-stone-400">
-                      <button type="button" onClick={() => handleSort('date')} className="flex items-center gap-0.5 text-left hover:text-stone-600 transition-colors">
-                        ขอแลกเมื่อ<Pill col="date" labels={['ล่าสุดก่อน', 'เก่าสุดก่อน']} />
+                    <div className="flex items-center gap-3 border-b border-stone-100 bg-stone-50/60 px-4 py-1.5 text-xs font-semibold text-stone-400">
+                      <button type="button" onClick={() => handleSort('date')} className="flex items-center hover:text-stone-600 transition-colors">
+                        วันที่<Pill col="date" labels={['ล่าสุด', 'เก่าสุด']} />
                       </button>
-                      <button type="button" onClick={() => handleSort('points')} className="flex items-center justify-end gap-0.5 pr-3 hover:text-stone-600 transition-colors">
-                        แต้ม<Pill col="points" labels={['มากก่อน', 'น้อยก่อน']} />
+                      <span className="text-stone-200">·</span>
+                      <button type="button" onClick={() => handleSort('points')} className="flex items-center hover:text-stone-600 transition-colors">
+                        แต้ม<Pill col="points" labels={['มาก', 'น้อย']} />
                       </button>
-                      <button type="button" onClick={() => handleSort('status')} className="flex items-center justify-end gap-0.5 hover:text-stone-600 transition-colors">
+                      <span className="text-stone-200">·</span>
+                      <button type="button" onClick={() => handleSort('status')} className="flex items-center hover:text-stone-600 transition-colors">
                         สถานะ<Pill col="status" labels={['ก→ฮ', 'ฮ→ก']} />
                       </button>
                     </div>
@@ -560,70 +557,70 @@ export default function FarmerRewards() {
                       <button
                         type="button"
                         onClick={() => setExpandedRequestId(isExpanded ? null : request.id)}
-                        className={`grid w-full grid-cols-[1fr_4.5rem_8rem] items-center gap-2 px-4 py-3.5 text-left transition-colors ${
+                        className={`flex w-full items-start gap-2.5 px-4 py-2.5 text-left transition-colors ${
                           isExpanded ? 'bg-stone-50' : 'hover:bg-stone-50/60 active:bg-stone-50'
                         }`}
                       >
-                        {/* Col 1: thumbnail + name + date */}
-                        <div className="min-w-0 flex items-center gap-3">
-                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl">
-                            {rewardImg ? (
-                              <Image src={rewardImg} alt={rewardName} fill unoptimized className="object-cover" sizes="40px" />
-                            ) : (
-                              <div className={`flex h-full w-full items-center justify-center rounded-xl ${
-                                isPending ? 'bg-amber-50' : isDelivered ? 'bg-emerald-50' : 'bg-stone-50'
-                              }`}>
-                                {isPending ? (
-                                  <span className="relative flex h-2.5 w-2.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
-                                  </span>
-                                ) : isDelivered ? (
-                                  <CheckCheck className="h-4 w-4 text-emerald-500" />
-                                ) : (
-                                  <Gift className={`h-4 w-4 ${isApproved ? 'text-sky-400' : 'text-stone-300'}`} />
-                                )}
-                              </div>
-                            )}
-                            {rewardImg && isPending && (
-                              <span className="absolute right-0.5 top-0.5 flex h-2.5 w-2.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
-                              </span>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-stone-900">{rewardName}</p>
-                            <p className="text-xs text-stone-400">ขอแลกเมื่อ {formatDateTime(request.requested_at)}</p>
-                          </div>
-                        </div>
-
-                        {/* Col 2: points */}
-                        <div className="pr-3 text-right">
-                          <p className="text-sm font-semibold tabular-nums text-stone-700">
-                            {Number(request.requested_points).toLocaleString('th-TH')}
-                          </p>
-                          <p className="text-xs text-stone-400">แต้ม</p>
-                        </div>
-
-                        {/* Col 3: status + chevron */}
-                        <div className="flex flex-col items-end gap-1 min-w-0">
-                          {isApproved && hasDelivery ? (
-                            <StatusBadge status={deliveryJob.status} label={formatDeliveryStatus(deliveryJob.status)} size="sm" />
-                          ) : isApproved && !hasDelivery ? (
-                            <StatusBadge status="pickup_scheduled" label="รอจัดส่ง" size="sm" />
+                        {/* Thumbnail */}
+                        <div className="relative mt-0.5 h-9 w-9 shrink-0 overflow-hidden rounded-xl">
+                          {rewardImg ? (
+                            <Image src={rewardImg} alt={rewardName} fill unoptimized className="object-cover" sizes="36px" />
                           ) : (
-                            <StatusBadge status={request.status} label={formatRewardRequestStatus(request.status)} size="sm" />
+                            <div className={`flex h-full w-full items-center justify-center rounded-xl ${
+                              isPending ? 'bg-amber-50' : isDelivered ? 'bg-emerald-50' : 'bg-stone-50'
+                            }`}>
+                              {isPending ? (
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                                  <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400" />
+                                </span>
+                              ) : isDelivered ? (
+                                <CheckCheck className="h-4 w-4 text-emerald-500" />
+                              ) : (
+                                <Gift className={`h-4 w-4 ${isApproved ? 'text-sky-400' : 'text-stone-300'}`} />
+                              )}
+                            </div>
                           )}
-                          <motion.span
-                            animate={reduceMotion ? {} : { rotate: isExpanded ? 180 : 0 }}
-                            transition={{ duration: 0.18 }}
-                            style={{ display: 'inline-flex' }}
-                            className="text-stone-300"
-                          >
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          </motion.span>
+                          {rewardImg && isPending && (
+                            <span className="absolute right-0.5 top-0.5 flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400" />
+                            </span>
+                          )}
                         </div>
+
+                        {/* Main content */}
+                        <div className="min-w-0 flex-1 space-y-1">
+                          {/* Row 1: name + date */}
+                          <div className="flex items-baseline gap-2">
+                            <p className="truncate text-sm font-bold text-stone-900">{rewardName}</p>
+                            <span className="shrink-0 text-xs text-stone-400">ขอเมื่อ {formatDateTime(request.requested_at)}</span>
+                          </div>
+                          {/* Row 2: points chip + status */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-stone-600">
+                              <Coins className="h-3 w-3" />
+                              {Number(request.requested_points).toLocaleString('th-TH')} แต้ม
+                            </span>
+                            {isApproved && hasDelivery ? (
+                              <StatusBadge status={deliveryJob.status} label={formatDeliveryStatus(deliveryJob.status)} size="sm" />
+                            ) : isApproved && !hasDelivery ? (
+                              <StatusBadge status="pickup_scheduled" label="รอจัดส่ง" size="sm" />
+                            ) : (
+                              <StatusBadge status={request.status} label={formatRewardRequestStatus(request.status)} size="sm" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Chevron */}
+                        <motion.span
+                          animate={reduceMotion ? {} : { rotate: isExpanded ? 180 : 0 }}
+                          transition={{ duration: 0.18 }}
+                          style={{ display: 'inline-flex' }}
+                          className="mt-1 shrink-0 text-stone-300"
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </motion.span>
                       </button>
 
                       {/* Expanded detail */}
@@ -717,6 +714,7 @@ export default function FarmerRewards() {
           const unavailable = !reward.active || outOfStock;
           return (
             <>
+              {/* Backdrop */}
               <motion.div
                 key="detail-backdrop"
                 className="fixed inset-0 z-40 bg-black/50"
@@ -725,133 +723,124 @@ export default function FarmerRewards() {
                 exit={reduceMotion ? {} : { opacity: 0 }}
                 onClick={() => setSelectedReward(null)}
               />
-              <motion.div
-                key="detail-sheet"
-                className="fixed inset-x-0 bottom-0 z-50 overflow-hidden rounded-t-3xl bg-white shadow-2xl"
-                initial={reduceMotion ? {} : { y: '100%' }}
-                animate={reduceMotion ? {} : { y: 0 }}
-                exit={reduceMotion ? {} : { y: '100%' }}
-                transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-              >
-                {/* Hero image — tall, edge-to-edge */}
-                <div className="relative h-52 w-full bg-gradient-to-br from-emerald-50 to-stone-100">
-                  {reward.image_url ? (
-                    <Image
-                      src={reward.image_url}
-                      alt={reward.name_th}
-                      fill
-                      unoptimized
-                      className="object-cover"
-                      sizes="100vw"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Gift className="h-20 w-20 text-emerald-200" />
-                    </div>
-                  )}
-                  {/* Close button floated over image */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedReward(null)}
-                    className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition hover:bg-black/50"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                  {/* Insufficient overlay badge */}
-                  {availablePoints < pts * rewardQty && !unavailable && (
-                    <div className="absolute bottom-3 left-4 rounded-full bg-red-500/90 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
-                      แต้มไม่พอ — ขาดอีก {(pts * rewardQty - availablePoints).toLocaleString('th-TH')} แต้ม
-                    </div>
-                  )}
-                  {outOfStock && (
-                    <div className="absolute bottom-3 left-4 rounded-full bg-stone-700/80 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
-                      หมดสต็อก
-                    </div>
-                  )}
-                </div>
 
-                {/* Content */}
-                <div className="space-y-4 px-5 pb-8 pt-5">
-                  <div>
-                    <h3 className="text-xl font-bold text-stone-900">{reward.name_th}</h3>
-                    {reward.description_th && (
-                      <p className="mt-1 text-sm text-stone-500">{reward.description_th}</p>
+              {/* Modal */}
+              <motion.div
+                key="detail-modal"
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                initial={reduceMotion ? {} : { opacity: 0, scale: 0.95 }}
+                animate={reduceMotion ? {} : { opacity: 1, scale: 1 }}
+                exit={reduceMotion ? {} : { opacity: 0, scale: 0.95 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              >
+                <div className="relative flex w-full max-w-2xl flex-col sm:flex-row overflow-hidden rounded-3xl bg-white shadow-2xl">
+
+                  {/* Image — full width on mobile, fixed sidebar on sm+ */}
+                  <div className="relative h-72 w-full shrink-0 sm:h-auto sm:w-80 sm:self-stretch bg-stone-50">
+                    {reward.image_url ? (
+                      <Image
+                        src={reward.image_url}
+                        alt={reward.name_th}
+                        fill
+                        unoptimized
+                        className="object-contain p-5"
+                        sizes="256px"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Gift className="h-16 w-16 text-emerald-200" />
+                      </div>
                     )}
                   </div>
 
-                  {/* Interactive quantity + coin math */}
+                  {/* Right — interactions */}
                   {(() => {
                     const totalCost = pts * rewardQty;
                     const afterBalance = availablePoints - totalCost;
                     const insufficientQty = afterBalance < 0;
                     const maxQty = outOfStock ? 0 : Math.min(10, stock, pts > 0 && availablePoints > 0 ? Math.floor(availablePoints / pts) : 0);
                     return (
-                      <div className="space-y-3">
+                      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
+
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xl font-bold leading-snug text-stone-900">{reward.name_th}</p>
+                            {reward.description_th && (
+                              <p className="mt-1 text-base text-stone-400 leading-snug">{reward.description_th}</p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedReward(null)}
+                            className="shrink-0 flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-400 transition hover:bg-stone-200"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+
                         {/* Quantity picker */}
                         <div className="flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3">
-                          <span className="text-sm font-semibold text-stone-600">จำนวน</span>
+                          <span className="text-lg font-semibold text-stone-600">จำนวน</span>
                           <div className="flex items-center gap-3">
                             <button
                               type="button"
                               onClick={() => setRewardQty((q) => Math.max(1, q - 1))}
                               disabled={rewardQty <= 1}
-                              className="flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-stone-200 text-xl font-bold text-stone-600 transition disabled:opacity-30 active:scale-90"
+                              className="flex h-14 w-14 items-center justify-center rounded-xl border border-stone-200 bg-white text-3xl font-bold text-stone-600 transition disabled:opacity-30 active:scale-90"
                             >−</button>
-                            <span className="w-8 text-center text-xl font-bold text-stone-900">{rewardQty}</span>
+                            <span className="w-10 text-center text-3xl font-bold text-stone-900">{rewardQty}</span>
                             <button
                               type="button"
                               onClick={() => setRewardQty((q) => Math.min(maxQty, q + 1))}
                               disabled={rewardQty >= maxQty}
-                              className="flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-stone-200 text-xl font-bold text-stone-600 transition disabled:opacity-30 active:scale-90"
+                              className="flex h-14 w-14 items-center justify-center rounded-xl border border-stone-200 bg-white text-3xl font-bold text-stone-600 transition disabled:opacity-30 active:scale-90"
                             >+</button>
                           </div>
                         </div>
 
-                        {/* Coin math card */}
-                        <div className="rounded-2xl border border-stone-100 overflow-hidden">
-                          <div className="flex items-center justify-between px-4 py-3">
-                            <span className="text-sm text-stone-400">ราคา/ชิ้น</span>
-                            <span className="text-sm font-semibold text-stone-700">{pts.toLocaleString('th-TH')} แต้ม</span>
+                        {/* Coin math */}
+                        <div className="rounded-2xl border border-stone-100 overflow-hidden text-base">
+                          <div className="flex justify-between px-4 py-3">
+                            <span className="text-stone-400">ราคา/ชิ้น</span>
+                            <span className="font-semibold text-stone-700">{pts.toLocaleString('th-TH')} แต้ม</span>
                           </div>
-                          <div className="flex items-center justify-between border-t border-stone-100 bg-stone-50 px-4 py-3">
-                            <span className="text-sm text-stone-400">รวมที่ใช้</span>
-                            <span className={`text-base font-bold ${insufficientQty ? 'text-red-500' : 'text-stone-800'}`}>
+                          <div className="flex justify-between border-t border-stone-100 bg-stone-50 px-4 py-3">
+                            <span className="text-stone-400">รวม</span>
+                            <span className={`font-bold text-base ${insufficientQty ? 'text-red-500' : 'text-stone-800'}`}>
                               {totalCost.toLocaleString('th-TH')} แต้ม
                             </span>
                           </div>
-                          <div className="flex items-center justify-between border-t border-stone-100 px-4 py-3">
-                            <span className="text-sm text-stone-400">แต้มของคุณ</span>
-                            <div className="flex items-center gap-2 text-sm font-semibold">
-                              <span className="text-stone-500">{availablePoints.toLocaleString('th-TH')}</span>
-                              <span className="text-stone-300">→</span>
-                              <span className={insufficientQty ? 'text-red-500 font-bold' : 'text-emerald-600 font-bold'}>
-                                {afterBalance.toLocaleString('th-TH')}
-                              </span>
-                            </div>
+                          <div className="flex justify-between border-t border-stone-100 px-4 py-3">
+                            <span className="text-stone-400">คงเหลือ</span>
+                            <span className={`font-bold text-base ${insufficientQty ? 'text-red-500' : 'text-emerald-600'}`}>
+                              {afterBalance.toLocaleString('th-TH')}
+                            </span>
                           </div>
                         </div>
 
                         {insufficientQty && (
-                          <p className="text-center text-xs font-semibold text-red-500">
-                            แต้มไม่พอ — ขาดอีก {(totalCost - availablePoints).toLocaleString('th-TH')} แต้ม
+                          <p className="text-center text-sm font-semibold text-red-500">
+                            ขาดอีก {(totalCost - availablePoints).toLocaleString('th-TH')} แต้ม
                           </p>
                         )}
                         {outOfStock && (
-                          <p className="text-center text-xs font-semibold text-stone-400">สินค้าหมดสต็อก</p>
+                          <p className="text-center text-sm font-semibold text-stone-400">หมดสต็อก</p>
                         )}
+
+                        {/* CTA */}
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedReward(null); void handleCreateRewardRequest(reward, rewardQty); }}
+                          disabled={unavailable || availablePoints < pts * rewardQty || requestingRewardId === reward.id}
+                          className="flex w-full min-h-[64px] items-center justify-center gap-2 rounded-2xl bg-primary text-lg font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+                        >
+                          <Gift className="h-5 w-5" />
+                          {requestingRewardId === reward.id ? 'กำลังส่งคำขอ...' : 'ขอแลกรางวัลนี้'}
+                        </button>
                       </div>
                     );
                   })()}
-
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedReward(null); void handleCreateRewardRequest(reward, rewardQty); }}
-                    disabled={unavailable || availablePoints < pts * rewardQty || requestingRewardId === reward.id}
-                    className="flex w-full min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40"
-                  >
-                    <Gift className="h-5 w-5" />
-                    {requestingRewardId === reward.id ? 'กำลังส่งคำขอ...' : 'ขอแลกรางวัลนี้'}
-                  </button>
                 </div>
               </motion.div>
             </>
@@ -886,69 +875,80 @@ export default function FarmerRewards() {
               exit={reduceMotion ? {} : { opacity: 0 }}
               onClick={() => setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null })}
             />
+
+            {/* Location modal */}
             <motion.div
-              key="sheet"
-              className="fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl"
-              initial={reduceMotion ? {} : { y: '100%' }}
-              animate={reduceMotion ? {} : { y: 0 }}
-              exit={reduceMotion ? {} : { y: '100%' }}
-              transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+              key="location-modal"
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              initial={reduceMotion ? {} : { opacity: 0, scale: 0.95 }}
+              animate={reduceMotion ? {} : { opacity: 1, scale: 1 }}
+              exit={reduceMotion ? {} : { opacity: 0, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             >
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-100 bg-white px-5 py-4">
-                <div className="flex items-center gap-3">
+              <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl max-h-[90dvh]">
+
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-stone-100 px-6 py-5">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => { setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null }); setSelectedReward(locationPicker.reward); }}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-500 transition hover:bg-stone-200"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </button>
+                    <div>
+                      <p className="text-xl font-bold text-stone-900">ระบุสถานที่รับของรางวัล</p>
+                      <p className="text-base text-stone-400">{locationPicker.reward?.name_th} · {rewardQty} ชิ้น</p>
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => { setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null }); setSelectedReward(locationPicker.reward); }}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-500"
+                    onClick={() => setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null })}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-stone-100 text-stone-400 transition hover:bg-stone-200"
                   >
-                    <ArrowLeft className="h-5 w-5" />
+                    <X className="h-5 w-5" />
                   </button>
-                  <div>
-                    <p className="text-base font-bold text-stone-900">ระบุสถานที่รับของรางวัล</p>
-                    <p className="text-xs text-stone-400">{locationPicker.reward?.name_th} · {rewardQty} ชิ้น</p>
+                </div>
+
+                {/* Body */}
+                <div className="flex flex-col gap-4 overflow-y-auto px-6 pb-6 pt-5">
+                  <div className="space-y-2">
+                    <label className="block text-base font-semibold text-stone-700">สถานที่รับของ</label>
+                    <input
+                      type="text"
+                      value={locationPicker.locationText}
+                      onChange={(e) => setLocationPicker((prev) => ({ ...prev, locationText: e.target.value }))}
+                      placeholder="เช่น หน้าบ้าน / หน้าวัด"
+                      className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-lg text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                    />
                   </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null })}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-500"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
 
-              <div className="space-y-4 px-5 pb-8 pt-5">
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-stone-700">สถานที่รับของ</label>
-                  <input
-                    type="text"
-                    value={locationPicker.locationText}
-                    onChange={(e) => setLocationPicker((prev) => ({ ...prev, locationText: e.target.value }))}
-                    placeholder="เช่น หน้าบ้าน / หน้าวัด"
-                    className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-base text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                  <div className="rounded-xl bg-emerald-50 px-4 py-3 text-base text-emerald-700">
+                    ปักหมุดบนแผนที่เพื่อให้ขนส่งนำทางได้ถูกต้อง
+                  </div>
+
+                  <PickupLocationMapPicker
+                    lat={locationPicker.lat}
+                    lng={locationPicker.lng}
+                    onChange={({ lat, lng }) => setLocationPicker((prev) => ({ ...prev, lat, lng }))}
+                    onAddressResolved={(address) => setLocationPicker((prev) => ({ ...prev, locationText: address }))}
+                    mapHeightClassName="h-[300px] w-full overflow-hidden rounded-2xl"
                   />
+
+                  {!locationPicker.locationText.trim() && (
+                    <p className="text-center text-base font-semibold text-red-500">กรุณาระบุสถานที่รับของก่อน</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleLocationConfirmed(locationPicker.locationText, locationPicker.lat, locationPicker.lng)}
+                    disabled={!locationPicker.locationText.trim()}
+                    className="flex w-full min-h-[64px] items-center justify-center gap-2 rounded-2xl bg-primary text-lg font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+                  >
+                    <Gift className="h-5 w-5" />
+                    ยืนยันสถานที่และขอแลกรางวัล
+                  </button>
                 </div>
-
-                <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  ปักหมุดบนแผนที่เพื่อให้ขนส่งนำทางได้ถูกต้อง
-                </div>
-
-                <PickupLocationMapPicker
-                  lat={locationPicker.lat}
-                  lng={locationPicker.lng}
-                  onChange={({ lat, lng }) => setLocationPicker((prev) => ({ ...prev, lat, lng }))}
-                  onAddressResolved={(address) => setLocationPicker((prev) => ({ ...prev, locationText: address }))}
-                  mapHeightClassName="h-[260px] w-full overflow-hidden rounded-2xl"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => handleLocationConfirmed(locationPicker.locationText, locationPicker.lat, locationPicker.lng)}
-                  className="flex w-full min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 active:scale-95"
-                >
-                  <Gift className="h-5 w-5" />
-                  ยืนยันสถานที่และขอแลกรางวัล
-                </button>
               </div>
             </motion.div>
           </>

@@ -24,7 +24,7 @@ export function Pagination({ total, page, limit, onChange }: PaginationProps) {
   return (
     <div className="flex items-center justify-between pt-3">
       <span className="text-xs text-stone-400">
-        แสดง {Math.min((page - 1) * limit + 1, total)}–{Math.min(page * limit, total)} จาก {total} รายการ
+        แสดง {Math.min((page - 1) * limit + 1, total)}-{Math.min(page * limit, total)} จาก {total} รายการ
       </span>
       <div className="flex items-center gap-1">
         <button
