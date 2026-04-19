@@ -279,6 +279,64 @@ class LogisticsService(BaseService):
         except Exception as exc:
             raise WorkflowError(f"Failed to mark delivered to factory: {exc}") from exc
 
+    def reschedule_pickup_job(
+        self,
+        pickup_job_id: str,
+        payload: SchedulePickupRequest,
+    ) -> dict[str, Any]:
+        try:
+            dest_rows = (
+                self.client.table("factories")
+                .select("id, active")
+                .eq("id", payload.destination_factory_id)
+                .limit(1)
+                .execute()
+            ).data or []
+            if not dest_rows:
+                raise WorkflowError("Destination factory not found")
+            if not bool(dest_rows[0].get("active")):
+                raise WorkflowError("Destination factory is inactive")
+            rows = (
+                self.client.table("pickup_jobs")
+                .update({
+                    "planned_pickup_at": payload.pickup_window_start_at.isoformat(),
+                    "pickup_window_end_at": payload.pickup_window_end_at.isoformat(),
+                    "destination_factory_id": payload.destination_factory_id,
+                })
+                .eq("id", pickup_job_id)
+                .execute()
+            ).data or []
+            if not rows:
+                raise WorkflowError("Pickup job not found")
+            return rows[0]
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to reschedule pickup job: {exc}") from exc
+
+    def reschedule_delivery_job(
+        self,
+        delivery_job_id: str,
+        payload: ScheduleRewardDeliveryRequest,
+    ) -> dict[str, Any]:
+        try:
+            rows = (
+                self.client.table("reward_delivery_jobs")
+                .update({
+                    "planned_delivery_at": payload.delivery_window_start_at.isoformat(),
+                    "delivery_window_end_at": payload.delivery_window_end_at.isoformat(),
+                })
+                .eq("id", delivery_job_id)
+                .execute()
+            ).data or []
+            if not rows:
+                raise WorkflowError("Delivery job not found")
+            return rows[0]
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to reschedule delivery job: {exc}") from exc
+
     def list_approved_reward_requests(self) -> list[dict[str, Any]]:
         try:
             approved = (

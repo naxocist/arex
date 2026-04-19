@@ -13,6 +13,7 @@ import {
   MapPin,
   Navigation,
   PackageCheck,
+  Pencil,
   Phone,
   RefreshCw,
   Route,
@@ -129,6 +130,10 @@ function formatLoadIssue(label: string, error: unknown): string {
 
 function dateOnlyToStartIso(d: string): string { return new Date(`${d}T00:00:00`).toISOString(); }
 function dateOnlyToEndIso(d: string): string { return new Date(`${d}T23:59:59`).toISOString(); }
+function isoToDateOnly(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  return iso.slice(0, 10);
+}
 function toKgForSort(value: number | null | undefined, unit: string | null | undefined): number {
   const v = Number(value ?? 0);
   if (unit === 'ton') return v * 1000;
@@ -407,6 +412,14 @@ export default function LogisticsTracking() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [routeModal, setRouteModal] = useState<{ title: string; stops: RouteStop[] } | null>(null);
+  const [editingPickupJobId, setEditingPickupJobId] = useState<string | null>(null);
+  const [editPickupRangeById, setEditPickupRangeById] = useState<Record<string, DateRangeValue>>({});
+  const [editPickupFactoryById, setEditPickupFactoryById] = useState<Record<string, string>>({});
+  const [reschedulingPickupJobId, setReschedulingPickupJobId] = useState<string | null>(null);
+  const [editingDeliveryJobId, setEditingDeliveryJobId] = useState<string | null>(null);
+  const [editDeliveryRangeById, setEditDeliveryRangeById] = useState<Record<string, DateRangeValue>>({});
+  const [reschedulingDeliveryJobId, setReschedulingDeliveryJobId] = useState<string | null>(null);
+
   const [pickupQueueSort, setPickupQueueSort] = useState<{ key: 'created_at' | 'material' | 'weight'; dir: SortDir }>({ key: 'created_at', dir: 'desc' });
   const [pickupJobSort, setPickupJobSort] = useState<{ key: 'planned_pickup_at' | 'material' | 'status' | 'weight'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'asc' });
   const [rewardQueueSort, setRewardQueueSort] = useState<{ key: 'requested_points' | 'reward_name' | 'requested_at'; dir: SortDir }>({ key: 'requested_at', dir: 'asc' });
@@ -567,6 +580,43 @@ export default function LogisticsTracking() {
     try { await logisticsApi.markDeliveredToFactory(jobId); setMessage('อัปเดตสถานะเป็นส่งถึงโรงงานแล้ว'); await loadAll(true); }
     catch (error) { setMessage(error instanceof ApiError ? `อัปเดตสถานะไม่สำเร็จ: ${error.message}` : 'อัปเดตสถานะไม่สำเร็จ'); }
     finally { setUpdatingPickupJobId(null); }
+  };
+
+  const handleReschedulePickup = async (jobId: string) => {
+    const range = editPickupRangeById[jobId] || { from: null, to: null };
+    if (!range.from || !range.to) { setMessage('กรุณาระบุช่วงวันนัดรับให้ครบ'); return; }
+    const factoryId = editPickupFactoryById[jobId];
+    if (!factoryId) { setMessage('กรุณาเลือกโรงงานปลายทาง'); return; }
+    setReschedulingPickupJobId(jobId); setMessage(null);
+    try {
+      await logisticsApi.reschedulePickup(jobId, {
+        pickup_window_start_at: dateOnlyToStartIso(range.from),
+        pickup_window_end_at: dateOnlyToEndIso(range.to),
+        destination_factory_id: factoryId,
+      });
+      setMessage('แก้ไขตารางรับวัสดุสำเร็จแล้ว');
+      setEditingPickupJobId(null);
+      await loadAll(true);
+    } catch (error) {
+      setMessage(error instanceof ApiError ? `แก้ไขไม่สำเร็จ: ${error.message}` : 'แก้ไขไม่สำเร็จ');
+    } finally { setReschedulingPickupJobId(null); }
+  };
+
+  const handleRescheduleDelivery = async (jobId: string) => {
+    const range = editDeliveryRangeById[jobId] || { from: null, to: null };
+    if (!range.from || !range.to) { setMessage('กรุณาระบุช่วงวันนำส่งให้ครบ'); return; }
+    setReschedulingDeliveryJobId(jobId); setMessage(null);
+    try {
+      await logisticsApi.rescheduleDeliveryJob(jobId, {
+        delivery_window_start_at: dateOnlyToStartIso(range.from),
+        delivery_window_end_at: dateOnlyToEndIso(range.to),
+      });
+      setMessage('แก้ไขตารางส่งรางวัลสำเร็จแล้ว');
+      setEditingDeliveryJobId(null);
+      await loadAll(true);
+    } catch (error) {
+      setMessage(error instanceof ApiError ? `แก้ไขไม่สำเร็จ: ${error.message}` : 'แก้ไขไม่สำเร็จ');
+    } finally { setReschedulingDeliveryJobId(null); }
   };
 
   const handleScheduleRewardDelivery = async (requestId: string) => {
@@ -992,6 +1042,70 @@ export default function LogisticsTracking() {
                                   </div>
                                 </div>
                               )}
+                              {/* ── Edit schedule ── */}
+                              {item.status === 'pickup_scheduled' && (
+                                <div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (editingPickupJobId === item.id) { setEditingPickupJobId(null); return; }
+                                      setEditingPickupJobId(item.id);
+                                      setEditPickupRangeById((p) => ({ ...p, [item.id]: { from: isoToDateOnly(item.planned_pickup_at), to: isoToDateOnly(item.pickup_window_end_at) } }));
+                                      setEditPickupFactoryById((p) => ({ ...p, [item.id]: item.destination_factory_id ?? '' }));
+                                    }}
+                                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                    {editingPickupJobId === item.id ? 'ซ่อนฟอร์มแก้ไข' : 'แก้ไขวันนัดรับ / โรงงาน'}
+                                  </button>
+                                  <AnimatePresence initial={false}>
+                                    {editingPickupJobId === item.id && (
+                                      <motion.div
+                                        key="edit-pickup"
+                                        initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
+                                        animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
+                                        exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.22, ease: 'easeInOut' }}
+                                        style={{ overflow: 'hidden' }}
+                                      >
+                                        <div className="mt-2 space-y-3 rounded-xl border border-sky-100 bg-sky-50/50 p-3">
+                                          <div className="space-y-1.5">
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">โรงงานปลายทาง</p>
+                                            <select
+                                              value={editPickupFactoryById[item.id] ?? ''}
+                                              onChange={(e) => setEditPickupFactoryById((p) => ({ ...p, [item.id]: e.target.value }))}
+                                              className="w-full rounded-xl border border-outline-variant/20 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 min-h-[44px]"
+                                            >
+                                              <option value="">เลือกโรงงาน</option>
+                                              {factoryOptions.map((f) => (
+                                                <option key={f.id} value={f.id}>{f.name_th}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                          <div className="space-y-1.5">
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">ช่วงวันนัดรับใหม่</p>
+                                            <DateRangePicker
+                                              value={editPickupRangeById[item.id] || { from: null, to: null }}
+                                              onChange={(v) => setEditPickupRangeById((p) => ({ ...p, [item.id]: v }))}
+                                              minDate={new Date()}
+                                              placeholder="เลือกช่วงวัน"
+                                            />
+                                          </div>
+                                          <motion.button
+                                            type="button"
+                                            onClick={() => confirm('ยืนยันแก้ไขตารางรับวัสดุ?', () => void handleReschedulePickup(item.id))}
+                                            disabled={reschedulingPickupJobId === item.id || !editPickupRangeById[item.id]?.from || !editPickupRangeById[item.id]?.to || !editPickupFactoryById[item.id]}
+                                            className="flex w-full min-h-[40px] items-center justify-center gap-1.5 rounded-xl bg-sky-500 text-xs font-semibold text-white transition hover:bg-sky-600 disabled:opacity-40"
+                                            whileTap={reduceMotion ? {} : { scale: 0.97 }}
+                                          >
+                                            {reschedulingPickupJobId === item.id ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                                          </motion.button>
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              )}
                             </div>
                           }
                         >
@@ -1293,6 +1407,56 @@ export default function LogisticsTracking() {
                                   )}
                                 </div>
                               </div>
+                              {/* ── Edit delivery schedule ── */}
+                              {item.status === 'reward_delivery_scheduled' && (
+                                <div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (editingDeliveryJobId === item.id) { setEditingDeliveryJobId(null); return; }
+                                      setEditingDeliveryJobId(item.id);
+                                      setEditDeliveryRangeById((p) => ({ ...p, [item.id]: { from: isoToDateOnly(item.planned_delivery_at), to: isoToDateOnly(item.delivery_window_end_at) } }));
+                                    }}
+                                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                    {editingDeliveryJobId === item.id ? 'ซ่อนฟอร์มแก้ไข' : 'แก้ไขวันนำส่ง'}
+                                  </button>
+                                  <AnimatePresence initial={false}>
+                                    {editingDeliveryJobId === item.id && (
+                                      <motion.div
+                                        key="edit-delivery"
+                                        initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
+                                        animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
+                                        exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.22, ease: 'easeInOut' }}
+                                        style={{ overflow: 'hidden' }}
+                                      >
+                                        <div className="mt-2 space-y-3 rounded-xl border border-violet-100 bg-violet-50/50 p-3">
+                                          <div className="space-y-1.5">
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">ช่วงวันนำส่งใหม่</p>
+                                            <DateRangePicker
+                                              value={editDeliveryRangeById[item.id] || { from: null, to: null }}
+                                              onChange={(v) => setEditDeliveryRangeById((p) => ({ ...p, [item.id]: v }))}
+                                              minDate={new Date()}
+                                              placeholder="เลือกช่วงวัน"
+                                            />
+                                          </div>
+                                          <motion.button
+                                            type="button"
+                                            onClick={() => confirm('ยืนยันแก้ไขตารางส่งรางวัล?', () => void handleRescheduleDelivery(item.id))}
+                                            disabled={reschedulingDeliveryJobId === item.id || !editDeliveryRangeById[item.id]?.from || !editDeliveryRangeById[item.id]?.to}
+                                            className="flex w-full min-h-[40px] items-center justify-center gap-1.5 rounded-xl bg-violet-500 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:opacity-40"
+                                            whileTap={reduceMotion ? {} : { scale: 0.97 }}
+                                          >
+                                            {reschedulingDeliveryJobId === item.id ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                                          </motion.button>
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              )}
                             </div>
                           }
                         >

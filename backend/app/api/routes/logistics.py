@@ -103,6 +103,34 @@ def schedule_pickup(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.patch("/pickup-jobs/{pickup_job_id}/reschedule")
+def reschedule_pickup_job(
+    pickup_job_id: str,
+    payload: SchedulePickupRequest,
+    current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
+) -> dict[str, Any]:
+    try:
+        result = workflow_service.reschedule_pickup_job(pickup_job_id, payload)
+        return {"message": "Pickup job rescheduled", "result": result}
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.patch("/reward-delivery-jobs/{delivery_job_id}/reschedule")
+def reschedule_delivery_job(
+    delivery_job_id: str,
+    payload: ScheduleRewardDeliveryRequest,
+    current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
+) -> dict[str, Any]:
+    try:
+        result = workflow_service.reschedule_delivery_job(delivery_job_id, payload)
+        return {"message": "Delivery job rescheduled", "result": result}
+    except WorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 @router.post("/pickup-jobs/{pickup_job_id}/delivered-to-factory")
 def mark_delivered_to_factory(
     pickup_job_id: str,

@@ -24,6 +24,10 @@ export const logisticsApi = {
     apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/out-for-delivery`, { method: 'POST' }),
   markRewardDelivered: (deliveryJobId: string) =>
     apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/delivered`, { method: 'POST' }),
+  reschedulePickup: (pickupJobId: string, payload: SchedulePickupPayload) =>
+    apiRequest(`/logistics/pickup-jobs/${pickupJobId}/reschedule`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  rescheduleDeliveryJob: (deliveryJobId: string, payload: ScheduleRewardDeliveryPayload) =>
+    apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/reschedule`, { method: 'PATCH', body: JSON.stringify(payload) }),
   getMyInfo: (options?: RequestBehaviorOptions) =>
     apiRequest<LogisticsInfoItem>('/logistics/me', options),
   updateMyInfo: (payload: UpsertLogisticsInfoPayload) =>
