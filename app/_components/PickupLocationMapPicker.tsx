@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import L, { type LatLngExpression } from 'leaflet';
 import { LoaderCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -204,31 +205,34 @@ export default function PickupLocationMapPicker(props: PickupLocationMapPickerPr
         {isResolvingAddress ? <span>กำลังดึงที่อยู่...</span> : null}
       </div>
     </div>
-    <AnimatePresence>
-      {isBusy ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="fixed inset-0 z-[2200] flex items-center justify-center bg-white/70 backdrop-blur-md"
-        >
+    {typeof window !== 'undefined' && createPortal(
+      <AnimatePresence>
+        {isBusy ? (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            transition={{ duration: 0.24, ease: 'easeOut' }}
-            className="mx-4 flex max-w-sm items-center gap-4 rounded-2xl border border-emerald-200 bg-white px-5 py-4 shadow-xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="fixed inset-0 z-[2200] flex items-center justify-center bg-white/70 backdrop-blur-md"
           >
-            <LoaderCircle className="h-6 w-6 animate-spin text-emerald-700" />
-            <div>
-              <p className="text-sm font-semibold text-on-surface">กำลังดึงข้อมูลที่อยู่</p>
-              <p className="mt-1 text-sm text-on-surface-variant">{busyMessage}</p>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ duration: 0.24, ease: 'easeOut' }}
+              className="mx-4 flex max-w-sm items-center gap-4 rounded-2xl border border-emerald-200 bg-white px-5 py-4 shadow-xl"
+            >
+              <LoaderCircle className="h-6 w-6 animate-spin text-emerald-700" />
+              <div>
+                <p className="text-sm font-semibold text-on-surface">กำลังดึงข้อมูลที่อยู่</p>
+                <p className="mt-1 text-sm text-on-surface-variant">{busyMessage}</p>
+              </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+        ) : null}
+      </AnimatePresence>,
+      document.body
+    )}
     </>
   );
 }

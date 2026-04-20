@@ -190,26 +190,25 @@ Admin manages account approvals.
 
 ## Local Dev Accounts (after db:reset)
 
-All passwords: `123456`
+All passwords: `123456`. Farmer is the only role requiring admin approval.
 
 | Email | Role | Notes |
 |---|---|---|
-| farmer@gmail.com | farmer | submissions in every status, reward requests in every status |
-| farmer2@gmail.com | farmer | delivery jobs in every status |
-| farmer3@gmail.com | farmer | complete end-to-end flow (points_credited + reward delivered) |
-| logistics@gmail.com | logistics | handles สระบุรี / central region jobs |
-| logistics2@gmail.com | logistics | handles ลพบุรี / เชียงใหม่ region jobs |
-| factory@gmail.com | factory | สระบุรี factory |
-| factory2@gmail.com | factory | ชัยนาท factory |
+| fac1@gmail.com | factory | โรงงาน 1 — สระบุรี |
+| fac2@gmail.com | factory | โรงงาน 2 — ชัยนาท |
+| logis1@gmail.com | logistics | ขนส่ง 1 — สระบุรี, handles central/east/north-east jobs |
+| logis2@gmail.com | logistics | ขนส่ง 2 — เชียงใหม่, handles CMU-area jobs |
+| farmer1@gmail.com | farmer | เกษตรกร 1 — all submission statuses + reward requested/approved/rejected |
+| farmer2@gmail.com | farmer | เกษตรกร 2 — reward delivered + cancelled |
+| farmer3@gmail.com | farmer | เกษตรกร 3 — complete end-to-end (points + reward delivered via CMU) |
+| farmer4@gmail.com | farmer | เกษตรกร 4 — reward out_for_delivery + release (cancel) |
+| farmer5@gmail.com | farmer | เกษตรกร 5 — warehouse_rejected reward flow |
 | warehouse@gmail.com | warehouse | |
 | executive@gmail.com | executive | |
-| admin@gmail.com | admin | sees 3 pending approvals (2 farmers + 1 logistics) |
-| demo_farmer1@arex.local | farmer | D-06 demo — points credited + reward delivered |
-| demo_farmer2@arex.local | farmer | D-06 demo — points credited + reward pending |
-| demo_farmer3@arex.local | farmer | D-06 demo — submitted submission |
-| demo_logistics@arex.local | logistics | D-06 demo — เชียงใหม่ |
-| demo_factory@arex.local | factory | D-06 demo — มช. factory |
-| demo_warehouse@arex.local | warehouse | D-06 demo |
+| admin@gmail.com | admin | sees 2 pending farmer approvals + 1 rejected |
+| farmerpending1@gmail.com | farmer | approval_status = pending |
+| farmerpending2@gmail.com | farmer | approval_status = pending |
+| farmerrejected@gmail.com | farmer | approval_status = rejected |
 
 ## Local URLs
 

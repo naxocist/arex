@@ -7,6 +7,7 @@ export {
   clearAuthSession,
   getStoredRole,
   getStoredApprovalStatus,
+  hasAccessToken,
 } from './auth-session';
 
 export * from './types';

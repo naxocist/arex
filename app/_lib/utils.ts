@@ -84,3 +84,18 @@ export const THAI_PROVINCES = [
   'อุทัยธานี',
   'อุบลราชธานี',
 ] as const;
+
+export function formatDate(dateTime: string | null | undefined): string {
+  if (!dateTime) return '-';
+  return new Date(dateTime).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
+}
+
+export function formatDateTime(dateTime: string | null | undefined): string {
+  if (!dateTime) return '-';
+  return new Date(dateTime).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+export function fallbackThaiUnit(unitCode: string): string {
+  const map: Record<string, string> = { kg: 'กิโลกรัม', ton: 'ตัน' };
+  return map[unitCode] ?? unitCode;
+}

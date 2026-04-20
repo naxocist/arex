@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
-  ArrowUpDown,
   CalendarRange,
   CheckCheck,
   ChevronDown,
@@ -26,17 +25,16 @@ import StatusBadge from '@/app/_components/StatusBadge';
 import { generatePickupJobPdf, generateDeliveryJobPdf } from '@/app/_lib/pdfGenerator';
 import {
   ApiError,
+  hasAccessToken,
   logisticsApi,
   type LogisticsInfoItem,
   type LogisticsPickupJobItem,
   type LogisticsRewardDeliveryJobItem,
 } from '@/app/_lib/api';
 import { fetchRoadDistanceKm, formatKm, buildGoogleMapsDirectionsUrl } from '@/app/_lib/geo';
-
-function hasAccessToken(): boolean {
-  if (typeof window === 'undefined') return false;
-  return Boolean(localStorage.getItem('AREX_ACCESS_TOKEN'));
-}
+import { formatDateRange, hasValidCoordinates, buildGoogleMapsUrl } from '../_components/logisticsUtils';
+import { fallbackThaiUnit } from '@/app/_lib/utils';
+import SortHeaderBar, { type SortDir } from '@/app/_components/SortHeaderBar';
 
 function formatMaterial(materialType: string): string {
   const map: Record<string, string> = {
@@ -47,27 +45,6 @@ function formatMaterial(materialType: string): string {
     plastic_waste: 'พลาสติก',
   };
   return map[materialType] ?? materialType;
-}
-
-function fallbackThaiUnit(unitCode: string): string {
-  const map: Record<string, string> = { kg: 'กิโลกรัม', ton: 'ตัน' };
-  return map[unitCode] ?? unitCode;
-}
-
-function formatDateRange(start: string | null | undefined, end: string | null | undefined): string {
-  if (!start) return '-';
-  const s = new Date(start).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
-  if (!end) return s;
-  const e = new Date(end).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
-  return s === e ? s : `${s} - ${e}`;
-}
-
-function hasValidCoordinates(lat: number | null | undefined, lng: number | null | undefined): boolean {
-  return typeof lat === 'number' && Number.isFinite(lat) && typeof lng === 'number' && Number.isFinite(lng);
-}
-
-function buildGoogleMapsUrl(lat: number, lng: number): string {
-  return `https://www.google.com/maps?q=${lat},${lng}`;
 }
 
 function copyToClipboard(text: string): Promise<void> {
@@ -136,53 +113,13 @@ function HistoryCard({
   );
 }
 
-type SortDir = 'asc' | 'desc';
-
-function SortHeaderBar<T extends string>({
-  cols,
-  sort,
-  onSort,
-}: {
-  cols: { key: T; label: string; dirLabels?: [string, string] }[];
-  sort: { key: T; dir: SortDir };
-  onSort: (key: T) => void;
-}) {
-  return (
-    <div className="flex items-center gap-1 border-b border-stone-100 bg-stone-50/70 px-4 py-2 rounded-t-xl -mb-1 flex-wrap">
-      {cols.map((col) => {
-        const active = sort.key === col.key;
-        const [ascLabel, descLabel] = col.dirLabels ?? ['ก่อน', 'หลัง'];
-        return (
-          <button
-            key={col.key}
-            type="button"
-            onClick={() => onSort(col.key)}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
-              active ? 'text-primary' : 'text-stone-400 hover:text-stone-600'
-            }`}
-          >
-            {col.label}
-            {active ? (
-              <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-primary/10 text-primary">
-                {sort.dir === 'asc' ? ascLabel : descLabel}
-              </span>
-            ) : (
-              <ArrowUpDown className="h-3 w-3 opacity-40" />
-            )}
-          </button>
-        );
-      })}
-      <span className="ml-auto text-[11px] text-stone-400 hidden sm:inline">กดชื่อคอลัมน์เพื่อเรียงลำดับ</span>
-    </div>
-  );
-}
 
 interface RouteStop { label: string; sublabel?: string | null; lat: number; lng: number; icon: 'me' | 'farmer' | 'factory' }
 
 function RouteModal({ stops, title, onClose }: { stops: RouteStop[]; title: string; onClose: () => void }) {
-  const [distances, setDistances] = React.useState<(number | null)[]>([]);
+  const [distances, setDistances] = useState<(number | null)[]>([]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const pairs = stops.slice(0, -1).map((s, i) =>
       fetchRoadDistanceKm(s.lat, s.lng, stops[i + 1].lat, stops[i + 1].lng)
     );

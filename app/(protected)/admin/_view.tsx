@@ -20,15 +20,10 @@ import AlertBanner from '@/app/_components/AlertBanner';
 import EmptyState from '@/app/_components/EmptyState';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import { SkeletonCard } from '@/app/_components/Skeleton';
-import { adminApi, ApiError, type AdminProfile } from '@/app/_lib/api';
+import { adminApi, ApiError, hasAccessToken, type AdminProfile } from '@/app/_lib/api';
 import { roleMeta } from '@/app/_lib/roleConfig';
 
 /* ── helpers ── */
-function hasAccessToken(): boolean {
-  if (typeof window === 'undefined') return false;
-  return Boolean(localStorage.getItem('AREX_ACCESS_TOKEN'));
-}
-
 function formatDate(dt: string): string {
   return new Date(dt).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' });
 }

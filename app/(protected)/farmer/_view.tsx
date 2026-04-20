@@ -16,11 +16,13 @@ import { useFarmerProfile } from '@/app/_contexts/FarmerProfileContext';
 import {
   ApiError,
   farmerApi,
+  hasAccessToken,
   type CreateSubmissionPayload,
   type FarmerMaterialTypeItem,
   type FarmerMeasurementUnitItem,
   type FarmerSubmissionItem,
 } from '@/app/_lib/api';
+import { fallbackThaiUnit, formatDate, formatDateTime } from '@/app/_lib/utils';
 
 const ACTIVE_STATUSES = new Set(['submitted', 'pickup_scheduled', 'picked_up', 'delivered_to_factory', 'factory_confirmed']);
 const LIVE_DOT_STATUSES = new Set(['pickup_scheduled', 'picked_up']);
@@ -55,11 +57,6 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'material',  label: 'ชื่อวัสดุ ก-ฮ' },
 ];
 
-function hasAccessToken(): boolean {
-  if (typeof window === 'undefined') return false;
-  return Boolean(localStorage.getItem('AREX_ACCESS_TOKEN'));
-}
-
 function formatSubmissionStatus(status: string): string {
   const map: Record<string, string> = {
     submitted: 'รอจัดคิวรถ',
@@ -72,27 +69,12 @@ function formatSubmissionStatus(status: string): string {
   return map[status] ?? status;
 }
 
-function formatDate(dateTime: string | null | undefined): string {
-  if (!dateTime) return '-';
-  return new Date(dateTime).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
-}
-
-function formatDateTime(dateTime: string | null | undefined): string {
-  if (!dateTime) return '-';
-  return new Date(dateTime).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
-
 function formatPickupWindow(start: string | null | undefined, end: string | null | undefined): string {
   if (!start) return 'รอนัดหมาย';
   const startStr = formatDate(start);
   if (!end) return startStr;
   const endStr = formatDate(end);
   return startStr === endStr ? startStr : `${startStr} - ${endStr}`;
-}
-
-function fallbackThaiUnit(unitCode: string): string {
-  const map: Record<string, string> = { kg: 'กิโลกรัม', ton: 'ตัน' };
-  return map[unitCode] ?? unitCode;
 }
 
 function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {

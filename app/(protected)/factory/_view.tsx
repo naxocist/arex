@@ -19,16 +19,13 @@ import { SkeletonCard } from '@/app/_components/Skeleton';
 import StatusBadge from '@/app/_components/StatusBadge';
 import {
   ApiError,
+  hasAccessToken,
   factoryApi,
   type FactoryConfirmedIntakeItem,
   type FactoryIntakeSummary,
   type FactoryPendingIntakeItem,
 } from '@/app/_lib/api';
-
-function hasAccessToken(): boolean {
-  if (typeof window === 'undefined') return false;
-  return Boolean(localStorage.getItem('AREX_ACCESS_TOKEN'));
-}
+import { formatDate } from '@/app/_lib/utils';
 
 function formatMaterial(materialType: string): string {
   const map: Record<string, string> = {
@@ -51,11 +48,6 @@ function quantityToKg(quantityValue: number, toKgFactor: number | null | undefin
 function fallbackThaiUnit(unitCode: string): string {
   const map: Record<string, string> = { kg: 'กก.', ton: 'ตัน' };
   return map[unitCode] ?? unitCode;
-}
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '-';
-  return new Date(iso).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
 }
 
 function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {

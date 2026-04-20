@@ -7,13 +7,8 @@ import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
-import { ApiError, logisticsApi } from '@/app/_lib/api';
+import { ApiError, hasAccessToken, logisticsApi } from '@/app/_lib/api';
 import { clearApiCache } from '@/app/_lib/api/core';
-
-function hasAccessToken(): boolean {
-  if (typeof window === 'undefined') return false;
-  return Boolean(localStorage.getItem('AREX_ACCESS_TOKEN'));
-}
 
 function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
   if (!message) return 'info';

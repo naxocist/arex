@@ -4,13 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { RefreshCw, Save, ShieldCheck } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
-import { adminApi, ApiError } from '@/app/_lib/api';
+import { adminApi, ApiError, hasAccessToken } from '@/app/_lib/api';
 import { roleMeta } from '@/app/_lib/roleConfig';
-
-function hasAccessToken(): boolean {
-  if (typeof window === 'undefined') return false;
-  return Boolean(localStorage.getItem('AREX_ACCESS_TOKEN'));
-}
 
 const APPROVABLE_ROLES = ['farmer', 'logistics', 'factory'] as const;
 

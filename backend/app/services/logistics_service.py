@@ -157,6 +157,24 @@ class LogisticsService(DistanceService):
 
             dist_map = self._fetch_distances(logistics_profile_id, "submission", submission_ids)
 
+            # Fetch provider-independent farmer→factory distances
+            sub_factory_pairs = [
+                (str(job["submission_id"]), str(job["destination_factory_id"]))
+                for job in jobs
+                if job.get("submission_id") and job.get("destination_factory_id")
+            ]
+            sub_factory_dist: dict[tuple[str, str], float | None] = {}
+            if sub_factory_pairs:
+                sf_rows = (
+                    self.client.table("submission_factory_distances")
+                    .select("submission_id, factory_id, distance_km")
+                    .in_("submission_id", list({p[0] for p in sub_factory_pairs}))
+                    .in_("factory_id", list({p[1] for p in sub_factory_pairs}))
+                    .execute()
+                ).data or []
+                for row in sf_rows:
+                    sub_factory_dist[(str(row["submission_id"]), str(row["factory_id"]))] = row.get("distance_km")
+
             result: list[dict[str, Any]] = []
             for job in jobs:
                 submission = submissions_by_id.get(str(job.get("submission_id")))
@@ -196,8 +214,8 @@ class LogisticsService(DistanceService):
                     "submission_status": submission.get("status"),
                     "farmer_display_name": farmer.get("display_name"),
                     "farmer_phone": farmer.get("phone"),
-                    "distance_to_farmer_km": dist_map.get((sid, "to_farmer")),
-                    "distance_farmer_to_factory_km": dist_map.get((sid, "farmer_to_factory")),
+                    "distance_to_farmer_km": dist_map.get(sid),
+                    "distance_farmer_to_factory_km": sub_factory_dist.get((sid, dest_id)),
                 })
 
             return result
@@ -487,7 +505,7 @@ class LogisticsService(DistanceService):
                     "pickup_location_text": request.get("delivery_location_text"),
                     "pickup_lat": request.get("delivery_lat"),
                     "pickup_lng": request.get("delivery_lng"),
-                    "distance_to_farmer_km": dist_map.get((rid, "to_farmer")),
+                    "distance_to_farmer_km": dist_map.get(rid),
                 })
 
             return result

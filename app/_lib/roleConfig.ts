@@ -7,10 +7,8 @@ import {
   PackageCheck,
   Settings2,
   Shapes,
-  ShieldCheck,
   SlidersHorizontal,
   Truck,
-  UserCircle,
   Users,
   type LucideIcon,
 } from 'lucide-react';
