@@ -95,9 +95,9 @@ export const roleNavItems: RoleNavItem[] = [
   { icon: PackageCheck, label: 'คลังสินค้า', shortLabel: 'อนุมัติ', path: '/warehouse', roles: ['warehouse'] },
   { icon: BarChart3, label: 'ผู้บริหาร', shortLabel: 'ภาพรวม', path: '/executive', roles: ['executive'] },
   { icon: SlidersHorizontal, label: 'ตั้งค่าวัสดุ / รางวัล', shortLabel: 'วัสดุ/รางวัล', path: '/executive/settings', roles: ['executive'] },
-  { icon: Users, label: 'อนุมัติบัญชี', shortLabel: 'อนุมัติ', path: '/admin', roles: ['admin'] },
+  { icon: Users, label: 'จัดการบัญชี', shortLabel: 'บัญชี', path: '/admin', roles: ['admin'] },
+  { icon: Settings2, label: 'ตั้งค่าการอนุมัติ', shortLabel: 'การอนุมัติ', path: '/admin/approval', roles: ['admin'] },
   { icon: BarChart3, label: 'ภาพรวมระบบ', shortLabel: 'ภาพรวม', path: '/admin/overview', roles: ['admin'] },
   { icon: SlidersHorizontal, label: 'ตั้งค่าวัสดุ / รางวัล', shortLabel: 'วัสดุ/รางวัล', path: '/admin/settings', roles: ['admin'] },
-  { icon: Settings2, label: 'ตั้งค่าการอนุมัติ', shortLabel: 'การอนุมัติ', path: '/admin/approval', roles: ['admin'] },
 ];
 

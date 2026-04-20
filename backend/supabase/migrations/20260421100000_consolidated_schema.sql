@@ -45,8 +45,7 @@ create table if not exists profiles (
   display_name    text,
   phone           text,
   province        text,
-  approval_status text not null default 'approved' check (approval_status in ('pending','approved','rejected')),
-  approval_note   text,
+  approval_status text not null default 'active' check (approval_status in ('active','inactive')),
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );

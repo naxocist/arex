@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { RefreshCw, Save, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { CheckCircle2, Save, ShieldCheck, XCircle } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import { adminApi, ApiError, hasAccessToken } from '@/app/_lib/api';
@@ -9,13 +10,42 @@ import { roleMeta } from '@/app/_lib/roleConfig';
 
 const APPROVABLE_ROLES = ['farmer', 'logistics', 'factory'] as const;
 
+/* ── Toast ── */
+function Toast({ tone, message, onDone }: { tone: 'success' | 'error'; message: string; onDone: () => void }) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => {
+    timerRef.current = setTimeout(() => onDoneRef.current(), 3000);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
+  const success = tone === 'success';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 16, scale: 0.96 }}
+      transition={{ duration: 0.2 }}
+      className={`fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border px-5 py-3.5 shadow-lg backdrop-blur-sm ${
+        success ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'
+      }`}
+    >
+      {success
+        ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+        : <XCircle className="h-5 w-5 shrink-0 text-red-400" />}
+      <span className={`text-sm font-medium ${success ? 'text-emerald-700' : 'text-red-700'}`}>{message}</span>
+    </motion.div>
+  );
+}
+
 export default function AdminSettingsView() {
   const [required, setRequired] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [msgTone, setMsgTone] = useState<'success' | 'error'>('success');
+  const [toast, setToast] = useState<{ tone: 'success' | 'error'; message: string; id: number } | null>(null);
+  const toastId = useRef(0);
 
   const load = async () => {
     if (!hasAccessToken()) return;
@@ -44,11 +74,9 @@ export default function AdminSettingsView() {
     setError(null);
     try {
       await adminApi.updateSettings(required);
-      setMsg('บันทึกการตั้งค่าสำเร็จ');
-      setMsgTone('success');
+      setToast({ tone: 'success', message: 'บันทึกการตั้งค่าสำเร็จ', id: ++toastId.current });
     } catch (e) {
-      setMsg(e instanceof ApiError ? e.message : 'บันทึกไม่สำเร็จ');
-      setMsgTone('error');
+      setToast({ tone: 'error', message: e instanceof ApiError ? e.message : 'บันทึกไม่สำเร็จ', id: ++toastId.current });
     } finally {
       setSaving(false);
     }
@@ -57,13 +85,12 @@ export default function AdminSettingsView() {
   return (
     <ErrorBoundary>
       <div className="flex flex-col gap-4 pb-6">
-        {msg && <AlertBanner tone={msgTone} message={msg} />}
         {error && <AlertBanner tone="error" message={error} />}
 
         <div className="rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 border-b border-stone-100 px-4 py-3">
             <ShieldCheck className="h-4 w-4 text-violet-500" />
-            <span className="font-semibold text-stone-800 text-sm">บทบาทที่ต้องผ่านการอนุมัติ</span>
+            <span className="font-semibold text-stone-800 text-sm">บทบาทที่ต้องรอเปิดใช้งานเมื่อสมัครใหม่</span>
           </div>
           {loading ? (
             <div className="px-4 py-6 text-sm text-stone-400">กำลังโหลด...</div>
@@ -79,12 +106,7 @@ export default function AdminSettingsView() {
                       <p className="text-xs text-stone-400">{meta.description}</p>
                     </div>
                     <div className="relative">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggle(role)}
-                        className="sr-only"
-                      />
+                      <input type="checkbox" checked={checked} onChange={() => toggle(role)} className="sr-only" />
                       <div className={`h-6 w-11 rounded-full transition-colors duration-200 ${checked ? 'bg-violet-500' : 'bg-stone-200'}`} />
                       <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
                     </div>
@@ -96,7 +118,7 @@ export default function AdminSettingsView() {
         </div>
 
         <p className="text-xs text-stone-400 px-1">
-          บทบาทที่เปิดใช้งานจะต้องรอให้ผู้ดูแลระบบอนุมัติก่อนจึงจะเข้าใช้งานได้
+          บทบาทที่เปิดสวิตช์ไว้จะถูกสร้างบัญชีในสถานะ "ปิดใช้งาน" และต้องให้ผู้ดูแลระบบเปิดใช้งานก่อนจึงจะเข้าได้
         </p>
 
         <button
@@ -109,6 +131,10 @@ export default function AdminSettingsView() {
           {saving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า'}
         </button>
       </div>
+
+      <AnimatePresence>
+        {toast && <Toast key={toast.id} tone={toast.tone} message={toast.message} onDone={() => setToast(null)} />}
+      </AnimatePresence>
     </ErrorBoundary>
   );
 }

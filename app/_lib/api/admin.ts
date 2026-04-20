@@ -4,8 +4,6 @@ import type { AdminProfile, AdminSettings, AdminOverview } from './types';
 export const adminApi = {
   getOverview: (options?: RequestBehaviorOptions) =>
     apiRequest<AdminOverview>('/admin/dashboard/overview', options),
-  listPendingAccounts: (roleFilter?: string) =>
-    apiRequest<{ accounts: AdminProfile[] }>(`/admin/accounts/pending${roleFilter ? `?role_filter=${encodeURIComponent(roleFilter)}` : ''}`),
   listAllAccounts: (params?: { role_filter?: string; approval_filter?: string }) => {
     const qs = new URLSearchParams();
     if (params?.role_filter) qs.set('role_filter', params.role_filter);
@@ -13,10 +11,8 @@ export const adminApi = {
     const query = qs.toString();
     return apiRequest<{ accounts: AdminProfile[] }>(`/admin/accounts/all${query ? `?${query}` : ''}`);
   },
-  approveAccount: (profileId: string) =>
-    apiRequest<{ message: string }>(`/admin/accounts/${encodeURIComponent(profileId)}/approve`, { method: 'POST' }),
-  rejectAccount: (profileId: string, note?: string) =>
-    apiRequest<{ message: string }>(`/admin/accounts/${encodeURIComponent(profileId)}/reject`, { method: 'POST', body: JSON.stringify({ note }) }),
+  toggleAccount: (profileId: string) =>
+    apiRequest<{ message: string; account: AdminProfile }>(`/admin/accounts/${encodeURIComponent(profileId)}/toggle`, { method: 'POST' }),
   getSettings: (options?: RequestBehaviorOptions) =>
     apiRequest<{ settings: AdminSettings }>('/admin/settings', options),
   updateSettings: (approvalRequiredRoles: string[]) =>

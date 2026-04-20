@@ -69,7 +69,7 @@ export default function LoginView() {
         accessToken: login.access_token,
         refreshToken: login.refresh_token,
         role: login.user.role,
-        approvalStatus: login.approval_status ?? 'approved',
+        approvalStatus: login.approval_status ?? 'active',
       });
 
       const role = login.user.role;

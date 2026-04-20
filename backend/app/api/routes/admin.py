@@ -1,9 +1,8 @@
-import json
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.api.deps import require_roles
 from app.db.supabase import get_service_client
@@ -13,15 +12,8 @@ from app.services.executive_service import ExecutiveDomainService, get_executive
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 _VALID_ROLES = {"farmer", "logistics", "factory", "warehouse", "executive", "admin"}
-_VALID_APPROVAL_STATUSES = {"pending", "approved", "rejected"}
-
-
-class ApproveAccountRequest(BaseModel):
-    note: str | None = Field(default=None, max_length=1000)
-
-
-class RejectAccountRequest(BaseModel):
-    note: str = Field(default="", max_length=1000)
+_VALID_APPROVAL_STATUSES = {"active", "inactive"}
+_APPROVABLE_ROLES = {"farmer", "logistics", "factory"}
 
 
 class UpdateApprovalSettingsRequest(BaseModel):
@@ -43,31 +35,6 @@ def _get_admin_settings(client: Any) -> dict[str, Any]:
     return {"key": "global", "approval_required_roles": []}
 
 
-@router.get("/accounts/pending")
-def list_pending_accounts(
-    role_filter: str | None = None,
-    current_user: AuthenticatedUser = Depends(require_roles(Role.ADMIN)),
-) -> dict[str, Any]:
-    if role_filter is not None and role_filter not in _VALID_ROLES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role_filter")
-    client = get_service_client()
-    try:
-        query = (
-            client.table("profiles")
-            .select("id, role, display_name, phone, province, approval_status, approval_note, created_at")
-            .eq("approval_status", "pending")
-            .order("created_at", desc=False)
-        )
-        if role_filter:
-            query = query.eq("role", role_filter)
-        res = query.execute()
-        return {"accounts": res.data or [], "actor": current_user.role.value}
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to fetch accounts")
-
-
 @router.get("/accounts/all")
 def list_all_accounts(
     role_filter: str | None = None,
@@ -81,8 +48,9 @@ def list_all_accounts(
     client = get_service_client()
     try:
         query = (
-            client.table("profiles")
-            .select("id, role, display_name, phone, province, approval_status, approval_note, created_at")
+            client.table("profiles_with_email")
+            .select("id, role, display_name, phone, province, approval_status, created_at, email")
+            .in_("role", list(_APPROVABLE_ROLES))
             .order("created_at", desc=True)
         )
         if role_filter:
@@ -97,53 +65,40 @@ def list_all_accounts(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to fetch accounts")
 
 
-@router.post("/accounts/{profile_id}/approve")
-def approve_account(
+@router.post("/accounts/{profile_id}/toggle")
+def toggle_account_status(
     profile_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.ADMIN)),
 ) -> dict[str, Any]:
     _validate_uuid(profile_id, "profile_id")
     client = get_service_client()
     try:
+        current = (
+            client.table("profiles")
+            .select("id, approval_status, role")
+            .eq("id", profile_id)
+            .single()
+            .execute()
+        )
+        if not current.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+        if current.data["role"] not in _APPROVABLE_ROLES:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role cannot be toggled")
+        new_status = "inactive" if current.data["approval_status"] == "active" else "active"
         res = (
             client.table("profiles")
-            .update({"approval_status": "approved", "approval_note": None})
+            .update({"approval_status": new_status})
             .eq("id", profile_id)
             .execute()
         )
         rows = res.data or []
         if not rows:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-        return {"message": "Account approved", "account": rows[0], "actor": current_user.role.value}
+        return {"message": f"Account set to {new_status}", "account": rows[0], "actor": current_user.role.value}
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to approve account")
-
-
-@router.post("/accounts/{profile_id}/reject")
-def reject_account(
-    profile_id: str,
-    payload: RejectAccountRequest,
-    current_user: AuthenticatedUser = Depends(require_roles(Role.ADMIN)),
-) -> dict[str, Any]:
-    _validate_uuid(profile_id, "profile_id")
-    client = get_service_client()
-    try:
-        res = (
-            client.table("profiles")
-            .update({"approval_status": "rejected", "approval_note": payload.note or None})
-            .eq("id", profile_id)
-            .execute()
-        )
-        rows = res.data or []
-        if not rows:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-        return {"message": "Account rejected", "account": rows[0], "actor": current_user.role.value}
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to reject account")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to toggle account status")
 
 
 @router.get("/settings")
@@ -165,12 +120,11 @@ def update_admin_settings(
     payload: UpdateApprovalSettingsRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.ADMIN)),
 ) -> dict[str, Any]:
-    valid_roles = {"farmer", "logistics", "factory"}
-    invalid = [r for r in payload.approval_required_roles if r not in valid_roles]
+    invalid = [r for r in payload.approval_required_roles if r not in _APPROVABLE_ROLES]
     if invalid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid roles: {invalid}. Must be one of {sorted(valid_roles)}",
+            detail=f"Invalid roles: {invalid}. Must be one of {sorted(_APPROVABLE_ROLES)}",
         )
     client = get_service_client()
     try:
@@ -198,19 +152,20 @@ def get_admin_dashboard_overview(
 ) -> dict[str, Any]:
     overview = workflow_service.get_executive_overview()
     client = get_service_client()
-    pending_res = (
+    inactive_res = (
         client.table("profiles")
         .select("role", count="exact")
-        .eq("approval_status", "pending")
+        .eq("approval_status", "inactive")
+        .in_("role", list(_APPROVABLE_ROLES))
         .execute()
     )
-    pending_by_role: dict[str, int] = {}
-    for row in pending_res.data or []:
+    inactive_by_role: dict[str, int] = {}
+    for row in inactive_res.data or []:
         r = row.get("role", "")
-        pending_by_role[r] = pending_by_role.get(r, 0) + 1
+        inactive_by_role[r] = inactive_by_role.get(r, 0) + 1
     return {
         "overview": overview,
-        "pending_approvals": pending_by_role,
-        "pending_total": sum(pending_by_role.values()),
+        "pending_approvals": inactive_by_role,
+        "pending_total": sum(inactive_by_role.values()),
         "actor": current_user.role.value,
     }

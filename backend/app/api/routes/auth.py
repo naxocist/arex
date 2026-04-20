@@ -222,18 +222,17 @@ def _register_user(
             detail="Missing created user id",
         )
 
-    # Check if this role requires approval
-    approval_status = "approved"
+    # Check if this role requires approval before activation
+    approval_status = "active"
     try:
         settings_res = service_client.table("admin_settings").select("approval_required_roles").eq("key", "global").execute()
         settings_rows = settings_res.data or []
         if settings_rows:
             required_roles: list[str] = settings_rows[0].get("approval_required_roles") or []
             if role.value in required_roles:
-                approval_status = "pending"
+                approval_status = "inactive"
     except Exception:
-        # If settings can't be read, default to approved (fail open)
-        approval_status = "approved"
+        approval_status = "active"
 
     try:
         service_client.table("profiles").insert(
@@ -378,9 +377,9 @@ def login(payload: LoginRequest) -> dict[str, Any]:
             .single()
             .execute()
         )
-        result["approval_status"] = (profile_res.data or {}).get("approval_status", "approved")
+        result["approval_status"] = (profile_res.data or {}).get("approval_status", "active")
     except Exception:
-        result["approval_status"] = "approved"
+        result["approval_status"] = "active"
     return result
 
 

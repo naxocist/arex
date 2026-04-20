@@ -151,6 +151,6 @@ export interface WarehousePendingRequestItem {
   rejection_reason?: string | null; warehouse_decision_at?: string | null;
 }
 
-export interface AdminProfile { id: string; display_name: string; email: string; role: string; phone: string; province: string; approval_status: 'pending' | 'approved' | 'rejected'; approval_note: string | null; created_at: string }
+export interface AdminProfile { id: string; display_name: string; email: string | null; role: string; phone: string; province: string; approval_status: 'active' | 'inactive'; created_at: string }
 export interface AdminSettings { approval_required_roles: string[] }
 export interface AdminOverview { pending_approvals: Record<string, number>; pending_total: number; overview: ExecutiveOverview }
