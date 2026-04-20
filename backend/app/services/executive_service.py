@@ -1,7 +1,10 @@
 from typing import Any
 
 from app.core.errors import WorkflowError
+from app.db.supabase import get_service_client
 from app.services._base import BaseService
+from app.services.catalog_service import CatalogService
+from app.services.rewards_service import RewardsService
 
 
 def _to_float(value: Any) -> float:
@@ -204,11 +207,6 @@ class ExecutiveService(BaseService):
             ).data or []
         except Exception as exc:
             raise WorkflowError(f"Failed to fetch value chain: {exc}") from exc
-
-
-from app.db.supabase import get_service_client
-from app.services.catalog_service import CatalogService
-from app.services.rewards_service import RewardsService
 
 
 class ExecutiveDomainService(ExecutiveService, CatalogService, RewardsService):

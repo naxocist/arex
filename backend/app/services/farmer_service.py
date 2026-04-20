@@ -1,12 +1,15 @@
 from typing import Any
 
 from app.core.errors import WorkflowError
+from app.db.supabase import get_service_client
 from app.models.workflow import (
     CreateRewardRequest,
     CreateSubmissionRequest,
     UpdateFarmerProfileRequest,
 )
 from app.services._base import BaseService, _first_row
+from app.services.catalog_service import CatalogService
+from app.services.rewards_service import RewardsService
 
 
 class FarmerService(BaseService):
@@ -292,11 +295,6 @@ class FarmerService(BaseService):
             )
         except Exception as exc:
             raise WorkflowError(f"Failed to cancel reward request: {exc}") from exc
-
-
-from app.db.supabase import get_service_client
-from app.services.catalog_service import CatalogService
-from app.services.rewards_service import RewardsService
 
 
 class FarmerDomainService(FarmerService, CatalogService, RewardsService):

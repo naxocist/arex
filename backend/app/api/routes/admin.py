@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import require_roles
-from app.core.errors import WorkflowError
 from app.db.supabase import get_service_client
 from app.models.auth import AuthenticatedUser, Role
 from app.services.executive_service import ExecutiveDomainService, get_executive_domain_service
@@ -197,24 +196,21 @@ def get_admin_dashboard_overview(
     current_user: AuthenticatedUser = Depends(require_roles(Role.ADMIN)),
     workflow_service: ExecutiveDomainService = Depends(get_executive_domain_service),
 ) -> dict[str, Any]:
-    try:
-        overview = workflow_service.get_executive_overview()
-        client = get_service_client()
-        pending_res = (
-            client.table("profiles")
-            .select("role", count="exact")
-            .eq("approval_status", "pending")
-            .execute()
-        )
-        pending_by_role: dict[str, int] = {}
-        for row in pending_res.data or []:
-            r = row.get("role", "")
-            pending_by_role[r] = pending_by_role.get(r, 0) + 1
-        return {
-            "overview": overview,
-            "pending_approvals": pending_by_role,
-            "pending_total": sum(pending_by_role.values()),
-            "actor": current_user.role.value,
-        }
-    except WorkflowError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    overview = workflow_service.get_executive_overview()
+    client = get_service_client()
+    pending_res = (
+        client.table("profiles")
+        .select("role", count="exact")
+        .eq("approval_status", "pending")
+        .execute()
+    )
+    pending_by_role: dict[str, int] = {}
+    for row in pending_res.data or []:
+        r = row.get("role", "")
+        pending_by_role[r] = pending_by_role.get(r, 0) + 1
+    return {
+        "overview": overview,
+        "pending_approvals": pending_by_role,
+        "pending_total": sum(pending_by_role.values()),
+        "actor": current_user.role.value,
+    }

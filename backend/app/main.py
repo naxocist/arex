@@ -1,11 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
+from starlette.requests import Request as StarletteRequest  # used by middleware dispatch signature
 from starlette.responses import Response
 
 from app.api.router import api_router
 from app.core.config import get_settings
+from app.core.errors import WorkflowError
 
 _MAX_REQUEST_BODY_BYTES = 1 * 1024 * 1024  # 1 MB
 
@@ -52,6 +54,10 @@ def create_app() -> FastAPI:
     @app.get("/", tags=["system"])
     def root() -> dict[str, str]:
         return {"message": "PMUC Zero Burn to Earn backend is running"}
+
+    @app.exception_handler(WorkflowError)
+    async def workflow_error_handler(request: Request, exc: WorkflowError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     app.include_router(api_router)
     return app
