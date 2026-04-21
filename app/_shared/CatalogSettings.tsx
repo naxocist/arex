@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { ClipboardList, Gift, ImagePlus, Plus, RefreshCw, Ruler, Save, Shapes, Trash2, X } from 'lucide-react';
+import { Gift, ImagePlus, Plus, RefreshCw, Ruler, Save, Shapes, Trash2, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import SectionCard from '@/app/_components/SectionCard';
@@ -119,7 +119,9 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
   const [message, setMessage] = useState<string | null>(null);
 
   const [materialRows, setMaterialRows] = useState<MaterialDraftRow[]>([]);
+  const [savedMaterialRows, setSavedMaterialRows] = useState<MaterialDraftRow[]>([]);
   const [unitRows, setUnitRows] = useState<UnitDraftRow[]>([]);
+  const [savedUnitRows, setSavedUnitRows] = useState<UnitDraftRow[]>([]);
 
   const [isAddingMaterial, setIsAddingMaterial] = useState(false);
   const [newMaterial, setNewMaterial] = useState<NewMaterialDraft>(defaultNewMaterial);
@@ -127,6 +129,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
   const [newUnit, setNewUnit] = useState<NewUnitDraft>(defaultNewUnit);
 
   const [rewardRows, setRewardRows] = useState<RewardDraftRow[]>([]);
+  const [savedRewardRows, setSavedRewardRows] = useState<RewardDraftRow[]>([]);
   const [isAddingReward, setIsAddingReward] = useState(false);
   const [newReward, setNewReward] = useState<NewRewardDraft>({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null, instruction_notes: '' });
 
@@ -144,29 +147,31 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
         executiveApi.listRewards({ forceRefresh }),
       ]);
 
-      setMaterialRows(mergeMaterialRows(materialResponse.material_types));
-      setUnitRows(
-        unitResponse.units.map((item: ExecutiveMeasurementUnitItem) => ({
-          originalCode: item.code,
-          code: item.code,
-          name_th: item.name_th,
-          to_kg_factor: item.to_kg_factor === null ? '' : String(item.to_kg_factor),
-          active: item.active,
-        })),
-      );
+      const mergedMaterials = mergeMaterialRows(materialResponse.material_types);
+      const mergedUnits = unitResponse.units.map((item: ExecutiveMeasurementUnitItem) => ({
+        originalCode: item.code,
+        code: item.code,
+        name_th: item.name_th,
+        to_kg_factor: item.to_kg_factor === null ? '' : String(item.to_kg_factor),
+        active: item.active,
+      }));
+      setMaterialRows(mergedMaterials);
+      setSavedMaterialRows(mergedMaterials);
+      setUnitRows(mergedUnits);
+      setSavedUnitRows(mergedUnits);
       if (rewardResponse?.rewards) {
-        setRewardRows(
-          rewardResponse.rewards.map((item: FarmerRewardItem) => ({
-            id: item.id,
-            name_th: item.name_th,
-            description_th: item.description_th || '',
-            points_cost: String(item.points_cost),
-            stock_qty: String(item.stock_qty),
-            active: item.active,
-            image_url: item.image_url ?? null,
-            instruction_notes: item.instruction_notes || '',
-          })),
-        );
+        const mergedRewards = rewardResponse.rewards.map((item: FarmerRewardItem) => ({
+          id: item.id,
+          name_th: item.name_th,
+          description_th: item.description_th || '',
+          points_cost: String(item.points_cost),
+          stock_qty: String(item.stock_qty),
+          active: item.active,
+          image_url: item.image_url ?? null,
+          instruction_notes: item.instruction_notes || '',
+        }));
+        setRewardRows(mergedRewards);
+        setSavedRewardRows(mergedRewards);
       }
 
       setMessage(null);
@@ -471,14 +476,30 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
     }
   };
 
+  const isMaterialDirty = (row: MaterialDraftRow, index: number) => {
+    const s = savedMaterialRows[index];
+    if (!s) return false;
+    return row.name_th !== s.name_th || row.active !== s.active || row.points_per_kg !== s.points_per_kg;
+  };
+  const isUnitDirty = (row: UnitDraftRow, index: number) => {
+    const s = savedUnitRows[index];
+    if (!s) return false;
+    return row.name_th !== s.name_th || row.active !== s.active || row.to_kg_factor !== s.to_kg_factor;
+  };
+  const isRewardDirty = (row: RewardDraftRow, index: number) => {
+    const s = savedRewardRows[index];
+    if (!s) return false;
+    return row.name_th !== s.name_th || row.description_th !== s.description_th ||
+      row.points_cost !== s.points_cost || row.stock_qty !== s.stock_qty ||
+      row.active !== s.active || row.instruction_notes !== s.instruction_notes;
+  };
+
   const reduceMotion = useReducedMotion();
 
   // Image modal state
   const [imageModal, setImageModal] = useState<{ index: number } | null>(null);
   const imgModalRow = imageModal !== null ? rewardRows[imageModal.index] : null;
 
-  // Instruction notes modal state
-  const [notesModal, setNotesModal] = useState<{ index: number; draft: string } | null>(null);
 
   return (
     <ErrorBoundary>
@@ -645,6 +666,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
             </div>
             {materialRows.map((row, index) => {
               const requestKey = `material:${row.originalCode}`;
+              const dirty = isMaterialDirty(row, index);
               return (
                 <div key={row.originalCode} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
                   <div className="flex flex-1 items-center gap-3">
@@ -671,7 +693,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                       type="button"
                       onClick={() => void saveMaterialRow(row)}
                       disabled={savingKey === requestKey}
-                      className="w-14 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                      className={`w-14 rounded-lg px-2 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50 ${dirty ? 'bg-amber-500 shadow-sm shadow-amber-200 ring-2 ring-amber-300 hover:bg-amber-600' : 'bg-stone-300 hover:bg-stone-400'}`}
                     >
                       {savingKey === requestKey ? '...' : 'บันทึก'}
                     </button>
@@ -736,14 +758,13 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">หมายเหตุ/เงื่อนไขการรับสินค้า</label>
-                  <button
-                    type="button"
-                    onClick={() => setNotesModal({ index: -1, draft: newReward.instruction_notes })}
-                    className={`flex w-full items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition ${newReward.instruction_notes ? 'border-stone-300 text-stone-700' : 'border-dashed border-stone-300 text-stone-400 hover:border-stone-400'}`}
-                  >
-                    <ClipboardList className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{newReward.instruction_notes || 'เพิ่มหมายเหตุ (ไม่บังคับ)'}</span>
-                  </button>
+                  <textarea
+                    value={newReward.instruction_notes}
+                    onChange={(e) => setNewReward((prev) => ({ ...prev, instruction_notes: e.target.value }))}
+                    rows={3}
+                    placeholder="เช่น เจ้าหน้าที่จะเข้าติดตั้งให้ภายหลัง (ไม่บังคับ)"
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 resize-none"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">แต้มที่ใช้แลก</label>
@@ -882,21 +903,21 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
           </AnimatePresence>
 
           <div>
-            <div className="hidden md:grid px-2 pb-2 border-b border-stone-100 items-center gap-3" style={{ gridTemplateColumns: '36px 1fr 1fr 80px 80px 64px 56px 56px' }}>
+            <div className="hidden md:grid px-2 pb-2 border-b border-stone-100 items-center gap-3" style={{ gridTemplateColumns: '36px 1fr 1fr 80px 80px 56px 56px' }}>
               <span />
               <span className="text-xs font-semibold text-stone-600">ชื่อรางวัล</span>
               <span className="text-xs font-semibold text-stone-600">รายละเอียดรางวัล</span>
               <span className="text-xs font-semibold text-stone-600">แต้มที่ใช้</span>
               <span className="text-xs font-semibold text-stone-600">สต็อก</span>
-              <span className="text-center text-xs font-semibold text-stone-600">หมายเหตุการรับของ</span>
               <span className="text-xs font-semibold text-stone-600">เปิดใช้งาน</span>
               <span />
             </div>
             {rewardRows.map((row, index) => {
               const requestKey = `reward:${row.id}`;
+              const dirty = isRewardDirty(row, index);
               return (
-                <div key={row.id} className="border-b border-stone-100 last:border-0">
-                  <div className="flex flex-col gap-2 py-2.5 md:grid md:items-center md:gap-3 md:px-2" style={{ gridTemplateColumns: '36px 1fr 1fr 80px 80px 64px 56px 56px' }}>
+                <div key={row.id} className="border-b border-stone-100 last:border-0 py-2.5 md:px-2 flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 md:grid md:items-center md:gap-3" style={{ gridTemplateColumns: '36px 1fr 1fr 80px 80px 56px 56px' }}>
                     <button
                       type="button"
                       onClick={() => setImageModal({ index })}
@@ -940,14 +961,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                       type="number"
                       placeholder="สต็อก"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setNotesModal({ index, draft: row.instruction_notes })}
-                      title="หมายเหตุ/เงื่อนไขการรับสินค้า"
-                      className={`flex h-8 w-full items-center justify-center rounded-lg border transition ${row.instruction_notes ? 'border-stone-400 bg-stone-100 text-stone-700 hover:bg-stone-200' : 'border-dashed border-stone-300 text-stone-400 hover:border-stone-400 hover:bg-stone-50'}`}
-                    >
-                      <ClipboardList className="h-4 w-4" />
-                    </button>
                     <label className="flex cursor-pointer items-center gap-1.5 text-stone-500">
                       <input type="checkbox" checked={row.active} onChange={(event) => updateRewardRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
                       <span className="text-xs">ใช้</span>
@@ -956,11 +969,18 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                       type="button"
                       onClick={() => void saveRewardRow(row)}
                       disabled={savingKey === requestKey}
-                      className="w-full rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                      className={`w-full rounded-lg px-2 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50 ${dirty ? 'bg-amber-500 shadow-sm shadow-amber-200 ring-2 ring-amber-300 hover:bg-amber-600' : 'bg-stone-300 hover:bg-stone-400'}`}
                     >
                       {savingKey === requestKey ? '...' : 'บันทึก'}
                     </button>
                   </div>
+                  <textarea
+                    value={row.instruction_notes}
+                    onChange={(e) => updateRewardRow(index, { instruction_notes: e.target.value })}
+                    rows={2}
+                    placeholder="หมายเหตุ/เงื่อนไขการรับสินค้า (ไม่บังคับ)"
+                    className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 resize-none"
+                  />
                 </div>
               );
             })}
@@ -1066,6 +1086,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
             </div>
             {unitRows.map((row, index) => {
               const requestKey = `unit:${row.originalCode}`;
+              const dirty = isUnitDirty(row, index);
               return (
                 <div key={row.originalCode} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
                   <div className="flex flex-1 items-center gap-3">
@@ -1092,7 +1113,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                       type="button"
                       onClick={() => void saveUnitRow(row)}
                       disabled={savingKey === requestKey}
-                      className="w-14 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                      className={`w-14 rounded-lg px-2 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50 ${dirty ? 'bg-amber-500 shadow-sm shadow-amber-200 ring-2 ring-amber-300 hover:bg-amber-600' : 'bg-stone-300 hover:bg-stone-400'}`}
                     >
                       {savingKey === requestKey ? '...' : 'บันทึก'}
                     </button>
@@ -1214,71 +1235,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
       )}
     </AnimatePresence>
 
-    {/* ── Instruction notes modal ── */}
-    <AnimatePresence>
-      {notesModal !== null && (() => {
-        const isNew = notesModal.index === -1;
-        const rowName = isNew ? newReward.name_th || 'รางวัลใหม่' : (rewardRows[notesModal.index]?.name_th ?? '');
-        const saveNotes = () => {
-          if (isNew) {
-            setNewReward((prev) => ({ ...prev, instruction_notes: notesModal.draft }));
-          } else {
-            updateRewardRow(notesModal.index, { instruction_notes: notesModal.draft });
-          }
-          setNotesModal(null);
-        };
-        return (
-          <>
-            <motion.div
-              key="notes-modal-backdrop"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.18 }}
-              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-              onClick={() => setNotesModal(null)}
-            />
-            <motion.div
-              key="notes-modal-panel"
-              initial={reduceMotion ? {} : { opacity: 0, scale: 0.95, y: 12 }}
-              animate={reduceMotion ? {} : { opacity: 1, scale: 1, y: 0 }}
-              exit={reduceMotion ? {} : { opacity: 0, scale: 0.95, y: 12 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white shadow-2xl"
-            >
-              <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
-                <div>
-                  <p className="text-sm font-bold text-stone-800">หมายเหตุ/เงื่อนไขการรับสินค้า</p>
-                  <p className="truncate max-w-[240px] text-xs text-stone-400">{rowName}</p>
-                </div>
-                <button type="button" onClick={() => setNotesModal(null)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="px-5 py-4">
-                <textarea
-                  value={notesModal.draft}
-                  onChange={(e) => setNotesModal((prev) => prev ? { ...prev, draft: e.target.value } : prev)}
-                  rows={6}
-                  placeholder="เช่น เจ้าหน้าที่จะเข้าติดตั้งให้ภายหลัง"
-                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 resize-none"
-                  autoFocus
-                />
-              </div>
-              <div className="flex justify-end gap-2 px-5 pb-5">
-                <button type="button" onClick={() => setNotesModal(null)}
-                  className="rounded-xl border border-stone-200 px-4 py-2 text-sm text-stone-600 hover:bg-stone-50 transition">
-                  ยกเลิก
-                </button>
-                <button type="button" onClick={saveNotes}
-                  className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition">
-                  <Save className="h-3.5 w-3.5" />บันทึก
-                </button>
-              </div>
-            </motion.div>
-          </>
-        );
-      })()}
-    </AnimatePresence>
     </ErrorBoundary>
   );
 }
