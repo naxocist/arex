@@ -18,7 +18,4 @@ def get_publishable_client() -> Client:
 @lru_cache
 def get_service_client() -> Client:
     settings = get_settings()
-    secret_key = settings.supabase_secret_key
-    if secret_key.startswith("sb_secret_") and settings.supabase_legacy_service_role_jwt:
-        secret_key = settings.supabase_legacy_service_role_jwt
-    return _build_client(secret_key)
+    return _build_client(settings.supabase_secret_key)

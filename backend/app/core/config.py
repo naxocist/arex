@@ -15,7 +15,6 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_publishable_key: str
     supabase_secret_key: str
-    supabase_legacy_service_role_jwt: str | None = None
     osrm_url: str = "https://router.project-osrm.org/route/v1/driving"
 
     model_config = SettingsConfigDict(
