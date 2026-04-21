@@ -22,8 +22,8 @@ export const executiveApi = {
     apiRequest<{ value_chain: ValueChainItem[]; actor: string }>('/executive/value-chain', options),
   listRewards: (options?: RequestBehaviorOptions) =>
     apiRequest<{ rewards: FarmerRewardItem[]; actor: string }>('/executive/rewards', options),
-  createReward: (payload: { name_th: string; description_th?: string; points_cost: number; stock_qty: number; active?: boolean; image_url?: string | null }) =>
+  createReward: (payload: { name_th: string; description_th?: string; points_cost: number; stock_qty: number; active?: boolean; image_url?: string | null; instruction_notes?: string | null }) =>
     apiRequest<{ message: string; reward: FarmerRewardItem; actor: string }>('/executive/rewards', { method: 'POST', body: JSON.stringify(payload) }),
-  updateReward: (rewardId: string, payload: Partial<{ name_th: string; description_th: string; points_cost: number; stock_qty: number; active: boolean; image_url: string | null }>) =>
+  updateReward: (rewardId: string, payload: Partial<{ name_th: string; description_th: string; points_cost: number; stock_qty: number; active: boolean; image_url: string | null; instruction_notes: string | null }>) =>
     apiRequest<{ message: string; reward: FarmerRewardItem; actor: string }>(`/executive/rewards/${encodeURIComponent(rewardId)}`, { method: 'PUT', body: JSON.stringify(payload) }),
 };

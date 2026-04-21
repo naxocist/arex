@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { Gift, ImagePlus, Plus, RefreshCw, Ruler, Save, Shapes, Trash2, X } from 'lucide-react';
+import { ClipboardList, Gift, ImagePlus, Plus, RefreshCw, Ruler, Save, Shapes, Trash2, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import SectionCard from '@/app/_components/SectionCard';
@@ -64,6 +64,7 @@ interface RewardDraftRow {
   stock_qty: string;
   active: boolean;
   image_url: string | null;
+  instruction_notes: string;
   uploadingImage?: boolean;
 }
 
@@ -74,6 +75,7 @@ interface NewRewardDraft {
   stock_qty: string;
   active: boolean;
   image_url: string | null;
+  instruction_notes: string;
   uploadingImage?: boolean;
 }
 
@@ -123,7 +125,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
 
   const [rewardRows, setRewardRows] = useState<RewardDraftRow[]>([]);
   const [isAddingReward, setIsAddingReward] = useState(false);
-  const [newReward, setNewReward] = useState<NewRewardDraft>({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null });
+  const [newReward, setNewReward] = useState<NewRewardDraft>({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null, instruction_notes: '' });
 
   const activeMaterialCount = useMemo(
     () => materialRows.filter((row) => row.active).length,
@@ -159,6 +161,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
             stock_qty: String(item.stock_qty),
             active: item.active,
             image_url: item.image_url ?? null,
+            instruction_notes: item.instruction_notes || '',
           })),
         );
       }
@@ -364,7 +367,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
   const cancelAddReward = async () => {
     const url = newReward.image_url;
     setIsAddingReward(false);
-    setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null });
+    setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null, instruction_notes: '' });
     if (url) {
       try { await deleteRewardImage(url); } catch { /* best-effort */ }
     }
@@ -401,10 +404,11 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
         stock_qty: stock,
         active: newReward.active,
         image_url: newReward.image_url ?? undefined,
+        instruction_notes: newReward.instruction_notes.trim() || null,
       });
       setMessage('สร้างรางวัลสำเร็จ');
       setIsAddingReward(false);
-      setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null });
+      setNewReward({ name_th: '', description_th: '', points_cost: '', stock_qty: '', active: true, image_url: null, instruction_notes: '' });
       await loadConfiguration(true);
     } catch (error) {
       if (error instanceof Error) {
@@ -449,6 +453,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
         stock_qty: stock,
         active: row.active,
         image_url: row.image_url,
+        instruction_notes: row.instruction_notes.trim() || null,
       });
       await loadConfiguration(true);
       setMessage('บันทึกรางวัลสำเร็จ');
@@ -468,6 +473,9 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
   // Image modal state
   const [imageModal, setImageModal] = useState<{ index: number } | null>(null);
   const imgModalRow = imageModal !== null ? rewardRows[imageModal.index] : null;
+
+  // Instruction notes modal state
+  const [notesModal, setNotesModal] = useState<{ index: number; draft: string } | null>(null);
 
   return (
     <ErrorBoundary>
@@ -844,6 +852,17 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                   />
                 </div>
                 <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">หมายเหตุ/เงื่อนไขการรับสินค้า</label>
+                  <button
+                    type="button"
+                    onClick={() => setNotesModal({ index: -1, draft: newReward.instruction_notes })}
+                    className={`flex w-full items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition ${newReward.instruction_notes ? 'border-stone-300 text-stone-700' : 'border-dashed border-stone-300 text-stone-400 hover:border-stone-400'}`}
+                  >
+                    <ClipboardList className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{newReward.instruction_notes || 'เพิ่มหมายเหตุ (ไม่บังคับ)'}</span>
+                  </button>
+                </div>
+                <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">แต้มที่ใช้แลก</label>
                   <input
                     value={newReward.points_cost}
@@ -980,26 +999,25 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
           </AnimatePresence>
 
           <div>
-            <div className="hidden md:flex md:items-center md:gap-3 px-2 pb-2 border-b border-stone-100">
-              <span className="w-9 shrink-0" />
-              <span className="flex-1 text-xs font-semibold text-stone-600">ชื่อรางวัล</span>
-              <span className="flex-1 text-xs font-semibold text-stone-600">รายละเอียด</span>
-              <span className="w-20 shrink-0 text-xs font-semibold text-stone-600">แต้มที่ใช้</span>
-              <span className="w-20 shrink-0 text-xs font-semibold text-stone-600">สต็อก</span>
-              <span className="w-14 shrink-0 text-xs font-semibold text-stone-600">เปิดใช้</span>
-              <span className="w-14 shrink-0" />
+            <div className="hidden md:grid px-2 pb-2 border-b border-stone-100 items-center gap-3" style={{ gridTemplateColumns: '36px 1fr 1fr 80px 80px 64px 56px 56px' }}>
+              <span />
+              <span className="text-xs font-semibold text-stone-600">ชื่อรางวัล</span>
+              <span className="text-xs font-semibold text-stone-600">รายละเอียดรางวัล</span>
+              <span className="text-xs font-semibold text-stone-600">แต้มที่ใช้</span>
+              <span className="text-xs font-semibold text-stone-600">สต็อก</span>
+              <span className="text-center text-xs font-semibold text-stone-600">หมายเหตุการรับของ</span>
+              <span className="text-xs font-semibold text-stone-600">เปิดใช้งาน</span>
+              <span />
             </div>
             {rewardRows.map((row, index) => {
               const requestKey = `reward:${row.id}`;
               return (
                 <div key={row.id} className="border-b border-stone-100 last:border-0">
-                  {/* Main row */}
-                  <div className="flex flex-col gap-2 py-2.5 md:flex-row md:items-center md:gap-3 md:px-2">
-                    {/* Thumbnail — click to open image modal */}
+                  <div className="flex flex-col gap-2 py-2.5 md:grid md:items-center md:gap-3 md:px-2" style={{ gridTemplateColumns: '36px 1fr 1fr 80px 80px 64px 56px 56px' }}>
                     <button
                       type="button"
                       onClick={() => setImageModal({ index })}
-                      className={`relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border transition-all ${
+                      className={`relative h-9 w-9 overflow-hidden rounded-lg border transition-all ${
                         row.image_url
                           ? 'border-stone-200 hover:ring-2 hover:ring-primary/30'
                           : 'border-dashed border-stone-300 hover:border-primary/60'
@@ -1013,50 +1031,53 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                         <ImagePlus className="h-3.5 w-3.5 text-stone-400 mx-auto" />
                       )}
                     </button>
-                    <div className="flex flex-1 items-center gap-3">
-                      <input
-                        value={row.name_th}
-                        onChange={(event) => updateRewardRow(index, { name_th: event.target.value })}
-                        className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                        placeholder="ชื่อรางวัล"
-                      />
-                      <input
-                        value={row.description_th}
-                        onChange={(event) => updateRewardRow(index, { description_th: event.target.value })}
-                        className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                        placeholder="รายละเอียด"
-                      />
-                      <input
-                        value={row.points_cost}
-                        onChange={(event) => updateRewardRow(index, { points_cost: event.target.value })}
-                        className="w-20 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                        type="number"
-                        placeholder="แต้ม"
-                      />
-                      <input
-                        value={row.stock_qty}
-                        onChange={(event) => updateRewardRow(index, { stock_qty: event.target.value })}
-                        className="w-20 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                        type="number"
-                        placeholder="สต็อก"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="flex w-14 shrink-0 cursor-pointer items-center gap-1.5 text-stone-500">
-                        <input type="checkbox" checked={row.active} onChange={(event) => updateRewardRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
-                        <span className="text-xs">ใช้</span>
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => void saveRewardRow(row)}
-                        disabled={savingKey === requestKey}
-                        className="w-14 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-                      >
-                        {savingKey === requestKey ? '...' : 'บันทึก'}
-                      </button>
-                    </div>
+                    <input
+                      value={row.name_th}
+                      onChange={(event) => updateRewardRow(index, { name_th: event.target.value })}
+                      className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      placeholder="ชื่อรางวัล"
+                    />
+                    <input
+                      value={row.description_th}
+                      onChange={(event) => updateRewardRow(index, { description_th: event.target.value })}
+                      className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      placeholder="รายละเอียด"
+                    />
+                    <input
+                      value={row.points_cost}
+                      onChange={(event) => updateRewardRow(index, { points_cost: event.target.value })}
+                      className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      type="number"
+                      placeholder="แต้ม"
+                    />
+                    <input
+                      value={row.stock_qty}
+                      onChange={(event) => updateRewardRow(index, { stock_qty: event.target.value })}
+                      className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      type="number"
+                      placeholder="สต็อก"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNotesModal({ index, draft: row.instruction_notes })}
+                      title="หมายเหตุ/เงื่อนไขการรับสินค้า"
+                      className={`flex h-8 w-full items-center justify-center rounded-lg border transition ${row.instruction_notes ? 'border-stone-400 bg-stone-100 text-stone-700 hover:bg-stone-200' : 'border-dashed border-stone-300 text-stone-400 hover:border-stone-400 hover:bg-stone-50'}`}
+                    >
+                      <ClipboardList className="h-4 w-4" />
+                    </button>
+                    <label className="flex cursor-pointer items-center gap-1.5 text-stone-500">
+                      <input type="checkbox" checked={row.active} onChange={(event) => updateRewardRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
+                      <span className="text-xs">ใช้</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void saveRewardRow(row)}
+                      disabled={savingKey === requestKey}
+                      className="w-full rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                    >
+                      {savingKey === requestKey ? '...' : 'บันทึก'}
+                    </button>
                   </div>
-
                 </div>
               );
             })}
@@ -1170,6 +1191,72 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
           </motion.div>
         </>
       )}
+    </AnimatePresence>
+
+    {/* ── Instruction notes modal ── */}
+    <AnimatePresence>
+      {notesModal !== null && (() => {
+        const isNew = notesModal.index === -1;
+        const rowName = isNew ? newReward.name_th || 'รางวัลใหม่' : (rewardRows[notesModal.index]?.name_th ?? '');
+        const saveNotes = () => {
+          if (isNew) {
+            setNewReward((prev) => ({ ...prev, instruction_notes: notesModal.draft }));
+          } else {
+            updateRewardRow(notesModal.index, { instruction_notes: notesModal.draft });
+          }
+          setNotesModal(null);
+        };
+        return (
+          <>
+            <motion.div
+              key="notes-modal-backdrop"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.18 }}
+              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+              onClick={() => setNotesModal(null)}
+            />
+            <motion.div
+              key="notes-modal-panel"
+              initial={reduceMotion ? {} : { opacity: 0, scale: 0.95, y: 12 }}
+              animate={reduceMotion ? {} : { opacity: 1, scale: 1, y: 0 }}
+              exit={reduceMotion ? {} : { opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
+                <div>
+                  <p className="text-sm font-bold text-stone-800">หมายเหตุ/เงื่อนไขการรับสินค้า</p>
+                  <p className="truncate max-w-[240px] text-xs text-stone-400">{rowName}</p>
+                </div>
+                <button type="button" onClick={() => setNotesModal(null)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="px-5 py-4">
+                <textarea
+                  value={notesModal.draft}
+                  onChange={(e) => setNotesModal((prev) => prev ? { ...prev, draft: e.target.value } : prev)}
+                  rows={6}
+                  placeholder="เช่น เจ้าหน้าที่จะเข้าติดตั้งให้ภายหลัง"
+                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 resize-none"
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2 px-5 pb-5">
+                <button type="button" onClick={() => setNotesModal(null)}
+                  className="rounded-xl border border-stone-200 px-4 py-2 text-sm text-stone-600 hover:bg-stone-50 transition">
+                  ยกเลิก
+                </button>
+                <button type="button" onClick={saveNotes}
+                  className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition">
+                  <Save className="h-3.5 w-3.5" />บันทึก
+                </button>
+              </div>
+            </motion.div>
+          </>
+        );
+      })()}
     </AnimatePresence>
     </ErrorBoundary>
   );

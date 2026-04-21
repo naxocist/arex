@@ -11,6 +11,25 @@ begin;
 -- -----------------------------------------------------------------------
 -- Wipe previous seed data
 -- -----------------------------------------------------------------------
+truncate table
+  public.delivery_jobs,
+  public.intakes,
+  public.pickup_jobs,
+  public.reward_requests,
+  public.points_ledger,
+  public.status_events,
+  public.submissions,
+  public.org_accounts,
+  public.rewards,
+  public.logistics_to_farmer_distances,
+  public.submission_factory_distances,
+  public.measurement_units,
+  public.material_types,
+  public.value_chain_mappings,
+  public.impact_baselines,
+  public.profiles
+restart identity cascade;
+
 delete from auth.identities i
 using auth.users u
 where i.user_id = u.id
@@ -35,25 +54,6 @@ where email in (
   'farmerrejected@gmail.com',
   'warehouse@gmail.com','executive@gmail.com','admin@gmail.com'
 );
-
-truncate table
-  public.delivery_jobs,
-  public.intakes,
-  public.pickup_jobs,
-  public.reward_requests,
-  public.points_ledger,
-  public.status_events,
-  public.submissions,
-  public.org_accounts,
-  public.rewards,
-  public.logistics_to_farmer_distances,
-  public.submission_factory_distances,
-  public.measurement_units,
-  public.material_types,
-  public.value_chain_mappings,
-  public.impact_baselines,
-  public.profiles
-restart identity cascade;
 
 -- -----------------------------------------------------------------------
 -- Auth users (password = 123456 for ALL)

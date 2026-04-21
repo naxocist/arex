@@ -9,7 +9,7 @@ class RewardsService(BaseService):
         try:
             return (
                 self.client.table("rewards")
-                .select("id, name_th, description_th, points_cost, stock_qty, active, image_url")
+                .select("id, name_th, description_th, points_cost, stock_qty, active, image_url, instruction_notes")
                 .eq("active", True)
                 .gt("stock_qty", 0)
                 .order("points_cost", desc=False)
@@ -22,7 +22,7 @@ class RewardsService(BaseService):
         try:
             return (
                 self.client.table("rewards")
-                .select("id, name_th, description_th, points_cost, stock_qty, active, image_url, created_at, updated_at")
+                .select("id, name_th, description_th, points_cost, stock_qty, active, image_url, instruction_notes, created_at, updated_at")
                 .order("points_cost", desc=False)
                 .execute()
             ).data or []
@@ -52,6 +52,8 @@ class RewardsService(BaseService):
             }
             if "image_url" in payload:
                 insert_data["image_url"] = payload["image_url"] or None
+            if "instruction_notes" in payload:
+                insert_data["instruction_notes"] = payload["instruction_notes"] or None
 
             return _first_row(
                 self.client.table("rewards").insert(insert_data).execute().data
@@ -90,6 +92,8 @@ class RewardsService(BaseService):
                 update_data["active"] = payload["active"]
             if "image_url" in payload:
                 update_data["image_url"] = payload["image_url"] or None
+            if "instruction_notes" in payload:
+                update_data["instruction_notes"] = payload["instruction_notes"] or None
 
             if not update_data:
                 raise WorkflowError("No fields to update")
@@ -98,7 +102,7 @@ class RewardsService(BaseService):
 
             updated = (
                 self.client.table("rewards")
-                .select("id, name_th, description_th, points_cost, stock_qty, active, image_url, created_at, updated_at")
+                .select("id, name_th, description_th, points_cost, stock_qty, active, image_url, instruction_notes, created_at, updated_at")
                 .eq("id", reward_id)
                 .limit(1)
                 .execute()

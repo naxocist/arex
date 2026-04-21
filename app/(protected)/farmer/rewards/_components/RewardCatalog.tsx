@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ArrowLeft, Coins, Gift, X } from 'lucide-react';
 import Image from 'next/image';
@@ -128,145 +129,157 @@ export default function RewardCatalog({ rewards, availablePoints, requestingRewa
         )}
       </section>
 
-      {/* Reward detail sheet */}
-      <AnimatePresence>
-        {selectedReward && (() => {
-          const reward = selectedReward;
-          const pts = Number(reward.points_cost) || 0;
-          const stock = Number(reward.stock_qty) || 0;
-          const outOfStock = stock <= 0;
-          const unavailable = !reward.active || outOfStock;
-          const totalCost = pts * rewardQty;
-          const afterBalance = availablePoints - totalCost;
-          const insufficientQty = afterBalance < 0;
-          const maxQty = outOfStock ? 0 : Math.min(10, stock, pts > 0 && availablePoints > 0 ? Math.floor(availablePoints / pts) : 0);
-          return (
+      {/* Reward detail sheet — portalled to body to escape overflow-hidden parent */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {selectedReward && (() => {
+            const reward = selectedReward;
+            const pts = Number(reward.points_cost) || 0;
+            const stock = Number(reward.stock_qty) || 0;
+            const outOfStock = stock <= 0;
+            const unavailable = !reward.active || outOfStock;
+            const totalCost = pts * rewardQty;
+            const afterBalance = availablePoints - totalCost;
+            const insufficientQty = afterBalance < 0;
+            const maxQty = outOfStock ? 0 : Math.min(10, stock, pts > 0 && availablePoints > 0 ? Math.floor(availablePoints / pts) : 0);
+            return (
+              <>
+                <motion.div key="detail-backdrop" className="fixed inset-0 z-40 bg-black/50"
+                  initial={reduceMotion ? {} : { opacity: 0 }} animate={reduceMotion ? {} : { opacity: 1 }} exit={reduceMotion ? {} : { opacity: 0 }}
+                  onClick={() => setSelectedReward(null)} />
+                <motion.div key="detail-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                  initial={reduceMotion ? {} : { opacity: 0, scale: 0.95 }} animate={reduceMotion ? {} : { opacity: 1, scale: 1 }} exit={reduceMotion ? {} : { opacity: 0, scale: 0.95 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                >
+                  <div className="relative flex w-full max-w-2xl flex-col sm:flex-row overflow-hidden rounded-3xl bg-white shadow-2xl">
+                    <div className="relative h-72 w-full shrink-0 sm:h-auto sm:w-80 sm:self-stretch bg-stone-50">
+                      {reward.image_url ? (
+                        <Image src={reward.image_url} alt={reward.name_th} fill unoptimized className="object-contain p-5" sizes="256px" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center"><Gift className="h-16 w-16 text-emerald-200" /></div>
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xl font-bold leading-snug text-stone-900">{reward.name_th}</p>
+                          {reward.description_th && <p className="mt-1 text-base text-stone-400 leading-snug">{reward.description_th}</p>}
+                        </div>
+                        <button type="button" onClick={() => setSelectedReward(null)} className="shrink-0 flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-400 transition hover:bg-stone-200">
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                      {reward.instruction_notes && (
+                        <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
+                          <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-amber-500">หมายเหตุ / เงื่อนไขการรับของ</p>
+                          <p className="whitespace-pre-wrap text-sm text-amber-800 leading-relaxed">{reward.instruction_notes}</p>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3">
+                        <span className="text-lg font-semibold text-stone-600">จำนวน</span>
+                        <div className="flex items-center gap-3">
+                          <button type="button" onClick={() => setRewardQty((q) => Math.max(1, q - 1))} disabled={rewardQty <= 1}
+                            className="flex h-14 w-14 items-center justify-center rounded-xl border border-stone-200 bg-white text-3xl font-bold text-stone-600 transition disabled:opacity-30 active:scale-90">−</button>
+                          <span className="w-10 text-center text-3xl font-bold text-stone-900">{rewardQty}</span>
+                          <button type="button" onClick={() => setRewardQty((q) => Math.min(maxQty, q + 1))} disabled={rewardQty >= maxQty}
+                            className="flex h-14 w-14 items-center justify-center rounded-xl border border-stone-200 bg-white text-3xl font-bold text-stone-600 transition disabled:opacity-30 active:scale-90">+</button>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-stone-100 overflow-hidden text-base">
+                        <div className="flex justify-between px-4 py-3">
+                          <span className="text-stone-400">ราคา/ชิ้น</span>
+                          <span className="font-semibold text-stone-700">{pts.toLocaleString('th-TH')} แต้ม</span>
+                        </div>
+                        <div className="flex justify-between border-t border-stone-100 bg-stone-50 px-4 py-3">
+                          <span className="text-stone-400">รวม</span>
+                          <span className={`font-bold text-base ${insufficientQty ? 'text-red-500' : 'text-stone-800'}`}>{totalCost.toLocaleString('th-TH')} แต้ม</span>
+                        </div>
+                        <div className="flex justify-between border-t border-stone-100 px-4 py-3">
+                          <span className="text-stone-400">คงเหลือ</span>
+                          <span className={`font-bold text-base ${insufficientQty ? 'text-red-500' : 'text-emerald-600'}`}>{afterBalance.toLocaleString('th-TH')}</span>
+                        </div>
+                      </div>
+                      {insufficientQty && <p className="text-center text-sm font-semibold text-red-500">ขาดอีก {(totalCost - availablePoints).toLocaleString('th-TH')} แต้ม</p>}
+                      {outOfStock && <p className="text-center text-sm font-semibold text-stone-400">หมดสต็อก</p>}
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedReward(null); handleRequestClick(reward, rewardQty); }}
+                        disabled={unavailable || availablePoints < pts * rewardQty || requestingRewardId === reward.id}
+                        className="flex w-full min-h-[64px] items-center justify-center gap-2 rounded-2xl bg-primary text-lg font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+                      >
+                        <Gift className="h-5 w-5" />
+                        {requestingRewardId === reward.id ? 'กำลังส่งคำขอ...' : 'ขอแลกรางวัลนี้'}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            );
+          })()}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* Location picker — portalled to body */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {locationPicker.open && (
             <>
-              <motion.div key="detail-backdrop" className="fixed inset-0 z-40 bg-black/50"
+              <motion.div key="backdrop" className="fixed inset-0 z-50 bg-black/40"
                 initial={reduceMotion ? {} : { opacity: 0 }} animate={reduceMotion ? {} : { opacity: 1 }} exit={reduceMotion ? {} : { opacity: 0 }}
-                onClick={() => setSelectedReward(null)} />
-              <motion.div key="detail-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                onClick={() => setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null })} />
+              <motion.div key="location-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4"
                 initial={reduceMotion ? {} : { opacity: 0, scale: 0.95 }} animate={reduceMotion ? {} : { opacity: 1, scale: 1 }} exit={reduceMotion ? {} : { opacity: 0, scale: 0.95 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               >
-                <div className="relative flex w-full max-w-2xl flex-col sm:flex-row overflow-hidden rounded-3xl bg-white shadow-2xl">
-                  <div className="relative h-72 w-full shrink-0 sm:h-auto sm:w-80 sm:self-stretch bg-stone-50">
-                    {reward.image_url ? (
-                      <Image src={reward.image_url} alt={reward.name_th} fill unoptimized className="object-contain p-5" sizes="256px" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center"><Gift className="h-16 w-16 text-emerald-200" /></div>
-                    )}
-                  </div>
-                  <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xl font-bold leading-snug text-stone-900">{reward.name_th}</p>
-                        {reward.description_th && <p className="mt-1 text-base text-stone-400 leading-snug">{reward.description_th}</p>}
-                      </div>
-                      <button type="button" onClick={() => setSelectedReward(null)} className="shrink-0 flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-400 transition hover:bg-stone-200">
-                        <X className="h-5 w-5" />
+                <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl max-h-[90dvh]">
+                  <div className="flex items-center justify-between border-b border-stone-100 px-6 py-5">
+                    <div className="flex items-center gap-3">
+                      <button type="button"
+                        onClick={() => { setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null }); setSelectedReward(locationPicker.reward); }}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-500 transition hover:bg-stone-200">
+                        <ArrowLeft className="h-5 w-5" />
                       </button>
-                    </div>
-                    <div className="flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3">
-                      <span className="text-lg font-semibold text-stone-600">จำนวน</span>
-                      <div className="flex items-center gap-3">
-                        <button type="button" onClick={() => setRewardQty((q) => Math.max(1, q - 1))} disabled={rewardQty <= 1}
-                          className="flex h-14 w-14 items-center justify-center rounded-xl border border-stone-200 bg-white text-3xl font-bold text-stone-600 transition disabled:opacity-30 active:scale-90">−</button>
-                        <span className="w-10 text-center text-3xl font-bold text-stone-900">{rewardQty}</span>
-                        <button type="button" onClick={() => setRewardQty((q) => Math.min(maxQty, q + 1))} disabled={rewardQty >= maxQty}
-                          className="flex h-14 w-14 items-center justify-center rounded-xl border border-stone-200 bg-white text-3xl font-bold text-stone-600 transition disabled:opacity-30 active:scale-90">+</button>
+                      <div>
+                        <p className="text-xl font-bold text-stone-900">ระบุสถานที่รับของรางวัล</p>
+                        <p className="text-base text-stone-400">{locationPicker.reward?.name_th} · {rewardQty} ชิ้น</p>
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-stone-100 overflow-hidden text-base">
-                      <div className="flex justify-between px-4 py-3">
-                        <span className="text-stone-400">ราคา/ชิ้น</span>
-                        <span className="font-semibold text-stone-700">{pts.toLocaleString('th-TH')} แต้ม</span>
-                      </div>
-                      <div className="flex justify-between border-t border-stone-100 bg-stone-50 px-4 py-3">
-                        <span className="text-stone-400">รวม</span>
-                        <span className={`font-bold text-base ${insufficientQty ? 'text-red-500' : 'text-stone-800'}`}>{totalCost.toLocaleString('th-TH')} แต้ม</span>
-                      </div>
-                      <div className="flex justify-between border-t border-stone-100 px-4 py-3">
-                        <span className="text-stone-400">คงเหลือ</span>
-                        <span className={`font-bold text-base ${insufficientQty ? 'text-red-500' : 'text-emerald-600'}`}>{afterBalance.toLocaleString('th-TH')}</span>
-                      </div>
+                    <button type="button" onClick={() => setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null })}
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-stone-100 text-stone-400 transition hover:bg-stone-200">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-4 overflow-y-auto px-6 pb-6 pt-5">
+                    <div className="space-y-2">
+                      <label className="block text-base font-semibold text-stone-700">สถานที่รับของ</label>
+                      <input type="text" value={locationPicker.locationText}
+                        onChange={(e) => setLocationPicker((prev) => ({ ...prev, locationText: e.target.value }))}
+                        placeholder="เช่น หน้าบ้าน / หน้าวัด"
+                        className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-lg text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10" />
                     </div>
-                    {insufficientQty && <p className="text-center text-sm font-semibold text-red-500">ขาดอีก {(totalCost - availablePoints).toLocaleString('th-TH')} แต้ม</p>}
-                    {outOfStock && <p className="text-center text-sm font-semibold text-stone-400">หมดสต็อก</p>}
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedReward(null); handleRequestClick(reward, rewardQty); }}
-                      disabled={unavailable || availablePoints < pts * rewardQty || requestingRewardId === reward.id}
-                      className="flex w-full min-h-[64px] items-center justify-center gap-2 rounded-2xl bg-primary text-lg font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40"
-                    >
-                      <Gift className="h-5 w-5" />
-                      {requestingRewardId === reward.id ? 'กำลังส่งคำขอ...' : 'ขอแลกรางวัลนี้'}
+                    <div className="rounded-xl bg-emerald-50 px-4 py-3 text-base text-emerald-700">ปักหมุดบนแผนที่เพื่อให้ขนส่งนำทางได้ถูกต้อง</div>
+                    <PickupLocationMapPicker
+                      lat={locationPicker.lat} lng={locationPicker.lng}
+                      onChange={({ lat, lng }) => setLocationPicker((prev) => ({ ...prev, lat, lng }))}
+                      onAddressResolved={(address) => setLocationPicker((prev) => ({ ...prev, locationText: address }))}
+                      mapHeightClassName="h-[300px] w-full overflow-hidden rounded-2xl"
+                    />
+                    {!locationPicker.locationText.trim() && <p className="text-center text-base font-semibold text-red-500">กรุณาระบุสถานที่รับของก่อน</p>}
+                    <button type="button"
+                      onClick={() => handleLocationConfirmed(locationPicker.locationText, locationPicker.lat, locationPicker.lng)}
+                      disabled={!locationPicker.locationText.trim()}
+                      className="flex w-full min-h-[64px] items-center justify-center gap-2 rounded-2xl bg-primary text-lg font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40">
+                      <Gift className="h-5 w-5" />ยืนยันสถานที่และขอแลกรางวัล
                     </button>
                   </div>
                 </div>
               </motion.div>
             </>
-          );
-        })()}
-      </AnimatePresence>
-
-      {/* Location picker */}
-      <AnimatePresence>
-        {locationPicker.open && (
-          <>
-            <motion.div key="backdrop" className="fixed inset-0 z-50 bg-black/40"
-              initial={reduceMotion ? {} : { opacity: 0 }} animate={reduceMotion ? {} : { opacity: 1 }} exit={reduceMotion ? {} : { opacity: 0 }}
-              onClick={() => setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null })} />
-            <motion.div key="location-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4"
-              initial={reduceMotion ? {} : { opacity: 0, scale: 0.95 }} animate={reduceMotion ? {} : { opacity: 1, scale: 1 }} exit={reduceMotion ? {} : { opacity: 0, scale: 0.95 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-            >
-              <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl max-h-[90dvh]">
-                <div className="flex items-center justify-between border-b border-stone-100 px-6 py-5">
-                  <div className="flex items-center gap-3">
-                    <button type="button"
-                      onClick={() => { setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null }); setSelectedReward(locationPicker.reward); }}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-500 transition hover:bg-stone-200">
-                      <ArrowLeft className="h-5 w-5" />
-                    </button>
-                    <div>
-                      <p className="text-xl font-bold text-stone-900">ระบุสถานที่รับของรางวัล</p>
-                      <p className="text-base text-stone-400">{locationPicker.reward?.name_th} · {rewardQty} ชิ้น</p>
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => setLocationPicker({ open: false, reward: null, locationText: '', lat: null, lng: null })}
-                    className="flex h-11 w-11 items-center justify-center rounded-full bg-stone-100 text-stone-400 transition hover:bg-stone-200">
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-                <div className="flex flex-col gap-4 overflow-y-auto px-6 pb-6 pt-5">
-                  <div className="space-y-2">
-                    <label className="block text-base font-semibold text-stone-700">สถานที่รับของ</label>
-                    <input type="text" value={locationPicker.locationText}
-                      onChange={(e) => setLocationPicker((prev) => ({ ...prev, locationText: e.target.value }))}
-                      placeholder="เช่น หน้าบ้าน / หน้าวัด"
-                      className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-lg text-stone-900 outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10" />
-                  </div>
-                  <div className="rounded-xl bg-emerald-50 px-4 py-3 text-base text-emerald-700">ปักหมุดบนแผนที่เพื่อให้ขนส่งนำทางได้ถูกต้อง</div>
-                  <PickupLocationMapPicker
-                    lat={locationPicker.lat} lng={locationPicker.lng}
-                    onChange={({ lat, lng }) => setLocationPicker((prev) => ({ ...prev, lat, lng }))}
-                    onAddressResolved={(address) => setLocationPicker((prev) => ({ ...prev, locationText: address }))}
-                    mapHeightClassName="h-[300px] w-full overflow-hidden rounded-2xl"
-                  />
-                  {!locationPicker.locationText.trim() && <p className="text-center text-base font-semibold text-red-500">กรุณาระบุสถานที่รับของก่อน</p>}
-                  <button type="button"
-                    onClick={() => handleLocationConfirmed(locationPicker.locationText, locationPicker.lat, locationPicker.lng)}
-                    disabled={!locationPicker.locationText.trim()}
-                    className="flex w-full min-h-[64px] items-center justify-center gap-2 rounded-2xl bg-primary text-lg font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 active:scale-95 disabled:opacity-40">
-                    <Gift className="h-5 w-5" />ยืนยันสถานที่และขอแลกรางวัล
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       <ConfirmDialog
         open={confirmDialog.open}

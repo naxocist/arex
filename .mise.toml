@@ -23,37 +23,33 @@ run = "supabase stop --workdir backend"
 description = "Show local Supabase endpoints and keys"
 run = "supabase status -o env --workdir backend"
 
+[tasks."db:migrate:new"]
+description = "Create a new migration (pass -- my_migration_name)"
+run = "supabase migration new --workdir backend"
+
 [tasks."db:reset"]
 description = "Reset local database, reapply migrations, and seed data"
 run = "supabase db reset --workdir backend"
 
-[tasks."db:migrate:new"]
-description = "Create a new migration (pass -- my_migration_name)"
-run = "supabase migration new --workdir backend"
+[tasks."db:reseed"]
+description = "Wipe and reseed local DB without reapplying migrations"
+run = "docker exec -i supabase_db_arex-local psql -U postgres -d postgres < backend/supabase/seeds/seed.local.sql"
 
 [tasks."db:push:staging"]
 description = "Push unapplied migrations to staging Supabase"
 run = "supabase link --project-ref %STAGING_PROJECT_REF% --password %STAGING_DB_PASSWORD% --workdir backend && supabase db push --workdir backend"
 
-[tasks."db:seed:staging"]
-description = "WIPE staging DB and reseed from scratch (truncates all tables + auth users)"
-run = "supabase link --project-ref %STAGING_PROJECT_REF% --password %STAGING_DB_PASSWORD% --workdir backend && supabase db query --workdir backend --linked --file supabase/seeds/seed.staging.sql"
-
-[tasks."db:reset:staging"]
-description = "Push all migrations then wipe+reseed staging from scratch"
-run = "mise run db:push:staging && mise run db:seed:staging"
+[tasks."db:reseed:staging"]
+description = "WIPE staging DB and reseed from scratch using local seed (truncates all tables + auth users)"
+run = "supabase link --project-ref %STAGING_PROJECT_REF% --password %STAGING_DB_PASSWORD% --workdir backend && cd backend && uv run python scripts/run_seed.py supabase/seeds/seed.local.sql"
 
 [tasks."db:push:prod"]
 description = "Push unapplied migrations to production Supabase"
 run = "supabase link --project-ref %PROD_PROJECT_REF% --password %PROD_DB_PASSWORD% --workdir backend && supabase db push --workdir backend"
 
-[tasks."db:seed:prod"]
-description = "WIPE prod DB and reseed from scratch (truncates all tables + auth users)"
+[tasks."db:reseed:prod"]
+description = "CAUTION!: WIPE prod DB and reseed from scratch (truncates all tables + auth users)"
 run = "supabase link --project-ref %PROD_PROJECT_REF% --password %PROD_DB_PASSWORD% --workdir backend && supabase db query --workdir backend --linked --file supabase/seeds/seed.prod.sql"
-
-[tasks."db:reset:prod"]
-description = "Push all migrations then wipe+reseed prod from scratch"
-run = "mise run db:push:prod && mise run db:seed:prod"
 
 [tasks."db:diff"]
 description = "Diff local schema vs current linked remote (shows what would be pushed)"

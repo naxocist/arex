@@ -23,7 +23,7 @@ export interface CreateSubmissionPayload {
 }
 export interface FarmerMaterialTypeItem { code: string; name_th: string; active: boolean }
 export interface FarmerMeasurementUnitItem { code: string; name_th: string; to_kg_factor: number | null; active: boolean }
-export interface FarmerRewardItem { id: string; name_th: string; description_th: string | null; points_cost: number; stock_qty: number; active: boolean; image_url: string | null }
+export interface FarmerRewardItem { id: string; name_th: string; description_th: string | null; points_cost: number; stock_qty: number; active: boolean; image_url: string | null; instruction_notes: string | null }
 export interface FarmerRewardDeliveryJobItem {
   id: string;
   status: 'reward_delivery_scheduled' | 'out_for_delivery' | 'reward_delivered' | string;
