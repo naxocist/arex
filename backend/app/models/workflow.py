@@ -14,6 +14,10 @@ class CreateSubmissionRequest(BaseModel):
     image_url: str | None = Field(default=None, max_length=2048)
 
 
+class CancelPickupJobRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class SchedulePickupRequest(BaseModel):
     pickup_window_start_at: datetime
     pickup_window_end_at: datetime

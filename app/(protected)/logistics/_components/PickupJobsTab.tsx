@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Truck,
   User,
+  X,
   ZoomIn,
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
@@ -74,6 +75,7 @@ interface Props {
   onMarkPickedUp: (jobId: string) => void;
   onMarkDeliveredToFactory: (jobId: string) => void;
   onReschedule: (jobId: string, range: DateRangeValue, factoryId: string) => void;
+  onCancel: (jobId: string, reason: string) => void;
   confirm: (message: string, onConfirm: () => void) => void;
 }
 
@@ -90,6 +92,7 @@ export default function PickupJobsTab({
   onMarkPickedUp,
   onMarkDeliveredToFactory,
   onReschedule,
+  onCancel,
   confirm,
 }: Props) {
   const reduceMotion = useReducedMotion();
@@ -99,6 +102,8 @@ export default function PickupJobsTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRangeById, setEditRangeById] = useState<Record<string, DateRangeValue>>({});
   const [editFactoryById, setEditFactoryById] = useState<Record<string, string>>({});
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [cancelReasonById, setCancelReasonById] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copyLoadingId, setCopyLoadingId] = useState<string | null>(null);
   const [pdfLoadingId] = useState<string | null>(null);
@@ -275,19 +280,77 @@ export default function PickupJobsTab({
                     )}
                     {item.status === 'pickup_scheduled' && (
                       <div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (editingId === item.id) { setEditingId(null); return; }
-                            setEditingId(item.id);
-                            setEditRangeById((p) => ({ ...p, [item.id]: { from: isoToDateOnly(item.planned_pickup_at), to: isoToDateOnly(item.pickup_window_end_at) } }));
-                            setEditFactoryById((p) => ({ ...p, [item.id]: item.destination_factory_id ?? '' }));
-                          }}
-                          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          {editingId === item.id ? 'ซ่อนฟอร์มแก้ไข' : 'แก้ไขวันนัดรับ / โรงงาน'}
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setCancelingId((cur) => cur === item.id ? null : item.id)}
+                            disabled={isBusy}
+                            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-40"
+                          >
+                            <X className="h-3 w-3" />
+                            ยกเลิกงาน
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (editingId === item.id) { setEditingId(null); return; }
+                              setEditingId(item.id);
+                              setEditRangeById((p) => ({ ...p, [item.id]: { from: isoToDateOnly(item.planned_pickup_at), to: isoToDateOnly(item.pickup_window_end_at) } }));
+                              setEditFactoryById((p) => ({ ...p, [item.id]: item.destination_factory_id ?? '' }));
+                            }}
+                            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            {editingId === item.id ? 'ซ่อนฟอร์มแก้ไข' : 'แก้ไขวันนัดรับ / โรงงาน'}
+                          </button>
+                        </div>
+                        <AnimatePresence initial={false}>
+                          {cancelingId === item.id && (
+                            <motion.div
+                              key="cancel-reason"
+                              initial={reduceMotion ? {} : { height: 0, opacity: 0 }}
+                              animate={reduceMotion ? {} : { height: 'auto', opacity: 1 }}
+                              exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2, ease: 'easeInOut' }}
+                              style={{ overflow: 'hidden' }}
+                            >
+                              <div className="mt-2 space-y-2 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
+                                <p className="text-xs font-semibold text-rose-700">ระบุเหตุผลการยกเลิก (จำเป็น)</p>
+                                <textarea
+                                  autoFocus
+                                  rows={2}
+                                  maxLength={500}
+                                  value={cancelReasonById[item.id] ?? ''}
+                                  onChange={(e) => setCancelReasonById((p) => ({ ...p, [item.id]: e.target.value }))}
+                                  placeholder="เช่น เกษตรกรไม่อยู่บ้าน, ปริมาณไม่ตรงที่แจ้ง..."
+                                  className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-rose-300 resize-none"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={isBusy || !(cancelReasonById[item.id] ?? '').trim()}
+                                    onClick={() => {
+                                      const reason = (cancelReasonById[item.id] ?? '').trim();
+                                      if (!reason) return;
+                                      onCancel(item.id, reason);
+                                      setCancelingId(null);
+                                    }}
+                                    className="flex-1 rounded-lg bg-rose-500 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-600 disabled:opacity-40"
+                                  >
+                                    {isBusy ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCancelingId(null)}
+                                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-semibold text-stone-500 hover:bg-stone-100 transition"
+                                  >
+                                    ปิด
+                                  </button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                         <AnimatePresence initial={false}>
                           {editingId === item.id && (
                             <motion.div

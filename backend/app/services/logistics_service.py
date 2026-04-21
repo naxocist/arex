@@ -32,6 +32,33 @@ class LogisticsService(DistanceService):
             if not submissions:
                 return []
 
+            # Fetch farmer profiles
+            farmer_ids = list({str(s["farmer_profile_id"]) for s in submissions if s.get("farmer_profile_id")})
+            farmer_by_id: dict[str, dict[str, Any]] = {}
+            if farmer_ids:
+                for row in (
+                    self.client.table("profiles")
+                    .select("id, display_name, phone")
+                    .in_("id", farmer_ids)
+                    .execute()
+                ).data or []:
+                    if row.get("id"):
+                        farmer_by_id[str(row["id"])] = row
+
+            # Fetch the active pickup_job_id for pickup_scheduled submissions
+            scheduled_ids = [str(s["id"]) for s in submissions if s.get("status") == "pickup_scheduled" and s.get("id")]
+            pickup_job_id_by_submission: dict[str, str] = {}
+            if scheduled_ids:
+                for row in (
+                    self.client.table("pickup_jobs")
+                    .select("id, submission_id")
+                    .in_("submission_id", scheduled_ids)
+                    .eq("status", "pickup_scheduled")
+                    .execute()
+                ).data or []:
+                    if row.get("submission_id") and row.get("id"):
+                        pickup_job_id_by_submission[str(row["submission_id"])] = str(row["id"])
+
             material_codes = list({s.get("material_type") for s in submissions if s.get("material_type")})
             material_types_by_code: dict[str, str] = {}
             if material_codes:
@@ -59,6 +86,9 @@ class LogisticsService(DistanceService):
                     "created_at": s.get("created_at"),
                     "image_url": s.get("image_url"),
                     "distance_to_farmer_km": None,
+                    "pickup_job_id": pickup_job_id_by_submission.get(str(s["id"])),
+                    "farmer_display_name": farmer_by_id.get(str(s.get("farmer_profile_id") or ""), {}).get("display_name"),
+                    "farmer_phone": farmer_by_id.get(str(s.get("farmer_profile_id") or ""), {}).get("phone"),
                 }
                 for s in submissions
             ]
@@ -347,6 +377,143 @@ class LogisticsService(DistanceService):
             )
         except Exception as exc:
             raise WorkflowError(f"Failed to mark delivered to factory: {exc}") from exc
+
+    def cancel_submitted_submission(self, submission_id: str, logistics_profile_id: str, reason: str) -> dict[str, Any]:
+        try:
+            return _first_row(
+                self.client.rpc(
+                    "cancel_submitted_submission_by_logistics",
+                    {
+                        "p_submission_id": submission_id,
+                        "p_logistics_profile_id": logistics_profile_id,
+                        "p_reason": reason,
+                    },
+                ).execute().data
+            )
+        except Exception as exc:
+            raise WorkflowError(f"Failed to cancel submission: {exc}") from exc
+
+    def cancel_pickup_job(self, pickup_job_id: str, logistics_profile_id: str, reason: str) -> dict[str, Any]:
+        try:
+            return _first_row(
+                self.client.rpc(
+                    "cancel_pickup_job_by_logistics",
+                    {
+                        "p_pickup_job_id": pickup_job_id,
+                        "p_logistics_profile_id": logistics_profile_id,
+                        "p_reason": reason,
+                    },
+                ).execute().data
+            )
+        except Exception as exc:
+            raise WorkflowError(f"Failed to cancel pickup job: {exc}") from exc
+
+    def list_cancelled_pickup_jobs(self, logistics_profile_id: str) -> list[dict[str, Any]]:
+        try:
+            jobs = (
+                self.client.table("pickup_jobs")
+                .select(
+                    "id, submission_id, logistics_profile_id, destination_factory_id, status, "
+                    "planned_pickup_at, pickup_window_end_at, created_at"
+                )
+                .eq("logistics_profile_id", logistics_profile_id)
+                .eq("status", "cancelled")
+                .order("created_at", desc=True)
+                .execute()
+            ).data or []
+
+            if not jobs:
+                return []
+
+            submission_ids = [str(job["submission_id"]) for job in jobs if job.get("submission_id")]
+            submissions = (
+                self.client.table("submissions")
+                .select(
+                    "id, farmer_profile_id, material_type, quantity_value, quantity_unit, "
+                    "pickup_location_text, pickup_lat, pickup_lng, image_url"
+                )
+                .in_("id", submission_ids)
+                .execute()
+            ).data or []
+            submissions_by_id = {str(row["id"]): row for row in submissions if row.get("id")}
+
+            farmer_ids = list({str(s["farmer_profile_id"]) for s in submissions if s.get("farmer_profile_id")})
+            farmer_by_id: dict[str, dict[str, Any]] = {}
+            if farmer_ids:
+                for row in (
+                    self.client.table("profiles")
+                    .select("id, display_name, phone")
+                    .in_("id", farmer_ids)
+                    .execute()
+                ).data or []:
+                    if row.get("id"):
+                        farmer_by_id[str(row["id"])] = row
+
+            material_codes = list({s.get("material_type") for s in submissions if s.get("material_type")})
+            material_types_by_code: dict[str, str] = {}
+            if material_codes:
+                for row in (
+                    self.client.table("material_types")
+                    .select("code, name_th")
+                    .in_("code", material_codes)
+                    .execute()
+                ).data or []:
+                    if row.get("code"):
+                        material_types_by_code[str(row["code"])] = row.get("name_th", "")
+
+            dest_factory_ids = list({
+                str(job["destination_factory_id"])
+                for job in jobs
+                if job.get("destination_factory_id") is not None
+            })
+            dest_factory_by_id: dict[str, dict[str, Any]] = {}
+            if dest_factory_ids:
+                for row in (
+                    self.client.table("org_accounts")
+                    .select("id, name_th, location_text, lat, lng")
+                    .eq("type", "factory")
+                    .in_("id", dest_factory_ids)
+                    .execute()
+                ).data or []:
+                    if row.get("id"):
+                        dest_factory_by_id[str(row["id"])] = row
+
+            result: list[dict[str, Any]] = []
+            for job in jobs:
+                submission = submissions_by_id.get(str(job.get("submission_id")))
+                if submission is None:
+                    continue
+                dest_id = str(job.get("destination_factory_id") or "")
+                dest = dest_factory_by_id.get(dest_id, {})
+                farmer = farmer_by_id.get(str(submission.get("farmer_profile_id") or ""), {})
+                result.append({
+                    "id": str(job["id"]),
+                    "submission_id": str(job.get("submission_id")),
+                    "status": job.get("status"),
+                    "planned_pickup_at": job.get("planned_pickup_at"),
+                    "pickup_window_end_at": job.get("pickup_window_end_at"),
+                    "created_at": job.get("created_at"),
+                    "destination_factory_name_th": dest.get("name_th"),
+                    "destination_factory_location_text": dest.get("location_text"),
+                    "destination_factory_lat": dest.get("lat"),
+                    "destination_factory_lng": dest.get("lng"),
+                    "material_type": submission.get("material_type"),
+                    "material_name_th": material_types_by_code.get(
+                        submission.get("material_type", ""), submission.get("material_type", "")
+                    ),
+                    "quantity_value": submission.get("quantity_value"),
+                    "quantity_unit": submission.get("quantity_unit"),
+                    "pickup_location_text": submission.get("pickup_location_text"),
+                    "pickup_lat": submission.get("pickup_lat"),
+                    "pickup_lng": submission.get("pickup_lng"),
+                    "farmer_display_name": farmer.get("display_name"),
+                    "farmer_phone": farmer.get("phone"),
+                    "image_url": submission.get("image_url"),
+                })
+
+            return result
+        except Exception as exc:
+            raise WorkflowError(f"Failed to list cancelled pickup jobs: {exc}") from exc
 
     def reschedule_pickup_job(self, pickup_job_id: str, payload: SchedulePickupRequest) -> dict[str, Any]:
         try:

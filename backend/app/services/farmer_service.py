@@ -142,6 +142,25 @@ class FarmerService(BaseService):
                 return []
 
             submission_ids = [str(item["id"]) for item in submissions if item.get("id")]
+
+            # Fetch cancel reasons from status_events for cancelled submissions
+            cancelled_ids = [str(item["id"]) for item in submissions if item.get("status") == "cancelled" and item.get("id")]
+            cancel_reason_by_submission: dict[str, str | None] = {}
+            if cancelled_ids:
+                events = (
+                    self.client.table("status_events")
+                    .select("entity_id, note")
+                    .eq("entity_type", "submission")
+                    .eq("to_status", "cancelled")
+                    .in_("entity_id", cancelled_ids)
+                    .order("event_at", desc=True)
+                    .execute()
+                ).data or []
+                for ev in events:
+                    eid = str(ev.get("entity_id") or "")
+                    if eid and eid not in cancel_reason_by_submission:
+                        cancel_reason_by_submission[eid] = ev.get("note") or None
+
             pickup_jobs = (
                 self.client.table("pickup_jobs")
                 .select("id, submission_id, planned_pickup_at, pickup_window_end_at, status, created_at")
@@ -207,6 +226,7 @@ class FarmerService(BaseService):
                         str(item.get("id")) if item.get("id") else "", {}
                     ).get("status"),
                     "credited_points": points_by_submission.get(str(item.get("id") or ""), None),
+                    "cancel_reason": cancel_reason_by_submission.get(str(item.get("id") or ""), None),
                 }
                 for item in submissions
             ]

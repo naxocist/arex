@@ -124,7 +124,7 @@ export default function LogisticsTracking() {
   const [updatingDeliveryJobId, setUpdatingDeliveryJobId] = useState<string | null>(null);
   const [reschedulingDeliveryJobId, setReschedulingDeliveryJobId] = useState<string | null>(null);
 
-  const submittedQueue = useMemo(() => pickupQueue.filter((i) => i.status === 'submitted'), [pickupQueue]);
+  const submittedQueue = useMemo(() => pickupQueue, [pickupQueue]);
   const activePickupJobs = useMemo(() => pickupJobs.filter((i) => i.status !== 'delivered_to_factory'), [pickupJobs]);
   const activeDeliveryJobs = useMemo(
     () => rewardDeliveryJobs.filter((i) => i.status === 'reward_delivery_scheduled' || i.status === 'out_for_delivery'),
@@ -298,6 +298,30 @@ export default function LogisticsTracking() {
     } finally { setReschedulingDeliveryJobId(null); }
   };
 
+  const handleCancelSubmission = async (submissionId: string, reason: string) => {
+    setUpdatingPickupJobId(submissionId);
+    try {
+      await logisticsApi.cancelSubmission(submissionId, reason);
+      setToast({ tone: 'success', message: 'ยกเลิกรายการสำเร็จแล้ว', id: ++toastId.current });
+      await loadAll(true);
+    } catch (err) {
+      await loadAll(true);
+      setToast({ tone: 'error', message: err instanceof ApiError ? `ยกเลิกไม่สำเร็จ: ${extractWorkflowMessage(err.message)}` : 'ยกเลิกไม่สำเร็จ', id: ++toastId.current });
+    } finally { setUpdatingPickupJobId(null); }
+  };
+
+  const handleCancelPickupJob = async (jobId: string, reason: string) => {
+    setUpdatingPickupJobId(jobId);
+    try {
+      await logisticsApi.cancelPickupJob(jobId, reason);
+      setToast({ tone: 'success', message: 'ยกเลิกงานขนส่งสำเร็จแล้ว', id: ++toastId.current });
+      await loadAll(true);
+    } catch (err) {
+      await loadAll(true);
+      setToast({ tone: 'error', message: err instanceof ApiError ? `ยกเลิกไม่สำเร็จ: ${extractWorkflowMessage(err.message)}` : 'ยกเลิกไม่สำเร็จ', id: ++toastId.current });
+    } finally { setUpdatingPickupJobId(null); }
+  };
+
   const toggleExpand = (id: string) => setExpandedId((cur) => cur === id ? null : id);
   const confirm = (message: string, onConfirm: () => void) => setConfirmPending({ message, onConfirm });
 
@@ -405,7 +429,10 @@ export default function LogisticsTracking() {
                 expandedId={expandedId}
                 onToggle={toggleExpand}
                 schedulingId={schedulingSubmissionId}
+                cancellingId={updatingPickupJobId}
                 onSchedule={handleSchedulePickup}
+                onCancel={(id, reason) => void handleCancelPickupJob(id, reason)}
+                onCancelSubmission={(id, reason) => void handleCancelSubmission(id, reason)}
                 confirm={confirm}
               />
             )}
@@ -423,6 +450,7 @@ export default function LogisticsTracking() {
                 onMarkPickedUp={(id) => void handleMarkPickedUp(id)}
                 onMarkDeliveredToFactory={(id) => void handleMarkDeliveredToFactory(id)}
                 onReschedule={(id, range, factoryId) => void handleReschedulePickup(id, range, factoryId)}
+                onCancel={(id, reason) => void handleCancelPickupJob(id, reason)}
                 confirm={confirm}
               />
             )}

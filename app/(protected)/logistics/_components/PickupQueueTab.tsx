@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { CalendarRange, Factory, MapPin, Navigation, Pencil, Truck, User, ZoomIn, X } from 'lucide-react';
+import { CalendarRange, Factory, MapPin, Navigation, Pencil, Phone, Truck, User, ZoomIn, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import DateRangePicker, { type DateRangeValue } from '@/app/_components/DateRangePicker';
 import EmptyState from '@/app/_components/EmptyState';
@@ -35,7 +35,10 @@ interface Props {
   expandedId: string | null;
   onToggle: (id: string) => void;
   schedulingId: string | null;
+  cancellingId: string | null;
   onSchedule: (submissionId: string, range: DateRangeValue, factoryId: string) => void;
+  onCancel: (pickupJobId: string, reason: string) => void;
+  onCancelSubmission: (submissionId: string, reason: string) => void;
   confirm: (message: string, onConfirm: () => void) => void;
 }
 
@@ -48,11 +51,16 @@ export default function PickupQueueTab({
   expandedId,
   onToggle,
   schedulingId,
+  cancellingId,
   onSchedule,
+  onCancel,
+  onCancelSubmission,
   confirm,
 }: Props) {
   const reduceMotion = useReducedMotion();
 
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [cancelReasonById, setCancelReasonById] = useState<Record<string, string>>({});
   const [pickupRangeById, setPickupRangeById] = useState<Record<string, DateRangeValue>>({});
   const [destFactoryById, setDestFactoryById] = useState<Record<string, string>>({});
   const [factoryNamesById, setFactoryNamesById] = useState<Record<string, string>>({});
@@ -244,6 +252,59 @@ export default function PickupQueueTab({
                       >
                         {schedulingId === item.id ? 'กำลังจัดคิว...' : 'ยืนยันจัดคิวรับวัสดุ'}
                       </motion.button>
+
+                      {(item.status === 'submitted' || (item.status === 'pickup_scheduled' && item.pickup_job_id)) && (
+                        cancelingId === item.id ? (
+                          <div className="space-y-2 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
+                            <p className="text-xs font-semibold text-rose-700">ระบุเหตุผลการยกเลิก (จำเป็น)</p>
+                            <textarea
+                              autoFocus
+                              rows={2}
+                              maxLength={500}
+                              value={cancelReasonById[item.id] ?? ''}
+                              onChange={(e) => setCancelReasonById((p) => ({ ...p, [item.id]: e.target.value }))}
+                              placeholder="เช่น เกษตรกรไม่อยู่บ้าน, ปริมาณไม่ตรงที่แจ้ง..."
+                              className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-rose-300 resize-none"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                disabled={cancellingId === (item.pickup_job_id ?? item.id) || !(cancelReasonById[item.id] ?? '').trim()}
+                                onClick={() => {
+                                  const reason = (cancelReasonById[item.id] ?? '').trim();
+                                  if (!reason) return;
+                                  if (item.status === 'pickup_scheduled' && item.pickup_job_id) {
+                                    onCancel(item.pickup_job_id, reason);
+                                  } else {
+                                    onCancelSubmission(item.id, reason);
+                                  }
+                                  setCancelingId(null);
+                                }}
+                                className="flex-1 rounded-lg bg-rose-500 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-600 disabled:opacity-40"
+                              >
+                                {cancellingId === (item.pickup_job_id ?? item.id) ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCancelingId(null)}
+                                className="rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-semibold text-stone-500 hover:bg-stone-100 transition"
+                              >
+                                ปิด
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setCancelingId(item.id)}
+                            disabled={cancellingId === (item.pickup_job_id ?? item.id)}
+                            className="flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold text-rose-500 hover:bg-rose-50 transition-colors disabled:opacity-40"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            ยกเลิกรายการนี้
+                          </button>
+                        )
+                      )}
                     </div>
                   }
                 >
@@ -287,6 +348,12 @@ export default function PickupQueueTab({
                       </div>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400">
                         <span className="flex items-center gap-1"><CalendarRange className="h-3 w-3" />ส่งคำขอ {formatDateTime(item.created_at)}</span>
+                        {item.farmer_display_name && (
+                          <span className="flex items-center gap-0.5">
+                            <User className="h-3 w-3" />{item.farmer_display_name}
+                            {item.farmer_phone && <><Phone className="h-3 w-3 ml-1" />{item.farmer_phone}</>}
+                          </span>
+                        )}
                         {item.pickup_location_text && (
                           <span className="flex items-center gap-1 min-w-0">
                             <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{item.pickup_location_text}</span>

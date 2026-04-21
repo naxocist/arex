@@ -1,5 +1,5 @@
 import { apiRequest, type RequestBehaviorOptions } from './core';
-import type { LogisticsFactoryOptionItem, LogisticsPickupQueueItem, LogisticsPickupJobItem, LogisticsApprovedRewardRequestItem, LogisticsRewardDeliveryJobItem, SchedulePickupPayload, SchedulePickupResponse, ScheduleRewardDeliveryPayload, ScheduleRewardDeliveryResponse, LogisticsInfoItem, UpsertLogisticsInfoPayload } from './types';
+import type { LogisticsCancelledPickupJobItem, LogisticsFactoryOptionItem, LogisticsPickupQueueItem, LogisticsPickupJobItem, LogisticsApprovedRewardRequestItem, LogisticsRewardDeliveryJobItem, SchedulePickupPayload, SchedulePickupResponse, ScheduleRewardDeliveryPayload, ScheduleRewardDeliveryResponse, LogisticsInfoItem, UpsertLogisticsInfoPayload } from './types';
 
 export const logisticsApi = {
   listFactories: (params?: { material_type?: string; quantity_kg?: number }, options?: RequestBehaviorOptions) => {
@@ -30,6 +30,12 @@ export const logisticsApi = {
     apiRequest(`/logistics/pickup-jobs/${pickupJobId}/reschedule`, { method: 'PATCH', body: JSON.stringify(payload) }),
   rescheduleDeliveryJob: (deliveryJobId: string, payload: ScheduleRewardDeliveryPayload) =>
     apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/reschedule`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  cancelSubmission: (submissionId: string, reason?: string) =>
+    apiRequest(`/logistics/submissions/${submissionId}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason ?? null }) }),
+  cancelPickupJob: (pickupJobId: string, reason?: string) =>
+    apiRequest(`/logistics/pickup-jobs/${pickupJobId}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason ?? null }) }),
+  getCancelledPickupJobs: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ jobs: LogisticsCancelledPickupJobItem[]; actor: string }>('/logistics/pickup-jobs/cancelled', options),
   getRouteDistance: (fromLat: number, fromLng: number, toLat: number, toLng: number) =>
     apiRequest<{ distance_km: number | null }>(`/logistics/route-distance?from_lat=${fromLat}&from_lng=${fromLng}&to_lat=${toLat}&to_lng=${toLng}`),
   getMyInfo: (options?: RequestBehaviorOptions) =>

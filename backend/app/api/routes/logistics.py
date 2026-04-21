@@ -4,7 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
 from app.api.deps import require_roles
 from app.models.auth import AuthenticatedUser, Role
-from app.models.workflow import SchedulePickupRequest, ScheduleRewardDeliveryRequest, UpsertLogisticsInfoRequest
+from app.models.workflow import CancelPickupJobRequest, SchedulePickupRequest, ScheduleRewardDeliveryRequest, UpsertLogisticsInfoRequest
 from app.services.logistics_service import LogisticsService, get_logistics_service
 
 router = APIRouter(prefix="/logistics", tags=["logistics"])
@@ -61,6 +61,36 @@ def schedule_pickup(
 ) -> dict[str, Any]:
     result = workflow_service.schedule_pickup(submission_id, current_user.user_id, payload)
     return {"message": "Pickup scheduled", "result": result}
+
+
+@router.post("/submissions/{submission_id}/cancel")
+def cancel_submission(
+    submission_id: str,
+    payload: CancelPickupJobRequest,
+    current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
+) -> dict[str, Any]:
+    result = workflow_service.cancel_submitted_submission(submission_id, current_user.user_id, payload.reason)
+    return {"message": "Submission cancelled", "result": result}
+
+
+@router.post("/pickup-jobs/{pickup_job_id}/cancel")
+def cancel_pickup_job(
+    pickup_job_id: str,
+    payload: CancelPickupJobRequest,
+    current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
+) -> dict[str, Any]:
+    result = workflow_service.cancel_pickup_job(pickup_job_id, current_user.user_id, payload.reason)
+    return {"message": "Pickup job cancelled", "result": result}
+
+
+@router.get("/pickup-jobs/cancelled")
+def get_cancelled_pickup_jobs(
+    current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
+    workflow_service: LogisticsService = Depends(get_logistics_service),
+) -> dict[str, Any]:
+    return {"jobs": workflow_service.list_cancelled_pickup_jobs(current_user.user_id), "actor": current_user.role.value}
 
 
 @router.patch("/pickup-jobs/{pickup_job_id}/reschedule")

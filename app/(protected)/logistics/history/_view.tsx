@@ -29,6 +29,7 @@ import {
   ApiError,
   hasAccessToken,
   logisticsApi,
+  type LogisticsCancelledPickupJobItem,
   type LogisticsInfoItem,
   type LogisticsPickupJobItem,
   type LogisticsRewardDeliveryJobItem,
@@ -212,6 +213,7 @@ export default function LogisticsHistory() {
   const reduceMotion = useReducedMotion();
   const [pickupJobs, setPickupJobs] = useState<LogisticsPickupJobItem[]>([]);
   const [deliveryJobs, setDeliveryJobs] = useState<LogisticsRewardDeliveryJobItem[]>([]);
+  const [cancelledJobs, setCancelledJobs] = useState<LogisticsCancelledPickupJobItem[]>([]);
   const [myInfo, setMyInfo] = useState<LogisticsInfoItem | null>(null);
   const [routeModal, setRouteModal] = useState<{ title: string; stops: RouteStop[] } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -221,9 +223,10 @@ export default function LogisticsHistory() {
   const [copyLoadingId, setCopyLoadingId] = useState<string | null>(null);
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'material' | 'reward'>('material');
+  const [activeTab, setActiveTab] = useState<'material' | 'reward' | 'cancelled'>('material');
   const [materialSort, setMaterialSort] = useState<{ key: 'planned_pickup_at' | 'material' | 'weight'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'desc' });
   const [rewardSort, setRewardSort] = useState<{ key: 'planned_delivery_at' | 'reward_name'; dir: SortDir }>({ key: 'planned_delivery_at', dir: 'desc' });
+  const [cancelledSort, setCancelledSort] = useState<{ key: 'planned_pickup_at' | 'material'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'desc' });
 
   const deliveredPickupJobsRaw = useMemo(
     () => pickupJobs.filter((i) => i.status === 'delivered_to_factory'),
@@ -256,6 +259,12 @@ export default function LogisticsHistory() {
     return mul * (new Date(a.planned_delivery_at ?? 0).getTime() - new Date(b.planned_delivery_at ?? 0).getTime());
   }), [completedDeliveryJobsRaw, rewardSort]);
 
+  const sortedCancelledJobs = useMemo(() => [...cancelledJobs].sort((a, b) => {
+    const mul = cancelledSort.dir === 'asc' ? 1 : -1;
+    if (cancelledSort.key === 'material') return mul * (a.material_type ?? '').localeCompare(b.material_type ?? '');
+    return mul * (new Date(a.planned_pickup_at ?? 0).getTime() - new Date(b.planned_pickup_at ?? 0).getTime());
+  }), [cancelledJobs, cancelledSort]);
+
   const loadJobs = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
       setError('ยังไม่พบโทเคน กรุณาเข้าสู่ระบบก่อน');
@@ -264,13 +273,15 @@ export default function LogisticsHistory() {
     setIsLoading(true);
     setError(null);
     try {
-      const [pickupRes, deliveryRes, myInfoRes] = await Promise.allSettled([
+      const [pickupRes, deliveryRes, cancelledRes, myInfoRes] = await Promise.allSettled([
         logisticsApi.getPickupJobs({ forceRefresh }),
         logisticsApi.getRewardDeliveryJobs({ forceRefresh }),
+        logisticsApi.getCancelledPickupJobs({ forceRefresh }),
         logisticsApi.getMyInfo({ forceRefresh }),
       ]);
       if (pickupRes.status === 'fulfilled') setPickupJobs(pickupRes.value.jobs);
       if (deliveryRes.status === 'fulfilled') setDeliveryJobs(deliveryRes.value.jobs);
+      if (cancelledRes.status === 'fulfilled') setCancelledJobs(cancelledRes.value.jobs);
       if (myInfoRes.status === 'fulfilled') setMyInfo(myInfoRes.value);
       if (pickupRes.status === 'rejected' && deliveryRes.status === 'rejected') {
         const e = pickupRes.reason;
@@ -330,6 +341,7 @@ export default function LogisticsHistory() {
             {([
               { key: 'material' as const, label: 'วัสดุ', count: deliveredPickupJobs.length },
               { key: 'reward' as const, label: 'รางวัล', count: completedDeliveryJobs.length },
+              { key: 'cancelled' as const, label: 'ยกเลิก', count: sortedCancelledJobs.length },
             ]).map((tab) => (
               <button
                 key={tab.key}
@@ -493,6 +505,90 @@ export default function LogisticsHistory() {
                           </div>
                         </div>
                       </div>
+                      </div>
+                    </HistoryCard>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* ── Cancelled pickup history ── */}
+        {activeTab === 'cancelled' && (
+          <div className="space-y-1.5">
+            {!isLoading && sortedCancelledJobs.length > 0 && (
+              <SortHeaderBar
+                cols={[
+                  { key: 'planned_pickup_at' as const, label: 'วันนัดรับ', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
+                  { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+                ]}
+                sort={cancelledSort}
+                onSort={(key) => setCancelledSort((cur) => cur.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' })}
+              />
+            )}
+            {isLoading ? (
+              <div className="space-y-3">{Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}</div>
+            ) : sortedCancelledJobs.length === 0 ? (
+              <EmptyState title="ยังไม่มีงานที่ยกเลิก" description="งานที่ถูกยกเลิกจะปรากฏที่นี่" icon={X} />
+            ) : (
+              sortedCancelledJobs.map((item) => {
+                const isExp = expandedId === item.id;
+                return (
+                  <div key={item.id}>
+                    <HistoryCard
+                      isExpanded={isExp}
+                      onToggle={() => setExpandedId((cur) => cur === item.id ? null : item.id)}
+                      accent="emerald"
+                      expandedContent={null}
+                    >
+                      <div className="flex items-start gap-2">
+                        {item.image_url && (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); setLightboxUrl(item.image_url!); }}
+                            onKeyDown={(e) => e.key === 'Enter' && setLightboxUrl(item.image_url!)}
+                            className="shrink-0 h-12 w-12 overflow-hidden rounded-xl border border-stone-200 bg-stone-100 hover:opacity-80 transition relative cursor-pointer"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={item.image_url} alt="ภาพวัสดุ" className="h-full w-full object-cover" />
+                            <div className="absolute inset-0 flex items-end justify-end p-0.5">
+                              <ZoomIn className="h-3 w-3 text-white drop-shadow" />
+                            </div>
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className="text-sm font-semibold text-on-surface leading-tight truncate">
+                              {item.material_name_th || formatMaterial(item.material_type)}
+                            </p>
+                            <span className="ml-auto shrink-0"><StatusBadge status="cancelled" label="ยกเลิกแล้ว" size="sm" /></span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400">
+                            <span className="font-bold text-rose-600">{Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</span>
+                            <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดรับ {formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}</span>
+                            {item.destination_factory_name_th && (
+                              <span className="flex items-center gap-0.5"><Factory className="h-3 w-3" />{item.destination_factory_name_th}</span>
+                            )}
+                            {item.farmer_display_name && (
+                              <span className="flex items-center gap-0.5">
+                                <User className="h-3 w-3" />{item.farmer_display_name}
+                                {item.farmer_phone && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{item.farmer_phone}</span>}
+                              </span>
+                            )}
+                            {item.pickup_location_text && (
+                              <span className="flex items-center gap-0.5 min-w-0">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{item.pickup_location_text}</span>
+                                {hasValidCoordinates(item.pickup_lat, item.pickup_lng) && (
+                                  <a href={buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)} target="_blank" rel="noopener noreferrer"
+                                    className="shrink-0 text-primary hover:underline">แผนที่</a>
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </HistoryCard>
                   </div>

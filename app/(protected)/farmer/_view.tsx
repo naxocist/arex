@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
-import { ArrowDownAZ, CalendarCheck, Camera, CheckCircle2, ClipboardList, Coins, Factory, Gift, MapPin, PackagePlus, RefreshCw, Truck, User, X, XCircle, ZoomIn } from 'lucide-react';
+import { ArrowDownAZ, Ban, CalendarCheck, Camera, CheckCircle2, ClipboardList, Coins, Factory, Gift, MapPin, PackagePlus, RefreshCw, Truck, User, X, XCircle, ZoomIn } from 'lucide-react';
 
 import AlertBanner from '@/app/_components/AlertBanner';
 import ConfirmDialog from '@/app/_components/ConfirmDialog';
@@ -55,6 +55,7 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'picked_up',           label: 'รับวัสดุแล้ว', Icon: Truck,         color: 'blue'    },
   { value: 'delivered_to_factory', label: 'ส่งถึงโรงงาน', Icon: Factory,       color: 'violet'  },
   { value: 'points_credited',      label: 'ได้แต้มแล้ว',  Icon: Coins,         color: 'emerald' },
+  { value: 'cancelled',            label: 'ถูกยกเลิก',    Icon: Ban,           color: 'rose'    },
 ] as const;
 
 const TAB_ACTIVE_CLASSES: Record<string, string> = {
@@ -64,10 +65,12 @@ const TAB_ACTIVE_CLASSES: Record<string, string> = {
   violet:  'bg-violet-500 text-white border-violet-500',
   indigo:  'bg-indigo-500 text-white border-indigo-500',
   emerald: 'bg-emerald-500 text-white border-emerald-500',
+  rose:    'bg-rose-500   text-white border-rose-500',
 };
 const TAB_COUNT_ACTIVE: Record<string, string> = {
   amber: 'bg-amber-400', sky: 'bg-sky-400', blue: 'bg-blue-400',
   violet: 'bg-violet-400', indigo: 'bg-indigo-400', emerald: 'bg-emerald-400',
+  rose: 'bg-rose-400',
 };
 
 type StatusGroup = (typeof STATUS_FILTER_OPTIONS)[number]['value'] | 'all';
@@ -87,6 +90,7 @@ function formatSubmissionStatus(status: string): string {
     delivered_to_factory: 'ส่งถึงโรงงานแล้ว',
     factory_confirmed: 'โรงงานยืนยันแล้ว',
     points_credited: 'ได้รับแต้มแล้ว',
+    cancelled: 'ถูกยกเลิก',
   };
   return map[status] ?? status;
 }
@@ -524,6 +528,14 @@ export default function FarmerHome() {
                             <p className="flex items-center gap-1 text-xs text-stone-400">
                               <MapPin className="h-3 w-3 shrink-0" />
                               {item.pickup_location_text}
+                            </p>
+                          )}
+
+                          {/* Cancellation reason */}
+                          {item.status === 'cancelled' && item.cancel_reason && (
+                            <p className="flex items-start gap-1 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs text-rose-700">
+                              <X className="h-3 w-3 shrink-0 mt-0.5" />
+                              <span><span className="font-semibold">เหตุผลที่ยกเลิก:</span> {item.cancel_reason}</span>
                             </p>
                           )}
                         </div>
