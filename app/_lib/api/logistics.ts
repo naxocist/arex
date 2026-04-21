@@ -2,8 +2,10 @@ import { apiRequest, type RequestBehaviorOptions } from './core';
 import type { LogisticsFactoryOptionItem, LogisticsPickupQueueItem, LogisticsPickupJobItem, LogisticsApprovedRewardRequestItem, LogisticsRewardDeliveryJobItem, SchedulePickupPayload, SchedulePickupResponse, ScheduleRewardDeliveryPayload, ScheduleRewardDeliveryResponse, LogisticsInfoItem, UpsertLogisticsInfoPayload } from './types';
 
 export const logisticsApi = {
-  listFactories: (options?: RequestBehaviorOptions) =>
-    apiRequest<{ factories: LogisticsFactoryOptionItem[]; actor: string }>('/logistics/factories', options),
+  listFactories: (params?: { material_type?: string; quantity_kg?: number }, options?: RequestBehaviorOptions) => {
+    const qs = params ? Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&') : '';
+    return apiRequest<{ factories: LogisticsFactoryOptionItem[]; actor: string }>(`/logistics/factories${qs ? `?${qs}` : ''}`, options);
+  },
   getPickupQueue: (options?: RequestBehaviorOptions) =>
     apiRequest<{ queue: LogisticsPickupQueueItem[]; actor: string }>('/logistics/pickup-queue', options),
   getPickupJobs: (options?: RequestBehaviorOptions) =>

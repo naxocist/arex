@@ -84,6 +84,17 @@ class UpsertLogisticsInfoRequest(BaseModel):
 
 
 
+class FactoryMaterialPreferenceItem(BaseModel):
+    material_type_code: str
+    accepts: bool
+    capacity_value: float | None = None
+    capacity_unit: str | None = None
+
+
+class UpsertFactoryMaterialPreferencesRequest(BaseModel):
+    items: list[FactoryMaterialPreferenceItem]
+
+
 class UpdateFarmerProfileRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, max_length=20)

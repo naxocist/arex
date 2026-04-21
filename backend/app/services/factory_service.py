@@ -2,7 +2,7 @@ from typing import Any
 
 from app.core.errors import WorkflowError
 from app.db.supabase import get_service_client
-from app.models.workflow import ConfirmFactoryIntakeRequest, UpsertFactoryInfoRequest
+from app.models.workflow import ConfirmFactoryIntakeRequest, UpsertFactoryInfoRequest, UpsertFactoryMaterialPreferencesRequest
 from app.services._base import BaseService, _first_row
 
 
@@ -301,6 +301,80 @@ class FactoryService(BaseService):
             )
         except Exception as exc:
             raise WorkflowError(f"Failed to confirm factory intake: {exc}") from exc
+
+
+    def list_material_preferences(self, factory_profile_id: str) -> list[dict[str, Any]]:
+        try:
+            factory = self.get_or_create_factory_for_profile(factory_profile_id)
+            factory_id = str(factory.get("id") or "")
+
+            all_materials = (
+                self.client.table("material_types")
+                .select("code, name_th, active")
+                .order("name_th", desc=False)
+                .execute()
+            ).data or []
+
+            prefs_rows = (
+                self.client.table("factory_material_preferences")
+                .select("material_type_code, accepts, capacity_value, capacity_unit")
+                .eq("factory_id", factory_id)
+                .execute()
+            ).data or []
+            prefs_by_code = {str(r["material_type_code"]): r for r in prefs_rows if r.get("material_type_code")}
+
+            units_rows = (
+                self.client.table("measurement_units")
+                .select("code, name_th, to_kg_factor, active")
+                .order("name_th", desc=False)
+                .execute()
+            ).data or []
+
+            result = []
+            for m in all_materials:
+                code = str(m.get("code") or "")
+                pref = prefs_by_code.get(code)
+                result.append({
+                    "material_type_code": code,
+                    "material_name_th": m.get("name_th"),
+                    "material_active": m.get("active", True),
+                    "accepts": pref["accepts"] if pref is not None else True,
+                    "capacity_value": float(pref["capacity_value"]) if pref and pref.get("capacity_value") is not None else None,
+                    "capacity_unit": pref.get("capacity_unit") if pref else None,
+                })
+            return result, units_rows
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to list material preferences: {exc}") from exc
+
+    def upsert_material_preferences(
+        self, factory_profile_id: str, payload: UpsertFactoryMaterialPreferencesRequest
+    ) -> dict[str, Any]:
+        try:
+            factory = self.get_or_create_factory_for_profile(factory_profile_id)
+            factory_id = str(factory.get("id") or "")
+
+            rows = [
+                {
+                    "factory_id": factory_id,
+                    "material_type_code": item.material_type_code,
+                    "accepts": item.accepts,
+                    "capacity_value": item.capacity_value,
+                    "capacity_unit": item.capacity_unit,
+                    "updated_at": "now()",
+                }
+                for item in payload.items
+            ]
+            if rows:
+                self.client.table("factory_material_preferences").upsert(
+                    rows, on_conflict="factory_id,material_type_code"
+                ).execute()
+            return {"updated": len(rows)}
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to upsert material preferences: {exc}") from exc
 
 
 def get_factory_service() -> FactoryService:

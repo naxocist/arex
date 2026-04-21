@@ -75,7 +75,12 @@ export interface ValueChainItem { id: string; product_name_th: string; producer_
 
 export interface SchedulePickupPayload { pickup_window_start_at: string; pickup_window_end_at: string; destination_factory_id: string; notes?: string }
 export interface SchedulePickupResponse { message: string; result: { pickup_job_id: string; submission_status: string; pickup_status: string } }
-export interface LogisticsFactoryOptionItem { id: string; name_th: string; location_text?: string | null; lat?: number | null; lng?: number | null; active: boolean; is_focal_point?: boolean }
+export interface FactoryMaterialPreferenceItem { material_type_code: string; material_name_th: string; material_active: boolean; accepts: boolean; capacity_value: number | null; capacity_unit: string | null }
+export interface FactoryMeasurementUnitOption { code: string; name_th: string; to_kg_factor: number | null; active: boolean }
+export interface UpsertFactoryMaterialPreferencePayload { material_type_code: string; accepts: boolean; capacity_value: number | null; capacity_unit: string | null }
+
+export interface FactoryMaterialPreference { accepts: boolean; capacity_value: number | null; capacity_unit: string | null; capacity_kg: number | null; has_capacity: boolean }
+export interface LogisticsFactoryOptionItem { id: string; name_th: string; location_text?: string | null; lat?: number | null; lng?: number | null; active: boolean; is_focal_point?: boolean; preference?: FactoryMaterialPreference }
 export interface LogisticsPickupQueueItem {
   id: string; farmer_profile_id: string;
   material_type: 'rice_straw' | 'cassava_root' | 'sugarcane_bagasse' | 'corn_stover' | string;

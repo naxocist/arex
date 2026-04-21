@@ -90,6 +90,7 @@ export const roleNavItems: RoleNavItem[] = [
   { icon: ClipboardList, label: 'ประวัติขนส่ง', shortLabel: 'ประวัติ', path: '/logistics/history', roles: ['logistics'] },
   { icon: SlidersHorizontal, label: 'ตั้งค่าทีมขนส่ง', shortLabel: 'ตั้งค่า', path: '/logistics/settings', roles: ['logistics'] },
   { icon: Factory, label: 'โรงงาน', shortLabel: 'ตรวจรับเข้า', path: '/factory', roles: ['factory'] },
+  { icon: PackageCheck, label: 'ความต้องการวัสดุ', shortLabel: 'รับวัสดุ', path: '/factory/preferences', roles: ['factory'] },
   { icon: Shapes, label: 'จัดการวัสดุ / รางวัล', shortLabel: 'วัสดุ/รางวัล', path: '/factory/materials', roles: ['factory'] },
   { icon: SlidersHorizontal, label: 'ตั้งค่าโรงงาน', shortLabel: 'ตั้งค่า', path: '/factory/settings', roles: ['factory'] },
   { icon: PackageCheck, label: 'คลังสินค้า', shortLabel: 'อนุมัติ', path: '/warehouse', roles: ['warehouse'] },

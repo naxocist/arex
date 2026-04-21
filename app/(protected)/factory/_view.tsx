@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   ArrowUpDown,
   CalendarRange,
+  CheckCircle2,
   ChevronDown,
   Factory,
   MapPin,
@@ -12,6 +13,7 @@ import {
   Scale,
   ShieldCheck,
   X,
+  XCircle,
   ZoomIn,
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
@@ -60,11 +62,27 @@ function fallbackThaiUnit(unitCode: string): string {
   return map[unitCode] ?? unitCode;
 }
 
-function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
-  if (!message) return 'info';
-  if (message.includes('ไม่สำเร็จ') || message.includes('กรุณา')) return 'error';
-  if (message.includes('สำเร็จ')) return 'success';
-  return 'info';
+function Toast({ tone, message, onDone }: { tone: 'success' | 'error'; message: string; onDone: () => void }) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => {
+    timerRef.current = setTimeout(() => onDoneRef.current(), 3000);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+  const success = tone === 'success';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 16, scale: 0.96 }}
+      transition={{ duration: 0.2 }}
+      className={`fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border px-5 py-3.5 shadow-lg backdrop-blur-sm ${success ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}
+    >
+      {success ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" /> : <XCircle className="h-5 w-5 shrink-0 text-red-400" />}
+      <span className={`text-sm font-medium ${success ? 'text-emerald-700' : 'text-red-700'}`}>{message}</span>
+    </motion.div>
+  );
 }
 
 type SortDir = 'asc' | 'desc';
@@ -199,7 +217,9 @@ export default function FactoryIntake() {
   const [weightByJobId, setWeightByJobId] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [confirmingJobId, setConfirmingJobId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ tone: 'success' | 'error'; message: string; id: number } | null>(null);
+  const toastId = useRef(0);
   const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'confirmed'>('pending');
@@ -210,10 +230,11 @@ export default function FactoryIntake() {
 
   const loadQueue = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
-      setMessage('ยังไม่พบโทเคน กรุณาเข้าสู่ระบบก่อน');
+      setError('ยังไม่พบโทเคน กรุณาเข้าสู่ระบบก่อน');
       return;
     }
     setIsLoading(true);
+    setError(null);
     try {
       const res = await factoryApi.listPendingIntakes({ forceRefresh });
       setQueue(res.queue);
@@ -229,9 +250,8 @@ export default function FactoryIntake() {
         }
         return next;
       });
-      setMessage(null);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `โหลดคิวรับเข้าไม่สำเร็จ: ${error.message}` : 'โหลดคิวรับเข้าไม่สำเร็จ');
+    } catch (err) {
+      setError(err instanceof ApiError ? `โหลดคิวรับเข้าไม่สำเร็จ: ${err.message}` : 'โหลดคิวรับเข้าไม่สำเร็จ');
     } finally {
       setIsLoading(false);
     }
@@ -242,18 +262,17 @@ export default function FactoryIntake() {
   const handleConfirm = async (item: FactoryPendingIntakeItem) => {
     const inputWeight = Number(weightByJobId[item.pickup_job_id]);
     if (!Number.isFinite(inputWeight) || inputWeight <= 0) {
-      setMessage('กรุณาระบุน้ำหนักจริง (กิโลกรัม) ให้ถูกต้อง');
+      setToast({ tone: 'error', message: 'กรุณาระบุน้ำหนักจริง (กิโลกรัม) ให้ถูกต้อง', id: ++toastId.current });
       return;
     }
     setConfirmingJobId(item.pickup_job_id);
-    setMessage(null);
     try {
       await factoryApi.confirmIntake({ pickup_job_id: item.pickup_job_id, measured_weight_kg: inputWeight });
-      setMessage('ยืนยันรับเข้าโรงงานสำเร็จแล้ว');
+      setToast({ tone: 'success', message: 'ยืนยันรับเข้าโรงงานสำเร็จแล้ว', id: ++toastId.current });
       await loadQueue(true);
-    } catch (error) {
+    } catch (err) {
       await loadQueue(true);
-      setMessage(error instanceof ApiError ? `ยืนยันรับเข้าไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'ยืนยันรับเข้าไม่สำเร็จ');
+      setToast({ tone: 'error', message: err instanceof ApiError ? `ยืนยันรับเข้าไม่สำเร็จ: ${extractWorkflowMessage(err.message)}` : 'ยืนยันรับเข้าไม่สำเร็จ', id: ++toastId.current });
     } finally {
       setConfirmingJobId(null);
     }
@@ -310,7 +329,7 @@ export default function FactoryIntake() {
           </motion.button>
         </div>
 
-        {message && <AlertBanner message={message} tone={inferMessageTone(message)} />}
+        {error && <AlertBanner message={error} tone="error" />}
 
         {/* Stats strip */}
         {!isLoading && summary && (
@@ -569,6 +588,9 @@ export default function FactoryIntake() {
         )}
 
       </div>
+      <AnimatePresence>
+        {toast && <Toast key={toast.id} tone={toast.tone} message={toast.message} onDone={() => setToast(null)} />}
+      </AnimatePresence>
       <AnimatePresence>
         {lightboxUrl && (
           <motion.div

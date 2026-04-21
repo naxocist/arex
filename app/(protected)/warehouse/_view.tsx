@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { CheckCircle2, Gift, RefreshCw, XCircle } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
@@ -9,11 +9,27 @@ import { ApiError, hasAccessToken, warehouseApi, type WarehousePendingRequestIte
 import AnsweredTab from './_components/AnsweredTab';
 import PendingTab from './_components/PendingTab';
 
-function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
-  if (!message) return 'info';
-  if (message.includes('ไม่สำเร็จ') || message.includes('ยังไม่')) return 'error';
-  if (message.includes('สำเร็จ')) return 'success';
-  return 'info';
+function Toast({ tone, message, onDone }: { tone: 'success' | 'error'; message: string; onDone: () => void }) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => {
+    timerRef.current = setTimeout(() => onDoneRef.current(), 3000);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+  const success = tone === 'success';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 16, scale: 0.96 }}
+      transition={{ duration: 0.2 }}
+      className={`fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border px-5 py-3.5 shadow-lg backdrop-blur-sm ${success ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}
+    >
+      {success ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" /> : <XCircle className="h-5 w-5 shrink-0 text-red-400" />}
+      <span className={`text-sm font-medium ${success ? 'text-emerald-700' : 'text-red-700'}`}>{message}</span>
+    </motion.div>
+  );
 }
 
 type WarehouseTab = 'pending' | 'answered';
@@ -23,7 +39,9 @@ export default function WarehouseApproval() {
   const [pendingRequests, setPendingRequests] = useState<WarehousePendingRequestItem[]>([]);
   const [answeredRequests, setAnsweredRequests] = useState<WarehousePendingRequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ tone: 'success' | 'error'; message: string; id: number } | null>(null);
+  const toastId = useRef(0);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -37,14 +55,14 @@ export default function WarehouseApproval() {
   }, [pendingRequests, answeredRequests]);
 
   const loadPendingRequests = async (forceRefresh = false) => {
-    if (!hasAccessToken()) { setMessage('ยังไม่พบโทเคน กรุณาเข้าสู่ระบบก่อน'); return; }
+    if (!hasAccessToken()) { setError('ยังไม่พบโทเคน กรุณาเข้าสู่ระบบก่อน'); return; }
     setIsLoading(true);
+    setError(null);
     try {
       const response = await warehouseApi.listPendingRewardRequests({ forceRefresh });
       setPendingRequests(response.requests);
-      setMessage(null);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `โหลดรายการรออนุมัติไม่สำเร็จ: ${error.message}` : 'โหลดรายการรออนุมัติไม่สำเร็จ');
+    } catch (err) {
+      setError(err instanceof ApiError ? `โหลดรายการรออนุมัติไม่สำเร็จ: ${err.message}` : 'โหลดรายการรออนุมัติไม่สำเร็จ');
     } finally {
       setIsLoading(false);
     }
@@ -56,9 +74,8 @@ export default function WarehouseApproval() {
     try {
       const response = await warehouseApi.listAnsweredRewardRequests({ forceRefresh });
       setAnsweredRequests(response.requests);
-      setMessage(null);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `โหลดประวัติคำขอไม่สำเร็จ: ${error.message}` : 'โหลดประวัติคำขอไม่สำเร็จ');
+    } catch (err) {
+      setError(err instanceof ApiError ? `โหลดประวัติคำขอไม่สำเร็จ: ${err.message}` : 'โหลดประวัติคำขอไม่สำเร็จ');
     } finally {
       setIsLoading(false);
     }
@@ -76,13 +93,12 @@ export default function WarehouseApproval() {
 
   const handleApprove = async (requestId: string) => {
     setProcessingRequestId(requestId);
-    setMessage(null);
     try {
       await warehouseApi.approveRewardRequest(requestId);
-      setMessage('อนุมัติคำขอสำเร็จแล้ว');
+      setToast({ tone: 'success', message: 'อนุมัติคำขอสำเร็จแล้ว', id: ++toastId.current });
       await loadPendingRequests(true);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `อนุมัติคำขอไม่สำเร็จ: ${error.message}` : 'อนุมัติคำขอไม่สำเร็จ');
+    } catch (err) {
+      setToast({ tone: 'error', message: err instanceof ApiError ? `อนุมัติคำขอไม่สำเร็จ: ${err.message}` : 'อนุมัติคำขอไม่สำเร็จ', id: ++toastId.current });
     } finally {
       setProcessingRequestId(null);
     }
@@ -90,14 +106,13 @@ export default function WarehouseApproval() {
 
   const handleReject = async (requestId: string) => {
     setProcessingRequestId(requestId);
-    setMessage(null);
     const reason = (reasons[requestId] || '').trim();
     try {
       await warehouseApi.rejectRewardRequest(requestId, { reason });
-      setMessage('ปฏิเสธคำขอสำเร็จแล้ว');
+      setToast({ tone: 'success', message: 'ปฏิเสธคำขอสำเร็จแล้ว', id: ++toastId.current });
       await loadPendingRequests(true);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `ปฏิเสธคำขอไม่สำเร็จ: ${error.message}` : 'ปฏิเสธคำขอไม่สำเร็จ');
+    } catch (err) {
+      setToast({ tone: 'error', message: err instanceof ApiError ? `ปฏิเสธคำขอไม่สำเร็จ: ${err.message}` : 'ปฏิเสธคำขอไม่สำเร็จ', id: ++toastId.current });
     } finally {
       setProcessingRequestId(null);
     }
@@ -132,7 +147,7 @@ export default function WarehouseApproval() {
           </motion.button>
         </div>
 
-        {message && <AlertBanner message={message} tone={inferMessageTone(message)} />}
+        {error && <AlertBanner message={error} tone="error" />}
 
         {!isLoading && (
           <div className="flex flex-wrap gap-2">
@@ -194,6 +209,10 @@ export default function WarehouseApproval() {
           />
         )}
       </div>
+
+      <AnimatePresence>
+        {toast && <Toast key={toast.id} tone={toast.tone} message={toast.message} onDone={() => setToast(null)} />}
+      </AnimatePresence>
     </ErrorBoundary>
   );
 }

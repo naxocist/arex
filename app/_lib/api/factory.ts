@@ -1,5 +1,5 @@
 import { apiRequest, type RequestBehaviorOptions } from './core';
-import type { FactoryInfoItem, UpsertFactoryInfoPayload, FactoryPendingIntakeItem, FactoryConfirmedIntakeItem, FactoryIntakeSummary, ConfirmFactoryIntakePayload } from './types';
+import type { FactoryInfoItem, UpsertFactoryInfoPayload, FactoryPendingIntakeItem, FactoryConfirmedIntakeItem, FactoryIntakeSummary, ConfirmFactoryIntakePayload, FactoryMaterialPreferenceItem, FactoryMeasurementUnitOption, UpsertFactoryMaterialPreferencePayload } from './types';
 
 export const factoryApi = {
   getMyFactory: (options?: RequestBehaviorOptions) =>
@@ -10,4 +10,8 @@ export const factoryApi = {
     apiRequest<{ queue: FactoryPendingIntakeItem[]; confirmed: FactoryConfirmedIntakeItem[]; summary: FactoryIntakeSummary; actor: string }>('/factory/intakes/pending', options),
   confirmIntake: (payload: ConfirmFactoryIntakePayload) =>
     apiRequest('/factory/intakes/confirm', { method: 'POST', body: JSON.stringify(payload) }),
+  listMaterialPreferences: (options?: RequestBehaviorOptions) =>
+    apiRequest<{ preferences: FactoryMaterialPreferenceItem[]; units: FactoryMeasurementUnitOption[]; actor: string }>('/factory/material-preferences', options),
+  updateMaterialPreferences: (items: UpsertFactoryMaterialPreferencePayload[]) =>
+    apiRequest<{ message: string; updated: number }>('/factory/material-preferences', { method: 'PUT', body: JSON.stringify({ items }) }),
 };

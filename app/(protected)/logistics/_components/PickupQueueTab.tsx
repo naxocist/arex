@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { CalendarRange, Factory, MapPin, Navigation, Truck, User, ZoomIn, X } from 'lucide-react';
+import { CalendarRange, Factory, MapPin, Navigation, Pencil, Truck, User, ZoomIn, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import DateRangePicker, { type DateRangeValue } from '@/app/_components/DateRangePicker';
 import EmptyState from '@/app/_components/EmptyState';
@@ -17,6 +17,7 @@ import {
 import { fallbackThaiUnit, formatDateTime } from '@/app/_lib/utils';
 import DistModeChips from './DistModeChips';
 import ExpandableCard from './ExpandableCard';
+import FactoryPickerModal from './FactoryPickerModal';
 import RouteStepper from './RouteStepper';
 import { buildGoogleMapsDirectionsUrl, buildGoogleMapsUrl, hasValidCoordinates } from './logisticsUtils';
 
@@ -54,26 +55,37 @@ export default function PickupQueueTab({
 
   const [pickupRangeById, setPickupRangeById] = useState<Record<string, DateRangeValue>>({});
   const [destFactoryById, setDestFactoryById] = useState<Record<string, string>>({});
+  const [factoryNamesById, setFactoryNamesById] = useState<Record<string, string>>({});
   const [leg2KmById, setLeg2KmById] = useState<Record<string, number | null>>({});
+  const [pickerSubmissionId, setPickerSubmissionId] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: 'created_at' | 'material' | 'weight' | 'distance'; dir: SortDir }>({ key: 'created_at', dir: 'desc' });
   const [distMode, setDistMode] = useState<'leg1' | 'leg2' | 'sum'>('leg1');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  // Seed default factory for each new queue item
+  // Seed default factory from global list for each new queue item
   useEffect(() => {
     if (!factoryOptions.length) return;
     setDestFactoryById((prev) => {
       const next = { ...prev };
-      const defaultId = factoryOptions[0].id;
+      const defaultFactory = factoryOptions[0];
       for (const item of items) {
         const exists = next[item.id] ? factoryOptions.some((f) => f.id === next[item.id]) : false;
-        if (!exists && defaultId) next[item.id] = defaultId;
+        if (!exists && defaultFactory) {
+          next[item.id] = defaultFactory.id;
+        }
+      }
+      return next;
+    });
+    setFactoryNamesById((prev) => {
+      const next = { ...prev };
+      for (const item of items) {
+        if (!next[item.id] && factoryOptions[0]) next[item.id] = factoryOptions[0].name_th;
       }
       return next;
     });
   }, [items, factoryOptions]);
 
-  // Fetch leg2 distance when factory selection changes
+  // Fetch leg2 distance whenever factory selection changes
   useEffect(() => {
     const entries = Object.entries(destFactoryById);
     if (!entries.length) return;
@@ -112,162 +124,203 @@ export default function PickupQueueTab({
     return mul * (new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime());
   }), [items, sort, distMode, leg2KmById]);
 
+  const pickerSubmission = pickerSubmissionId ? items.find((i) => i.id === pickerSubmissionId) ?? null : null;
+
   return (
     <>
-    <div className="space-y-1.5">
-      {loadIssue && <AlertBanner message={loadIssue} tone="info" title="บอร์ดคิวรับวัสดุยังไม่พร้อม" />}
-      {!isLoading && items.length > 0 && (
-        <SortHeaderBar
-          cols={[
-            { key: 'created_at' as const, label: 'วันที่ส่ง', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
-            { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
-            { key: 'weight' as const, label: 'น้ำหนัก', dirLabels: ['น้อยก่อน', 'มากก่อน'] },
-            {
-              key: 'distance' as const, label: 'ระยะทาง', dirLabels: ['ใกล้ก่อน', 'ไกลก่อน'],
-              activeExtra: (
-                <DistModeChips<'leg1' | 'leg2' | 'sum'>
-                  options={[
-                    { value: 'leg1', label: 'ฉัน→เกษตรกร' },
-                    { value: 'leg2', label: 'เกษตรกร→โรงงาน' },
-                    { value: 'sum', label: 'รวมทั้งหมด' },
-                  ]}
-                  value={distMode}
-                  onChange={setDistMode}
-                />
-              ),
-            },
-          ]}
-          sort={sort}
-          onSort={toggleSort}
-        />
-      )}
+      <div className="space-y-1.5">
+        {loadIssue && <AlertBanner message={loadIssue} tone="info" title="บอร์ดคิวรับวัสดุยังไม่พร้อม" />}
+        {!isLoading && items.length > 0 && (
+          <SortHeaderBar
+            cols={[
+              { key: 'created_at' as const, label: 'วันที่ส่ง', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
+              { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
+              { key: 'weight' as const, label: 'น้ำหนัก', dirLabels: ['น้อยก่อน', 'มากก่อน'] },
+              {
+                key: 'distance' as const, label: 'ระยะทาง', dirLabels: ['ใกล้ก่อน', 'ไกลก่อน'],
+                activeExtra: (
+                  <DistModeChips<'leg1' | 'leg2' | 'sum'>
+                    options={[
+                      { value: 'leg1', label: 'ฉัน→เกษตรกร' },
+                      { value: 'leg2', label: 'เกษตรกร→โรงงาน' },
+                      { value: 'sum', label: 'รวมทั้งหมด' },
+                    ]}
+                    value={distMode}
+                    onChange={setDistMode}
+                  />
+                ),
+              },
+            ]}
+            sort={sort}
+            onSort={toggleSort}
+          />
+        )}
 
-      {isLoading ? (
-        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}</div>
-      ) : sorted.length === 0 ? (
-        <EmptyState
-          title={loadIssue ? 'ยังแสดงคิวรับวัสดุใหม่ไม่ได้' : 'ไม่มีคิวใหม่ในตอนนี้'}
-          description={loadIssue ? 'โปรดกดรีเฟรชอีกครั้ง' : 'เมื่อเกษตรกรส่งคำขอใหม่ รายการจะมาปรากฏในบอร์ดนี้ทันที'}
-          icon={Truck}
-        />
-      ) : (
-        sorted.map((item) => {
-          const selFactoryId = destFactoryById[item.id] || '';
-          const selFactory = factoryOptions.find((f) => f.id === selFactoryId);
-          const canSchedule = pickupRangeById[item.id]?.from && pickupRangeById[item.id]?.to && selFactoryId;
-          const isExp = expandedId === item.id;
-          const leg2Km = leg2KmById[item.id];
+        {isLoading ? (
+          <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}</div>
+        ) : sorted.length === 0 ? (
+          <EmptyState
+            title={loadIssue ? 'ยังแสดงคิวรับวัสดุใหม่ไม่ได้' : 'ไม่มีคิวใหม่ในตอนนี้'}
+            description={loadIssue ? 'โปรดกดรีเฟรชอีกครั้ง' : 'เมื่อเกษตรกรส่งคำขอใหม่ รายการจะมาปรากฏในบอร์ดนี้ทันที'}
+            icon={Truck}
+          />
+        ) : (
+          sorted.map((item) => {
+            const selFactoryId = destFactoryById[item.id] || '';
+            const selFactory = factoryOptions.find((f) => f.id === selFactoryId);
+            const selFactoryName = factoryNamesById[item.id] || selFactory?.name_th || '';
+            const canSchedule = pickupRangeById[item.id]?.from && pickupRangeById[item.id]?.to && selFactoryId;
+            const isExp = expandedId === item.id;
+            const leg2Km = leg2KmById[item.id];
 
-          const farmerMapHref = hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number) : undefined;
-          const factoryMapHref = selFactory?.lat != null && selFactory?.lng != null ? buildGoogleMapsUrl(selFactory.lat as number, selFactory.lng as number) : undefined;
-          const leg1Href = myInfo?.lat != null && myInfo?.lng != null && item.pickup_lat != null && item.pickup_lng != null
-            ? buildGoogleMapsDirectionsUrl([{ lat: myInfo.lat, lng: myInfo.lng }, { lat: item.pickup_lat, lng: item.pickup_lng }]) : undefined;
-          const leg2Href = leg2Km != null && item.pickup_lat != null && item.pickup_lng != null && selFactory?.lat != null && selFactory?.lng != null
-            ? buildGoogleMapsDirectionsUrl([{ lat: item.pickup_lat, lng: item.pickup_lng }, { lat: selFactory.lat as number, lng: selFactory.lng as number }]) : undefined;
+            const farmerMapHref = hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number) : undefined;
+            const factoryMapHref = selFactory?.lat != null && selFactory?.lng != null ? buildGoogleMapsUrl(selFactory.lat as number, selFactory.lng as number) : undefined;
+            const leg1Href = myInfo?.lat != null && myInfo?.lng != null && item.pickup_lat != null && item.pickup_lng != null
+              ? buildGoogleMapsDirectionsUrl([{ lat: myInfo.lat, lng: myInfo.lng }, { lat: item.pickup_lat, lng: item.pickup_lng }]) : undefined;
+            const leg2Href = leg2Km != null && item.pickup_lat != null && item.pickup_lng != null && selFactory?.lat != null && selFactory?.lng != null
+              ? buildGoogleMapsDirectionsUrl([{ lat: item.pickup_lat, lng: item.pickup_lng }, { lat: selFactory.lat as number, lng: selFactory.lng as number }]) : undefined;
 
-          return (
-            <div key={item.id}>
-              <ExpandableCard
-                isExpanded={isExp}
-                onToggle={() => onToggle(item.id)}
-                accent="amber"
-                expandedContent={
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">โรงงานปลายทาง</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <select
-                          value={selFactoryId}
-                          onChange={(e) => setDestFactoryById((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                          className="flex-1 rounded-xl border border-outline-variant/20 bg-stone-50 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 min-h-[44px]"
+            return (
+              <div key={item.id}>
+                <ExpandableCard
+                  isExpanded={isExp}
+                  onToggle={() => onToggle(item.id)}
+                  accent="amber"
+                  expandedContent={
+                    <div className="space-y-4">
+                      {/* Factory picker trigger */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">โรงงานปลายทาง</p>
+                        <button
+                          type="button"
+                          onClick={() => setPickerSubmissionId(item.id)}
+                          className="flex w-full items-center gap-3 rounded-xl border-2 border-dashed border-outline-variant/40 bg-stone-50 px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary/30"
                         >
-                          <option value="">เลือกโรงงาน</option>
-                          {factoryOptions.map((f) => <option key={f.id} value={f.id}>{f.name_th}</option>)}
-                        </select>
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <Factory className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            {selFactoryName ? (
+                              <>
+                                <p className="truncate font-semibold text-on-surface">{selFactoryName}</p>
+                                {leg2Km != null && (
+                                  <p className="text-xs text-on-surface-variant">ระยะทาง {leg2Km.toFixed(1)} กม. จากจุดรับ</p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm text-stone-400">แตะเพื่อเลือกโรงงาน</p>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-xs font-semibold text-primary">
+                            <Pencil className="h-3 w-3" />
+                            {selFactoryName ? 'เปลี่ยน' : 'เลือก'}
+                          </div>
+                        </button>
                         {selFactory && hasValidCoordinates(selFactory.lat, selFactory.lng) && (
                           <a href={factoryMapHref} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/10">
-                            <MapPin className="h-3.5 w-3.5" /> แผนที่โรงงาน
+                            className="flex items-center gap-1 text-xs text-primary underline-offset-2 hover:underline">
+                            <MapPin className="h-3 w-3" /> ดูแผนที่โรงงาน
                           </a>
                         )}
                       </div>
+
+                      {/* Date range */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">ช่วงวันนัดรับ</p>
+                        <DateRangePicker
+                          value={pickupRangeById[item.id] || { from: null, to: null }}
+                          onChange={(v) => setPickupRangeById((prev) => ({ ...prev, [item.id]: v }))}
+                          minDate={new Date()}
+                          placeholder="เลือกช่วงวัน"
+                        />
+                      </div>
+
+                      <motion.button
+                        type="button"
+                        onClick={() => confirm('ยืนยันจัดคิวรับวัสดุ?', () => void onSchedule(item.id, pickupRangeById[item.id] || { from: null, to: null }, selFactoryId))}
+                        disabled={schedulingId === item.id || !canSchedule}
+                        className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-white shadow-sm shadow-primary/20 transition hover:opacity-90 disabled:opacity-40"
+                        whileTap={reduceMotion ? {} : { scale: 0.97 }}
+                      >
+                        {schedulingId === item.id ? 'กำลังจัดคิว...' : 'ยืนยันจัดคิวรับวัสดุ'}
+                      </motion.button>
                     </div>
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">ช่วงวันนัดรับ</p>
-                      <DateRangePicker
-                        value={pickupRangeById[item.id] || { from: null, to: null }}
-                        onChange={(v) => setPickupRangeById((prev) => ({ ...prev, [item.id]: v }))}
-                        minDate={new Date()}
-                        placeholder="เลือกช่วงวัน"
-                      />
-                    </div>
-                    <motion.button
-                      type="button"
-                      onClick={() => confirm('ยืนยันจัดคิวรับวัสดุ?', () => void onSchedule(item.id, pickupRangeById[item.id] || { from: null, to: null }, selFactoryId))}
-                      disabled={schedulingId === item.id || !canSchedule}
-                      className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-white shadow-sm shadow-primary/20 transition hover:opacity-90 disabled:opacity-40"
-                      whileTap={reduceMotion ? {} : { scale: 0.97 }}
-                    >
-                      {schedulingId === item.id ? 'กำลังจัดคิว...' : 'ยืนยันจัดคิวรับวัสดุ'}
-                    </motion.button>
-                  </div>
-                }
-              >
-                <div className="flex items-start gap-2">
-                  {item.image_url && (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => { e.stopPropagation(); setLightboxUrl(item.image_url!); }}
-                      onKeyDown={(e) => e.key === 'Enter' && setLightboxUrl(item.image_url!)}
-                      className="shrink-0 h-12 w-12 overflow-hidden rounded-xl border border-stone-200 bg-stone-100 hover:opacity-80 transition relative cursor-pointer"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={item.image_url} alt="ภาพวัสดุ" className="h-full w-full object-cover" />
-                      <div className="absolute inset-0 flex items-end justify-end p-0.5">
-                        <ZoomIn className="h-3 w-3 text-white drop-shadow" />
+                  }
+                >
+                  <div className="flex items-start gap-2">
+                    {item.image_url && (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); setLightboxUrl(item.image_url!); }}
+                        onKeyDown={(e) => e.key === 'Enter' && setLightboxUrl(item.image_url!)}
+                        className="shrink-0 h-12 w-12 overflow-hidden rounded-xl border border-stone-200 bg-stone-100 hover:opacity-80 transition relative cursor-pointer"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={item.image_url} alt="ภาพวัสดุ" className="h-full w-full object-cover" />
+                        <div className="absolute inset-0 flex items-end justify-end p-0.5">
+                          <ZoomIn className="h-3 w-3 text-white drop-shadow" />
+                        </div>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-sm font-semibold text-on-surface leading-tight truncate">
+                          {item.material_name_th || item.material_type}
+                        </p>
+                        {item.distance_to_farmer_km != null && (
+                          <RouteStepper
+                            nodes={[
+                              { icon: <Navigation className="h-3 w-3" />, label: 'ฉัน' },
+                              { icon: <User className="h-3 w-3" />, label: 'เกษตรกร', mapHref: farmerMapHref },
+                              ...(leg2Km != null ? [{ icon: <Factory className="h-3 w-3" />, label: selFactoryName || 'โรงงาน', mapHref: factoryMapHref }] : []),
+                            ]}
+                            legs={[
+                              { km: item.distance_to_farmer_km, href: leg1Href },
+                              ...(leg2Km != null ? [{ km: leg2Km, href: leg2Href }] : []),
+                            ]}
+                          />
+                        )}
+                        <span className="ml-auto shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+                          {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400">
+                        <span className="flex items-center gap-1"><CalendarRange className="h-3 w-3" />ส่งคำขอ {formatDateTime(item.created_at)}</span>
+                        {item.pickup_location_text && (
+                          <span className="flex items-center gap-1 min-w-0">
+                            <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{item.pickup_location_text}</span>
+                          </span>
+                        )}
                       </div>
                     </div>
-                  )}
-                  <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <p className="text-sm font-semibold text-on-surface leading-tight truncate">
-                      {item.material_name_th || item.material_type}
-                    </p>
-                    {item.distance_to_farmer_km != null && (
-                      <RouteStepper
-                        nodes={[
-                          { icon: <Navigation className="h-3 w-3" />, label: 'ฉัน' },
-                          { icon: <User className="h-3 w-3" />, label: 'เกษตรกร', mapHref: farmerMapHref },
-                          ...(leg2Km != null ? [{ icon: <Factory className="h-3 w-3" />, label: selFactory?.name_th ?? 'โรงงาน', mapHref: factoryMapHref }] : []),
-                        ]}
-                        legs={[
-                          { km: item.distance_to_farmer_km, href: leg1Href },
-                          ...(leg2Km != null ? [{ km: leg2Km, href: leg2Href }] : []),
-                        ]}
-                      />
-                    )}
-                    <span className="ml-auto shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
-                      {Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}
-                    </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400">
-                    <span className="flex items-center gap-1"><CalendarRange className="h-3 w-3" />ส่งคำขอ {formatDateTime(item.created_at)}</span>
-                    {item.pickup_location_text && (
-                      <span className="flex items-center gap-1 min-w-0">
-                        <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{item.pickup_location_text}</span>
-                      </span>
-                    )}
-                  </div>
-                  </div>
-                </div>
-              </ExpandableCard>
-            </div>
-          );
-        })
-      )}
-    </div>
+                </ExpandableCard>
+              </div>
+            );
+          })
+        )}
+      </div>
 
+      {/* Factory picker modal */}
+      <AnimatePresence>
+        {pickerSubmission && (
+          <FactoryPickerModal
+            key={pickerSubmission.id}
+            submission={pickerSubmission}
+            initialFactoryId={destFactoryById[pickerSubmission.id] || ''}
+            onConfirm={(factoryId) => {
+              const name = factoryOptions.find((f) => f.id === factoryId)?.name_th ?? factoryId;
+              setDestFactoryById((prev) => ({ ...prev, [pickerSubmission.id]: factoryId }));
+              setFactoryNamesById((prev) => ({ ...prev, [pickerSubmission.id]: name }));
+              setPickerSubmissionId(null);
+            }}
+            onClose={() => setPickerSubmissionId(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Image lightbox */}
       <AnimatePresence>
         {lightboxUrl && (
           <motion.div

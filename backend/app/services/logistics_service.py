@@ -70,9 +70,13 @@ class LogisticsService(DistanceService):
         except Exception as exc:
             raise WorkflowError(f"Failed to fetch pickup queue: {exc}") from exc
 
-    def list_active_factories(self) -> list[dict[str, Any]]:
+    def list_active_factories(
+        self,
+        material_type_code: str | None = None,
+        quantity_kg: float | None = None,
+    ) -> list[dict[str, Any]]:
         try:
-            return (
+            factories = (
                 self.client.table("org_accounts")
                 .select("id, name_th, location_text, lat, lng, active, is_focal_point")
                 .eq("type", "factory")
@@ -80,6 +84,64 @@ class LogisticsService(DistanceService):
                 .order("name_th", desc=False)
                 .execute()
             ).data or []
+
+            if not material_type_code or not factories:
+                return factories
+
+            factory_ids = [str(f["id"]) for f in factories if f.get("id")]
+            prefs_rows = (
+                self.client.table("factory_material_preferences")
+                .select("factory_id, accepts, capacity_value, capacity_unit")
+                .eq("material_type_code", material_type_code)
+                .in_("factory_id", factory_ids)
+                .execute()
+            ).data or []
+            prefs_by_factory = {str(r["factory_id"]): r for r in prefs_rows if r.get("factory_id")}
+
+            # Load unit factors for capacity conversion
+            unit_codes = list({str(r["capacity_unit"]) for r in prefs_rows if r.get("capacity_unit")})
+            factors_by_unit: dict[str, float] = {}
+            if unit_codes:
+                for row in (
+                    self.client.table("measurement_units")
+                    .select("code, to_kg_factor")
+                    .in_("code", unit_codes)
+                    .execute()
+                ).data or []:
+                    if row.get("code") and row.get("to_kg_factor") is not None:
+                        factors_by_unit[str(row["code"])] = float(row["to_kg_factor"])
+
+            for f in factories:
+                fid = str(f.get("id") or "")
+                pref = prefs_by_factory.get(fid)
+                if pref is None:
+                    # No preference set — factory accepts by default, capacity unknown
+                    f["preference"] = {"accepts": True, "capacity_value": None, "capacity_unit": None, "capacity_kg": None, "has_capacity": True}
+                else:
+                    accepts = bool(pref.get("accepts", True))
+                    cap_val = pref.get("capacity_value")
+                    cap_unit = pref.get("capacity_unit")
+                    capacity_kg: float | None = None
+                    if cap_val is not None and cap_unit:
+                        factor = factors_by_unit.get(str(cap_unit))
+                        if factor:
+                            capacity_kg = float(cap_val) * factor
+                    has_capacity: bool
+                    if not accepts:
+                        has_capacity = False
+                    elif capacity_kg is None:
+                        has_capacity = True
+                    else:
+                        has_capacity = quantity_kg is None or capacity_kg >= quantity_kg
+                    f["preference"] = {
+                        "accepts": accepts,
+                        "capacity_value": float(cap_val) if cap_val is not None else None,
+                        "capacity_unit": cap_unit,
+                        "capacity_kg": capacity_kg,
+                        "has_capacity": has_capacity,
+                    }
+
+            return factories
         except Exception as exc:
             raise WorkflowError(f"Failed to fetch active factories: {exc}") from exc
 

@@ -4,7 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 
 from app.api.deps import require_roles
 from app.models.auth import AuthenticatedUser, Role
-from app.models.workflow import ConfirmFactoryIntakeRequest, UpsertFactoryInfoRequest
+from app.models.workflow import ConfirmFactoryIntakeRequest, UpsertFactoryInfoRequest, UpsertFactoryMaterialPreferencesRequest
 from app.services.factory_service import FactoryService, get_factory_service
 from app.services.logistics_service import LogisticsService, get_logistics_service
 
@@ -45,6 +45,25 @@ def update_my_factory(
             float(result["lng"]),
         )
     return result
+
+
+@router.get("/material-preferences")
+def get_material_preferences(
+    current_user: AuthenticatedUser = Depends(require_roles(Role.FACTORY)),
+    workflow_service: FactoryService = Depends(get_factory_service),
+) -> dict[str, Any]:
+    preferences, units = workflow_service.list_material_preferences(current_user.user_id)
+    return {"preferences": preferences, "units": units, "actor": current_user.role.value}
+
+
+@router.put("/material-preferences")
+def update_material_preferences(
+    payload: UpsertFactoryMaterialPreferencesRequest,
+    current_user: AuthenticatedUser = Depends(require_roles(Role.FACTORY)),
+    workflow_service: FactoryService = Depends(get_factory_service),
+) -> dict[str, Any]:
+    result = workflow_service.upsert_material_preferences(current_user.user_id, payload)
+    return {"message": "บันทึกความต้องการวัสดุสำเร็จ", **result}
 
 
 @router.post("/intakes/confirm")

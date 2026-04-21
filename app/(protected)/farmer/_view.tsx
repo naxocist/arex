@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
-import { ArrowDownAZ, CalendarCheck, Camera, ClipboardList, Coins, Factory, Gift, MapPin, PackagePlus, RefreshCw, Truck, User, X, ZoomIn } from 'lucide-react';
+import { ArrowDownAZ, CalendarCheck, Camera, CheckCircle2, ClipboardList, Coins, Factory, Gift, MapPin, PackagePlus, RefreshCw, Truck, User, X, XCircle, ZoomIn } from 'lucide-react';
 
 import AlertBanner from '@/app/_components/AlertBanner';
 import ConfirmDialog from '@/app/_components/ConfirmDialog';
@@ -99,14 +99,28 @@ function formatPickupWindow(start: string | null | undefined, end: string | null
   return startStr === endStr ? startStr : `${startStr} - ${endStr}`;
 }
 
-function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
-  if (!message) return 'info';
-  if (message.includes('ไม่สำเร็จ') || message.includes('กรุณา') || message.includes('ยังไม่')) return 'error';
-  if (message.includes('สำเร็จ')) return 'success';
-  return 'info';
+function Toast({ tone, message, onDone }: { tone: 'success' | 'error'; message: string; onDone: () => void }) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => {
+    timerRef.current = setTimeout(() => onDoneRef.current(), 3000);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+  const success = tone === 'success';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 16, scale: 0.96 }}
+      transition={{ duration: 0.2 }}
+      className={`fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border px-5 py-3.5 shadow-lg backdrop-blur-sm ${success ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}
+    >
+      {success ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" /> : <XCircle className="h-5 w-5 shrink-0 text-red-400" />}
+      <span className={`text-sm font-medium ${success ? 'text-emerald-700' : 'text-red-700'}`}>{message}</span>
+    </motion.div>
+  );
 }
-
-
 
 export default function FarmerHome() {
   const reduceMotion = useReducedMotion();
@@ -130,7 +144,9 @@ export default function FarmerHome() {
   const [measurementUnits, setMeasurementUnits] = useState<FarmerMeasurementUnitItem[]>([]);
   const [availablePoints, setAvailablePoints] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ tone: 'success' | 'error'; message: string; id: number } | null>(null);
+  const toastId = useRef(0);
   const [statusGroup, setStatusGroup] = useState<StatusGroup>('submitted');
   const [sortKey, setSortKey] = useState<SortKey>('date_desc');
   const [showForm, setShowForm] = useState(false);
@@ -163,10 +179,11 @@ export default function FarmerHome() {
 
   const loadDashboard = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
-      setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
+      setError('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
       return;
     }
     setIsLoading(true);
+    setError(null);
     try {
       const [submissionsResponse, materialTypesResponse, unitsResponse, pointsResponse] = await Promise.all([
         farmerApi.listSubmissions({ forceRefresh }),
@@ -189,9 +206,8 @@ export default function FarmerHome() {
       if (nextUnits.length > 0 && !nextUnits.some((u) => u.code === quantityUnit)) {
         setQuantityUnit(nextUnits[0].code);
       }
-      setMessage(null);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `โหลดข้อมูลไม่สำเร็จ: ${error.message}` : 'โหลดข้อมูลไม่สำเร็จ');
+    } catch (err) {
+      setError(err instanceof ApiError ? `โหลดข้อมูลไม่สำเร็จ: ${err.message}` : 'โหลดข้อมูลไม่สำเร็จ');
     } finally {
       setIsLoading(false);
     }
@@ -200,12 +216,12 @@ export default function FarmerHome() {
   useEffect(() => { void loadDashboard(); }, []);
   const handleSubmitMaterial = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!hasAccessToken()) { setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI'); return; }
+    if (!hasAccessToken()) { setToast({ tone: 'error', message: 'ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI', id: ++toastId.current }); return; }
     const parsedQuantity = Number(quantityValue);
-    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) { setMessage('กรุณาระบุปริมาณมากกว่า 0'); return; }
-    if (!quantityUnit) { setMessage('กรุณาเลือกหน่วย'); return; }
-    if (!materialType) { setMessage('กรุณาเลือกชนิดวัสดุ'); return; }
-    if (pickupLat === null || pickupLng === null) { setMessage('กรุณาเลือกจุดนัดรับบนแผนที่ก่อนส่งรายการ'); return; }
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) { setToast({ tone: 'error', message: 'กรุณาระบุปริมาณมากกว่า 0', id: ++toastId.current }); return; }
+    if (!quantityUnit) { setToast({ tone: 'error', message: 'กรุณาเลือกหน่วย', id: ++toastId.current }); return; }
+    if (!materialType) { setToast({ tone: 'error', message: 'กรุณาเลือกชนิดวัสดุ', id: ++toastId.current }); return; }
+    if (pickupLat === null || pickupLng === null) { setToast({ tone: 'error', message: 'กรุณาเลือกจุดนัดรับบนแผนที่ก่อนส่งรายการ', id: ++toastId.current }); return; }
 
     const materialLabel = materialNameByCode[materialType] ?? materialType;
     const unitLabel = unitNameByCode[quantityUnit] ?? fallbackThaiUnit(quantityUnit);
@@ -240,7 +256,7 @@ export default function FarmerHome() {
       setPendingImageUrl(url);
     } catch {
       // Keep preview so user can see what they picked; just show the error
-      setMessage('อัปโหลดรูปภาพไม่สำเร็จ กรุณาลองใหม่');
+      setToast({ tone: 'error', message: 'อัปโหลดรูปภาพไม่สำเร็จ กรุณาลองใหม่', id: ++toastId.current });
     } finally {
       setIsUploadingImage(false);
     }
@@ -258,7 +274,6 @@ export default function FarmerHome() {
   const submitMaterial = async () => {
     const parsedQuantity = Number(quantityValue);
     setIsSubmittingMaterial(true);
-    setMessage(null);
     try {
       await farmerApi.createSubmission({
         material_type: materialType,
@@ -272,11 +287,11 @@ export default function FarmerHome() {
       setPendingImageUrl(null);
       setSubmissionImagePreview(null);
       setQuantityValue('');
-      setMessage('ส่งรายการวัสดุสำเร็จแล้ว');
+      setToast({ tone: 'success', message: 'ส่งรายการวัสดุสำเร็จแล้ว', id: ++toastId.current });
       setShowForm(false);
       await loadDashboard(true);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `ส่งรายการไม่สำเร็จ: ${error.message}` : 'ส่งรายการไม่สำเร็จ กรุณาลองใหม่');
+    } catch (err) {
+      setToast({ tone: 'error', message: err instanceof ApiError ? `ส่งรายการไม่สำเร็จ: ${err.message}` : 'ส่งรายการไม่สำเร็จ กรุณาลองใหม่', id: ++toastId.current });
     } finally {
       setIsSubmittingMaterial(false);
     }
@@ -344,21 +359,7 @@ export default function FarmerHome() {
           </div>
         </div>
 
-        {/* ── Alert ── */}
-        <AnimatePresence>
-          {message && (
-            <motion.div
-              key="alert"
-              initial={reduceMotion ? {} : { opacity: 0, y: -8 }}
-              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-              exit={reduceMotion ? {} : { opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className="mb-4"
-            >
-              <AlertBanner message={message} tone={inferMessageTone(message)} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {error && <AlertBanner message={error} tone="error" />}
 
         {/* ── Submissions list ── */}
         <div className="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
@@ -764,6 +765,10 @@ export default function FarmerHome() {
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
       />
+
+      <AnimatePresence>
+        {toast && <Toast key={toast.id} tone={toast.tone} message={toast.message} onDone={() => setToast(null)} />}
+      </AnimatePresence>
     </ErrorBoundary>
   );
 }

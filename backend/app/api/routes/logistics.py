@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
 from app.api.deps import require_roles
 from app.models.auth import AuthenticatedUser, Role
@@ -28,10 +28,12 @@ def get_pickup_jobs(
 
 @router.get("/factories")
 def get_factories(
+    material_type: str | None = Query(default=None),
+    quantity_kg: float | None = Query(default=None, gt=0),
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
-    return {"factories": workflow_service.list_active_factories(), "actor": current_user.role.value}
+    return {"factories": workflow_service.list_active_factories(material_type, quantity_kg), "actor": current_user.role.value}
 
 
 @router.get("/reward-requests/approved")

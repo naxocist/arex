@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { RefreshCw, User } from 'lucide-react';
+import { CheckCircle2, RefreshCw, User, XCircle } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import { useFarmerProfile } from '@/app/_contexts/FarmerProfileContext';
@@ -15,11 +15,27 @@ import {
 import RewardCatalog from './_components/RewardCatalog';
 import RequestTracking from './_components/RequestTracking';
 
-function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
-  if (!message) return 'info';
-  if (message.includes('ไม่สำเร็จ') || message.includes('แต้มไม่พอ') || message.includes('ยังไม่')) return 'error';
-  if (message.includes('สำเร็จ')) return 'success';
-  return 'info';
+function Toast({ tone, message, onDone }: { tone: 'success' | 'error'; message: string; onDone: () => void }) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => {
+    timerRef.current = setTimeout(() => onDoneRef.current(), 3000);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+  const success = tone === 'success';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 16, scale: 0.96 }}
+      transition={{ duration: 0.2 }}
+      className={`fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border px-5 py-3.5 shadow-lg backdrop-blur-sm ${success ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}
+    >
+      {success ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" /> : <XCircle className="h-5 w-5 shrink-0 text-red-400" />}
+      <span className={`text-sm font-medium ${success ? 'text-emerald-700' : 'text-red-700'}`}>{message}</span>
+    </motion.div>
+  );
 }
 
 export default function FarmerRewards() {
@@ -31,7 +47,9 @@ export default function FarmerRewards() {
   const [rewardRequests, setRewardRequests] = useState<Parameters<typeof RequestTracking>[0]['rewardRequests']>([]);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ tone: 'success' | 'error'; message: string; id: number } | null>(null);
+  const toastId = useRef(0);
   const [requestingRewardId, setRequestingRewardId] = useState<string | null>(null);
   const [cancellingRewardRequestId, setCancellingRewardRequestId] = useState<string | null>(null);
 
@@ -42,10 +60,11 @@ export default function FarmerRewards() {
 
   const loadRewards = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
-      setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
+      setError('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
       return;
     }
     setIsLoading(true);
+    setError(null);
     try {
       const [pointsRes, rewardsRes, requestsRes] = await Promise.all([
         farmerApi.getPoints({ forceRefresh }),
@@ -55,9 +74,8 @@ export default function FarmerRewards() {
       setAvailablePoints(pointsRes.available_points);
       setRewardsCatalog(rewardsRes.rewards);
       setRewardRequests(requestsRes.requests);
-      setMessage(null);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `โหลดข้อมูลไม่สำเร็จ: ${error.message}` : 'โหลดข้อมูลไม่สำเร็จ');
+    } catch (err) {
+      setError(err instanceof ApiError ? `โหลดข้อมูลไม่สำเร็จ: ${err.message}` : 'โหลดข้อมูลไม่สำเร็จ');
     } finally {
       setIsLoading(false);
     }
@@ -72,32 +90,30 @@ export default function FarmerRewards() {
     lat: number | null,
     lng: number | null,
   ) => {
-    if (!hasAccessToken()) { setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI'); return; }
+    if (!hasAccessToken()) { setToast({ tone: 'error', message: 'ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI', id: ++toastId.current }); return; }
     const pts = Number(reward.points_cost) || 0;
-    if (availablePoints < pts * qty) { setMessage(`แต้มไม่พอสำหรับ ${reward.name_th}`); return; }
+    if (availablePoints < pts * qty) { setToast({ tone: 'error', message: `แต้มไม่พอสำหรับ ${reward.name_th}`, id: ++toastId.current }); return; }
     setRequestingRewardId(reward.id);
-    setMessage(null);
     try {
       await farmerApi.createRewardRequest({ reward_id: reward.id, quantity: qty, delivery_location_text: locationText || null, delivery_lat: lat, delivery_lng: lng });
-      setMessage(`ส่งคำขอแลกรางวัล ${reward.name_th} สำเร็จแล้ว`);
+      setToast({ tone: 'success', message: `ส่งคำขอแลกรางวัล ${reward.name_th} สำเร็จแล้ว`, id: ++toastId.current });
       await loadRewards(true);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `ส่งคำขอแลกรางวัลไม่สำเร็จ: ${error.message}` : 'ส่งคำขอแลกรางวัลไม่สำเร็จ');
+    } catch (err) {
+      setToast({ tone: 'error', message: err instanceof ApiError ? `ส่งคำขอแลกรางวัลไม่สำเร็จ: ${err.message}` : 'ส่งคำขอแลกรางวัลไม่สำเร็จ', id: ++toastId.current });
     } finally {
       setRequestingRewardId(null);
     }
   };
 
   const handleCancelRequest = async (requestId: string) => {
-    if (!hasAccessToken()) { setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI'); return; }
+    if (!hasAccessToken()) { setToast({ tone: 'error', message: 'ยังไม่พบโทเคน AREX_ACCESS_TOKEN สำหรับเชื่อมต่อ FastAPI', id: ++toastId.current }); return; }
     setCancellingRewardRequestId(requestId);
-    setMessage(null);
     try {
       await farmerApi.cancelRewardRequest(requestId);
-      setMessage('ยกเลิกคำขอแลกรางวัลสำเร็จแล้ว และคืนแต้มที่จองไว้เรียบร้อย');
+      setToast({ tone: 'success', message: 'ยกเลิกคำขอแลกรางวัลสำเร็จแล้ว และคืนแต้มที่จองไว้เรียบร้อย', id: ++toastId.current });
       await loadRewards(true);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `ยกเลิกคำขอไม่สำเร็จ: ${error.message}` : 'ยกเลิกคำขอไม่สำเร็จ');
+    } catch (err) {
+      setToast({ tone: 'error', message: err instanceof ApiError ? `ยกเลิกคำขอไม่สำเร็จ: ${err.message}` : 'ยกเลิกคำขอไม่สำเร็จ', id: ++toastId.current });
     } finally {
       setCancellingRewardRequestId(null);
     }
@@ -133,16 +149,7 @@ export default function FarmerRewards() {
           </div>
         </div>
 
-        <AnimatePresence>
-          {message && (
-            <motion.div key="alert"
-              initial={reduceMotion ? {} : { opacity: 0, y: -8 }} animate={reduceMotion ? {} : { opacity: 1, y: 0 }} exit={reduceMotion ? {} : { opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-            >
-              <AlertBanner message={message} tone={inferMessageTone(message)} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {error && <AlertBanner message={error} tone="error" />}
 
         <RewardCatalog
           rewards={rewardsCatalog}
@@ -160,6 +167,10 @@ export default function FarmerRewards() {
           onCancel={(id) => void handleCancelRequest(id)}
         />
       </div>
+
+      <AnimatePresence>
+        {toast && <Toast key={toast.id} tone={toast.tone} message={toast.message} onDone={() => setToast(null)} />}
+      </AnimatePresence>
     </ErrorBoundary>
   );
 }

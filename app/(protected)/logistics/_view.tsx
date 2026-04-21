@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { PackageCheck, RefreshCw, Truck } from 'lucide-react';
+import { CheckCircle2, PackageCheck, RefreshCw, Truck, XCircle } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import {
@@ -25,11 +25,27 @@ import DeliveryJobsTab from './_components/DeliveryJobsTab';
 type LogisticsTab = 'pickupQueue' | 'pickupJobs' | 'rewardQueue' | 'deliveryJobs';
 type LogisticsLoadIssueKey = 'pickupQueue' | 'pickupJobs' | 'rewardQueue' | 'deliveryJobs' | 'factories';
 
-function inferMessageTone(message: string | null): 'info' | 'success' | 'error' {
-  if (!message) return 'info';
-  if (message.includes('ไม่สำเร็จ') || message.includes('กรุณา') || message.includes('ยังไม่')) return 'error';
-  if (message.includes('สำเร็จ')) return 'success';
-  return 'info';
+function Toast({ tone, message, onDone }: { tone: 'success' | 'error'; message: string; onDone: () => void }) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => {
+    timerRef.current = setTimeout(() => onDoneRef.current(), 3000);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+  const success = tone === 'success';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 16, scale: 0.96 }}
+      transition={{ duration: 0.2 }}
+      className={`fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border px-5 py-3.5 shadow-lg backdrop-blur-sm ${success ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}
+    >
+      {success ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" /> : <XCircle className="h-5 w-5 shrink-0 text-red-400" />}
+      <span className={`text-sm font-medium ${success ? 'text-emerald-700' : 'text-red-700'}`}>{message}</span>
+    </motion.div>
+  );
 }
 
 function isConnectivityError(message: string): boolean {
@@ -93,7 +109,9 @@ export default function LogisticsTracking() {
   const [myInfo, setMyInfo] = useState<LogisticsInfoItem | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ tone: 'success' | 'error'; message: string; id: number } | null>(null);
+  const toastId = useRef(0);
   const [loadIssues, setLoadIssues] = useState<Partial<Record<LogisticsLoadIssueKey, string>>>({});
   const [activeTab, setActiveTab] = useState<LogisticsTab>('pickupQueue');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -122,17 +140,18 @@ export default function LogisticsTracking() {
   const loadAll = async (forceRefresh = false) => {
     if (!hasAccessToken()) {
       setLoadIssues({});
-      setMessage('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
+      setError('ยังไม่พบโทเคน AREX_ACCESS_TOKEN กรุณาเข้าสู่ระบบที่หน้าเลือกผู้ใช้งาน');
       return;
     }
     setIsLoading(true);
+    setError(null);
     try {
       const [queueRes, jobsRes, approvedRes, deliveryRes, factoriesRes, myInfoRes] = await Promise.allSettled([
         logisticsApi.getPickupQueue({ forceRefresh }),
         logisticsApi.getPickupJobs({ forceRefresh }),
         logisticsApi.getApprovedRewardRequests({ forceRefresh }),
         logisticsApi.getRewardDeliveryJobs({ forceRefresh }),
-        logisticsApi.listFactories({ forceRefresh }),
+        logisticsApi.listFactories(undefined, { forceRefresh }),
         logisticsApi.getMyInfo({ forceRefresh }),
       ]);
 
@@ -157,11 +176,10 @@ export default function LogisticsTracking() {
       if (myInfoRes.status === 'fulfilled') setMyInfo(myInfoRes.value);
 
       setLoadIssues(nextIssues);
-      if (ok === 0) setMessage('ยังโหลดข้อมูลศูนย์ปฏิบัติการขนส่งไม่สำเร็จ โปรดลองรีเฟรชอีกครั้ง');
-      else setMessage((cur) => cur === 'ยังโหลดข้อมูลศูนย์ปฏิบัติการขนส่งไม่สำเร็จ โปรดลองรีเฟรชอีกครั้ง' ? null : cur);
-    } catch (error) {
+      if (ok === 0) setError('ยังโหลดข้อมูลศูนย์ปฏิบัติการขนส่งไม่สำเร็จ โปรดลองรีเฟรชอีกครั้ง');
+    } catch (err) {
       setLoadIssues({});
-      setMessage(error instanceof ApiError ? `โหลดข้อมูลไม่สำเร็จ: ${error.message}` : 'โหลดข้อมูลไม่สำเร็จ');
+      setError(err instanceof ApiError ? `โหลดข้อมูลไม่สำเร็จ: ${err.message}` : 'โหลดข้อมูลไม่สำเร็จ');
     } finally {
       setIsLoading(false);
     }
@@ -170,10 +188,10 @@ export default function LogisticsTracking() {
   useEffect(() => { void loadAll(); }, []);
 
   const handleSchedulePickup = async (submissionId: string, range: DateRangeValue, factoryId: string) => {
-    if (!range.from || !range.to) { setMessage('กรุณาระบุช่วงวันนัดรับให้ครบทั้งวันเริ่มและวันสิ้นสุด'); return; }
-    if (new Date(range.to).getTime() < new Date(range.from).getTime()) { setMessage('วันสิ้นสุดของช่วงนัดรับต้องไม่น้อยกว่าวันเริ่มต้น'); return; }
-    if (!factoryId) { setMessage('กรุณาเลือกโรงงานปลายทางก่อนจัดคิวรับวัสดุ'); return; }
-    setSchedulingSubmissionId(submissionId); setMessage(null);
+    if (!range.from || !range.to) { setToast({ tone: 'error', message: 'กรุณาระบุช่วงวันนัดรับให้ครบทั้งวันเริ่มและวันสิ้นสุด', id: ++toastId.current }); return; }
+    if (new Date(range.to).getTime() < new Date(range.from).getTime()) { setToast({ tone: 'error', message: 'วันสิ้นสุดของช่วงนัดรับต้องไม่น้อยกว่าวันเริ่มต้น', id: ++toastId.current }); return; }
+    if (!factoryId) { setToast({ tone: 'error', message: 'กรุณาเลือกโรงงานปลายทางก่อนจัดคิวรับวัสดุ', id: ++toastId.current }); return; }
+    setSchedulingSubmissionId(submissionId);
     try {
       await logisticsApi.schedulePickup(submissionId, {
         pickup_window_start_at: dateOnlyToStartIso(range.from),
@@ -181,102 +199,102 @@ export default function LogisticsTracking() {
         destination_factory_id: factoryId,
         notes: 'จัดคิวโดยฝ่ายขนส่ง',
       });
-      setMessage('จัดคิวรับวัสดุสำเร็จแล้ว');
+      setToast({ tone: 'success', message: 'จัดคิวรับวัสดุสำเร็จแล้ว', id: ++toastId.current });
       setExpandedId(null);
       await loadAll(true);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `จัดคิวรับวัสดุไม่สำเร็จ: ${error.message}` : 'จัดคิวรับวัสดุไม่สำเร็จ');
+    } catch (err) {
+      setToast({ tone: 'error', message: err instanceof ApiError ? `จัดคิวรับวัสดุไม่สำเร็จ: ${err.message}` : 'จัดคิวรับวัสดุไม่สำเร็จ', id: ++toastId.current });
     } finally { setSchedulingSubmissionId(null); }
   };
 
   const handleMarkPickedUp = async (jobId: string) => {
-    setUpdatingPickupJobId(jobId); setMessage(null);
-    try { await logisticsApi.markPickedUp(jobId); setMessage('อัปเดตสถานะเป็นรับวัสดุแล้ว'); await loadAll(true); }
-    catch (error) {
+    setUpdatingPickupJobId(jobId);
+    try { await logisticsApi.markPickedUp(jobId); setToast({ tone: 'success', message: 'อัปเดตสถานะเป็นรับวัสดุแล้ว', id: ++toastId.current }); await loadAll(true); }
+    catch (err) {
       await loadAll(true);
-      setMessage(error instanceof ApiError ? `อัปเดตสถานะไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'อัปเดตสถานะไม่สำเร็จ');
+      setToast({ tone: 'error', message: err instanceof ApiError ? `อัปเดตสถานะไม่สำเร็จ: ${extractWorkflowMessage(err.message)}` : 'อัปเดตสถานะไม่สำเร็จ', id: ++toastId.current });
     }
     finally { setUpdatingPickupJobId(null); }
   };
 
   const handleMarkDeliveredToFactory = async (jobId: string) => {
-    setUpdatingPickupJobId(jobId); setMessage(null);
-    try { await logisticsApi.markDeliveredToFactory(jobId); setMessage('อัปเดตสถานะเป็นส่งถึงโรงงานแล้ว'); await loadAll(true); }
-    catch (error) {
+    setUpdatingPickupJobId(jobId);
+    try { await logisticsApi.markDeliveredToFactory(jobId); setToast({ tone: 'success', message: 'อัปเดตสถานะเป็นส่งถึงโรงงานแล้ว', id: ++toastId.current }); await loadAll(true); }
+    catch (err) {
       await loadAll(true);
-      setMessage(error instanceof ApiError ? `อัปเดตสถานะไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'อัปเดตสถานะไม่สำเร็จ');
+      setToast({ tone: 'error', message: err instanceof ApiError ? `อัปเดตสถานะไม่สำเร็จ: ${extractWorkflowMessage(err.message)}` : 'อัปเดตสถานะไม่สำเร็จ', id: ++toastId.current });
     }
     finally { setUpdatingPickupJobId(null); }
   };
 
   const handleReschedulePickup = async (jobId: string, range: DateRangeValue, factoryId: string) => {
-    if (!range.from || !range.to) { setMessage('กรุณาระบุช่วงวันนัดรับให้ครบ'); return; }
-    if (!factoryId) { setMessage('กรุณาเลือกโรงงานปลายทาง'); return; }
-    setReschedulingPickupJobId(jobId); setMessage(null);
+    if (!range.from || !range.to) { setToast({ tone: 'error', message: 'กรุณาระบุช่วงวันนัดรับให้ครบ', id: ++toastId.current }); return; }
+    if (!factoryId) { setToast({ tone: 'error', message: 'กรุณาเลือกโรงงานปลายทาง', id: ++toastId.current }); return; }
+    setReschedulingPickupJobId(jobId);
     try {
       await logisticsApi.reschedulePickup(jobId, {
         pickup_window_start_at: dateOnlyToStartIso(range.from),
         pickup_window_end_at: dateOnlyToEndIso(range.to),
         destination_factory_id: factoryId,
       });
-      setMessage('แก้ไขตารางรับวัสดุสำเร็จแล้ว');
+      setToast({ tone: 'success', message: 'แก้ไขตารางรับวัสดุสำเร็จแล้ว', id: ++toastId.current });
       await loadAll(true);
-    } catch (error) {
+    } catch (err) {
       await loadAll(true);
-      setMessage(error instanceof ApiError ? `แก้ไขไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'แก้ไขไม่สำเร็จ');
+      setToast({ tone: 'error', message: err instanceof ApiError ? `แก้ไขไม่สำเร็จ: ${extractWorkflowMessage(err.message)}` : 'แก้ไขไม่สำเร็จ', id: ++toastId.current });
     } finally { setReschedulingPickupJobId(null); }
   };
 
   const handleScheduleRewardDelivery = async (requestId: string, range: DateRangeValue) => {
-    if (!range.from || !range.to) { setMessage('กรุณาระบุช่วงวันนำส่งให้ครบทั้งวันเริ่มและวันสิ้นสุด'); return; }
-    if (new Date(range.to).getTime() < new Date(range.from).getTime()) { setMessage('วันสิ้นสุดของช่วงนำส่งต้องไม่น้อยกว่าวันเริ่มต้น'); return; }
-    setSchedulingRewardRequestId(requestId); setMessage(null);
+    if (!range.from || !range.to) { setToast({ tone: 'error', message: 'กรุณาระบุช่วงวันนำส่งให้ครบทั้งวันเริ่มและวันสิ้นสุด', id: ++toastId.current }); return; }
+    if (new Date(range.to).getTime() < new Date(range.from).getTime()) { setToast({ tone: 'error', message: 'วันสิ้นสุดของช่วงนำส่งต้องไม่น้อยกว่าวันเริ่มต้น', id: ++toastId.current }); return; }
+    setSchedulingRewardRequestId(requestId);
     try {
       await logisticsApi.scheduleRewardDelivery(requestId, {
         delivery_window_start_at: dateOnlyToStartIso(range.from),
         delivery_window_end_at: dateOnlyToEndIso(range.to),
         notes: 'จัดรอบส่งโดยฝ่ายขนส่ง',
       });
-      setMessage('จัดรอบส่งรางวัลสำเร็จแล้ว');
+      setToast({ tone: 'success', message: 'จัดรอบส่งรางวัลสำเร็จแล้ว', id: ++toastId.current });
       setExpandedId(null);
       await loadAll(true);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `จัดรอบส่งรางวัลไม่สำเร็จ: ${error.message}` : 'จัดรอบส่งรางวัลไม่สำเร็จ');
+    } catch (err) {
+      setToast({ tone: 'error', message: err instanceof ApiError ? `จัดรอบส่งรางวัลไม่สำเร็จ: ${err.message}` : 'จัดรอบส่งรางวัลไม่สำเร็จ', id: ++toastId.current });
     } finally { setSchedulingRewardRequestId(null); }
   };
 
   const handleMarkOutForDelivery = async (jobId: string) => {
-    setUpdatingDeliveryJobId(jobId); setMessage(null);
-    try { await logisticsApi.markRewardOutForDelivery(jobId); setMessage('อัปเดตสถานะรางวัลเป็นกำลังนำส่งแล้ว'); await loadAll(true); }
-    catch (error) {
+    setUpdatingDeliveryJobId(jobId);
+    try { await logisticsApi.markRewardOutForDelivery(jobId); setToast({ tone: 'success', message: 'อัปเดตสถานะรางวัลเป็นกำลังนำส่งแล้ว', id: ++toastId.current }); await loadAll(true); }
+    catch (err) {
       await loadAll(true);
-      setMessage(error instanceof ApiError ? `อัปเดตสถานะรางวัลไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'อัปเดตสถานะรางวัลไม่สำเร็จ');
+      setToast({ tone: 'error', message: err instanceof ApiError ? `อัปเดตสถานะรางวัลไม่สำเร็จ: ${extractWorkflowMessage(err.message)}` : 'อัปเดตสถานะรางวัลไม่สำเร็จ', id: ++toastId.current });
     }
     finally { setUpdatingDeliveryJobId(null); }
   };
 
   const handleMarkDelivered = async (jobId: string) => {
-    setUpdatingDeliveryJobId(jobId); setMessage(null);
-    try { await logisticsApi.markRewardDelivered(jobId); setMessage('ยืนยันส่งมอบรางวัลสำเร็จแล้ว'); await loadAll(true); }
-    catch (error) {
+    setUpdatingDeliveryJobId(jobId);
+    try { await logisticsApi.markRewardDelivered(jobId); setToast({ tone: 'success', message: 'ยืนยันส่งมอบรางวัลสำเร็จแล้ว', id: ++toastId.current }); await loadAll(true); }
+    catch (err) {
       await loadAll(true);
-      setMessage(error instanceof ApiError ? `ยืนยันส่งมอบรางวัลไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'ยืนยันส่งมอบรางวัลไม่สำเร็จ');
+      setToast({ tone: 'error', message: err instanceof ApiError ? `ยืนยันส่งมอบรางวัลไม่สำเร็จ: ${extractWorkflowMessage(err.message)}` : 'ยืนยันส่งมอบรางวัลไม่สำเร็จ', id: ++toastId.current });
     }
     finally { setUpdatingDeliveryJobId(null); }
   };
 
   const handleRescheduleDelivery = async (jobId: string, range: DateRangeValue) => {
-    if (!range.from || !range.to) { setMessage('กรุณาระบุช่วงวันนำส่งให้ครบ'); return; }
-    setReschedulingDeliveryJobId(jobId); setMessage(null);
+    if (!range.from || !range.to) { setToast({ tone: 'error', message: 'กรุณาระบุช่วงวันนำส่งให้ครบ', id: ++toastId.current }); return; }
+    setReschedulingDeliveryJobId(jobId);
     try {
       await logisticsApi.rescheduleDeliveryJob(jobId, {
         delivery_window_start_at: dateOnlyToStartIso(range.from),
         delivery_window_end_at: dateOnlyToEndIso(range.to),
       });
-      setMessage('แก้ไขตารางส่งรางวัลสำเร็จแล้ว');
+      setToast({ tone: 'success', message: 'แก้ไขตารางส่งรางวัลสำเร็จแล้ว', id: ++toastId.current });
       await loadAll(true);
-    } catch (error) {
-      setMessage(error instanceof ApiError ? `แก้ไขไม่สำเร็จ: ${error.message}` : 'แก้ไขไม่สำเร็จ');
+    } catch (err) {
+      setToast({ tone: 'error', message: err instanceof ApiError ? `แก้ไขไม่สำเร็จ: ${err.message}` : 'แก้ไขไม่สำเร็จ', id: ++toastId.current });
     } finally { setReschedulingDeliveryJobId(null); }
   };
 
@@ -320,18 +338,7 @@ export default function LogisticsTracking() {
           </motion.button>
         </div>
 
-        <AnimatePresence>
-          {message && (
-            <motion.div key="msg"
-              initial={reduceMotion ? {} : { opacity: 0, y: -8 }}
-              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-              exit={reduceMotion ? {} : { opacity: 0, y: -8 }}
-              transition={{ duration: 0.22 }}
-            >
-              <AlertBanner message={message} tone={inferMessageTone(message)} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {error && <AlertBanner message={error} tone="error" />}
         {loadIssueMessages.length > 0 && (
           <AlertBanner message={loadIssueMessages.join(' ')} tone="info" title="บางส่วนของข้อมูลยังโหลดไม่ครบ" />
         )}
@@ -451,6 +458,10 @@ export default function LogisticsTracking() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {toast && <Toast key={toast.id} tone={toast.tone} message={toast.message} onDone={() => setToast(null)} />}
+      </AnimatePresence>
     </ErrorBoundary>
   );
 }
