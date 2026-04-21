@@ -37,7 +37,7 @@ export interface FarmerRewardRequestItem {
   status: 'requested' | 'warehouse_approved' | 'warehouse_rejected' | 'cancelled' | string;
   requested_at: string; warehouse_decision_at: string | null; rejection_reason: string | null;
   delivery_location_text: string | null; delivery_lat: number | null; delivery_lng: number | null;
-  reward_delivery_jobs: FarmerRewardDeliveryJobItem[];
+  delivery_jobs: FarmerRewardDeliveryJobItem[];
 }
 export interface FarmerSubmissionItem {
   id: string; material_type: string; quantity_value: number; quantity_unit: string;
