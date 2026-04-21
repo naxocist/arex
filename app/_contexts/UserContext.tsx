@@ -27,6 +27,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     registerAuthFailureHandler(() => {
       setRole(null);
+      sessionStorage.setItem('AREX_AUTH_EXPIRED', '1');
       router.replace('/');
     });
   }, [router]);

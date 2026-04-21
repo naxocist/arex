@@ -17,7 +17,7 @@ class LoginRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str = Field(min_length=20, max_length=4096)
+    refresh_token: str = Field(min_length=1, max_length=4096)
 
 
 class RegisterBaseRequest(BaseModel):

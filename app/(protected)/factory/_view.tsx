@@ -11,6 +11,8 @@ import {
   RefreshCw,
   Scale,
   ShieldCheck,
+  X,
+  ZoomIn,
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import EmptyState from '@/app/_components/EmptyState';
@@ -26,6 +28,14 @@ import {
   type FactoryPendingIntakeItem,
 } from '@/app/_lib/api';
 import { formatDate } from '@/app/_lib/utils';
+
+function extractWorkflowMessage(raw: string): string {
+  try {
+    const match = raw.match(/'message':\s*'([^']+)'/);
+    if (match) return match[1];
+  } catch { /* ignore */ }
+  return raw;
+}
 
 function formatMaterial(materialType: string): string {
   const map: Record<string, string> = {
@@ -193,6 +203,7 @@ export default function FactoryIntake() {
   const [confirmPending, setConfirmPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'confirmed'>('pending');
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [confirmedSort, setConfirmedSort] = useState<{ key: 'confirmed_at' | 'material'; dir: SortDir }>({ key: 'confirmed_at', dir: 'desc' });
 
   const confirm = (msg: string, onConfirm: () => void) => setConfirmPending({ message: msg, onConfirm });
@@ -241,7 +252,8 @@ export default function FactoryIntake() {
       setMessage('ยืนยันรับเข้าโรงงานสำเร็จแล้ว');
       await loadQueue(true);
     } catch (error) {
-      setMessage(error instanceof ApiError ? `ยืนยันรับเข้าไม่สำเร็จ: ${error.message}` : 'ยืนยันรับเข้าไม่สำเร็จ');
+      await loadQueue(true);
+      setMessage(error instanceof ApiError ? `ยืนยันรับเข้าไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'ยืนยันรับเข้าไม่สำเร็จ');
     } finally {
       setConfirmingJobId(null);
     }
@@ -409,6 +421,25 @@ export default function FactoryIntake() {
                               <p className="mt-0.5 text-xs text-stone-500">หน่วยนี้แปลงเป็น กก. อัตโนมัติไม่ได้</p>
                             )}
                           </div>
+                          {/* Submission image */}
+                          {item.image_url && (
+                            <div className="space-y-1">
+                              <p className="text-xs text-stone-400">ภาพถ่ายวัสดุจากเกษตรกร</p>
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setLightboxUrl(item.image_url!)}
+                                onKeyDown={(e) => e.key === 'Enter' && setLightboxUrl(item.image_url!)}
+                                className="relative w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-50 hover:opacity-90 transition cursor-pointer"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={item.image_url} alt="ภาพวัสดุ" className="h-48 w-full object-cover" />
+                                <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-xs text-white">
+                                  <ZoomIn className="h-3 w-3" />ขยาย
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       }
                     >
@@ -538,6 +569,21 @@ export default function FactoryIntake() {
         )}
 
       </div>
+      <AnimatePresence>
+        {lightboxUrl && (
+          <motion.div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setLightboxUrl(null)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={lightboxUrl} alt="ภาพวัสดุ" className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+            <button type="button" onClick={() => setLightboxUrl(null)} className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white">
+              <X className="h-5 w-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </ErrorBoundary>
   );
 }

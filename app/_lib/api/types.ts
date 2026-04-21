@@ -19,6 +19,7 @@ export interface CreateSubmissionPayload {
   pickup_lat: number;
   pickup_lng: number;
   notes?: string;
+  image_url?: string | null;
 }
 export interface FarmerMaterialTypeItem { code: string; name_th: string; active: boolean }
 export interface FarmerMeasurementUnitItem { code: string; name_th: string; to_kg_factor: number | null; active: boolean }
@@ -42,7 +43,7 @@ export interface FarmerSubmissionItem {
   id: string; material_type: string; quantity_value: number; quantity_unit: string;
   pickup_location_text: string; pickup_lat?: number | null; pickup_lng?: number | null;
   status: string; created_at: string; pickup_window_start_at?: string | null; pickup_window_end_at?: string | null;
-  pickup_job_status?: string | null; credited_points?: number | null;
+  pickup_job_status?: string | null; credited_points?: number | null; image_url?: string | null;
 }
 export interface CreateRewardRequestPayload { reward_id: string; quantity: number; delivery_location_text?: string | null; delivery_lat?: number | null; delivery_lng?: number | null }
 
@@ -81,7 +82,7 @@ export interface LogisticsPickupQueueItem {
   material_name_th?: string; quantity_value: number; quantity_unit: string;
   pickup_location_text: string; pickup_lat?: number | null; pickup_lng?: number | null;
   status: 'submitted' | 'pickup_scheduled' | string; created_at: string;
-  distance_to_farmer_km?: number | null;
+  image_url?: string | null; distance_to_farmer_km?: number | null;
 }
 export interface LogisticsPickupJobItem {
   id: string; submission_id: string; logistics_profile_id: string;
@@ -94,7 +95,7 @@ export interface LogisticsPickupJobItem {
   material_type: string; material_name_th?: string; quantity_value: number; quantity_unit: string;
   pickup_location_text: string; pickup_lat?: number | null; pickup_lng?: number | null;
   submission_status: string; farmer_display_name?: string | null; farmer_phone?: string | null;
-  distance_to_farmer_km?: number | null; distance_farmer_to_factory_km?: number | null;
+  image_url?: string | null; distance_to_farmer_km?: number | null; distance_farmer_to_factory_km?: number | null;
 }
 export interface ScheduleRewardDeliveryPayload { delivery_window_start_at: string; delivery_window_end_at: string; notes?: string }
 export interface ScheduleRewardDeliveryResponse { message: string; result: { delivery_job_id: string; delivery_status: string } }
@@ -124,12 +125,14 @@ export interface FactoryPendingIntakeItem {
   planned_pickup_at: string; picked_up_at: string | null; delivered_factory_at: string | null;
   material_type: string; material_name_th?: string | null; quantity_value: number;
   quantity_unit: string; quantity_to_kg_factor?: number | null; pickup_location_text: string;
+  image_url?: string | null;
 }
 export interface FactoryConfirmedIntakeItem {
   intake_id: string; pickup_job_id: string; submission_id: string; material_type: string;
   material_name_th?: string | null; quantity_value: number; quantity_unit: string;
   measured_weight_kg: number; measured_weight_ton: number; pickup_location_text: string;
   confirmed_at: string; status: string; factory_profile_id: string; discrepancy_note: string | null;
+  image_url?: string | null;
 }
 export interface FactoryIntakeSummary {
   arrived_count: number; confirmed_count: number; arrived_estimated_weight_kg_total: number;

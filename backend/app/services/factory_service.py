@@ -143,7 +143,7 @@ class FactoryService(BaseService):
             if submission_ids:
                 submissions = (
                     self.client.table("submissions")
-                    .select("id, material_type, quantity_value, quantity_unit, pickup_location_text")
+                    .select("id, material_type, quantity_value, quantity_unit, pickup_location_text, image_url")
                     .in_("id", submission_ids)
                     .execute()
                 ).data or []
@@ -202,6 +202,7 @@ class FactoryService(BaseService):
                     "quantity_unit": submission.get("quantity_unit"),
                     "quantity_to_kg_factor": unit_meta.get("to_kg_factor") if unit_meta else None,
                     "pickup_location_text": submission.get("pickup_location_text"),
+                    "image_url": submission.get("image_url"),
                 })
 
             confirmed: list[dict[str, Any]] = []
@@ -230,6 +231,7 @@ class FactoryService(BaseService):
                     "status": intake.get("status"),
                     "factory_profile_id": intake.get("factory_profile_id"),
                     "discrepancy_note": intake.get("discrepancy_note"),
+                    "image_url": submission.get("image_url"),
                 })
 
             arrived_estimated_weight_kg_total = 0.0

@@ -26,12 +26,24 @@ export default function LoginView() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [loginMessage, setLoginMessage] = useState<string | null>(null);
+  const [loginMessage, setLoginMessage] = useState<string | null>(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('AREX_AUTH_EXPIRED')) {
+      sessionStorage.removeItem('AREX_AUTH_EXPIRED');
+      return 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่';
+    }
+    return null;
+  });
 
-  const [registerRole, setRegisterRole] = useState<'farmer' | 'logistics' | 'factory'>('farmer');
+  // TO RE-ENABLE logistics/factory registration:
+  // 1. Replace this line with: const [registerRole, setRegisterRole] = useState<'farmer' | 'logistics' | 'factory'>('farmer');
+  // 2. Uncomment the two role buttons in the role selector below (search "ฝ่ายขนส่ง" / "ฝ่ายโรงงาน")
+  // 3. Restore the grid: change grid-cols-1 → grid-cols-3 on the role selector div
+  // Validation, API calls, and the company fields section are all intact and ready.
+  const registerRole = 'farmer' as 'farmer' | 'logistics' | 'factory';
   const [registerForm, setRegisterForm] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     display_name: '',
     phone: '',
     province: '',
@@ -41,6 +53,7 @@ export default function LoginView() {
     lng: null as number | null,
   });
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [provinceSearch, setProvinceSearch] = useState('');
   const [provinceOpen, setProvinceOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -104,6 +117,12 @@ export default function LoginView() {
 
     if (registerForm.password.length < 6) {
       setRegisterMessage('รหัสผ่านสั้นเกินไป (ต่ำกว่า 6 ตัว)');
+      setIsRegistering(false);
+      return;
+    }
+
+    if (registerForm.password !== registerForm.confirmPassword) {
+      setRegisterMessage('รหัสผ่านไม่ตรงกัน');
       setIsRegistering(false);
       return;
     }
@@ -398,159 +417,161 @@ export default function LoginView() {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleApiRegister} className="space-y-5">
-                {/* Role selector */}
-                <div className="space-y-2">
-                  <span className="text-base font-semibold text-stone-800">ฉันเป็น...</span>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: 'farmer', label: 'เกษตรกร' },
-                      { value: 'logistics', label: 'ฝ่ายขนส่ง' },
-                      { value: 'factory', label: 'ฝ่ายโรงงาน' },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setRegisterRole(option.value as 'farmer' | 'logistics' | 'factory')}
-                        className={`min-h-[52px] rounded-2xl border px-3 py-3 text-base font-semibold transition ${
-                          registerRole === option.value
-                            ? 'border-primary bg-primary text-white shadow-sm'
-                            : 'border-outline-variant/30 bg-surface-container-low text-on-surface-variant hover:border-primary/40'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+              <form onSubmit={handleApiRegister} className="space-y-4">
+
+                {/* Personal info */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block space-y-1.5">
+                    <span className="text-sm font-semibold text-stone-700">ชื่อ-นามสกุล <span className="text-rose-500">*</span></span>
+                    <input
+                      type="text"
+                      value={registerForm.display_name}
+                      onChange={(e) => setRegisterForm((prev) => ({ ...prev, display_name: e.target.value }))}
+                      autoComplete="name"
+                      placeholder="เช่น นายสมชาย ใจดี"
+                      className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3.5 text-base outline-none focus:ring-2 focus:ring-primary/20 min-h-[52px]"
+                      required
+                    />
+                  </label>
+
+                  <label className="block space-y-1.5">
+                    <span className="text-sm font-semibold text-stone-700">เบอร์โทร <span className="text-rose-500">*</span></span>
+                    <input
+                      type="tel"
+                      value={registerForm.phone}
+                      onChange={(e) => setRegisterForm((prev) => ({ ...prev, phone: e.target.value }))}
+                      autoComplete="tel"
+                      placeholder="เช่น 08xxxxxxxx"
+                      className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3.5 text-base outline-none focus:ring-2 focus:ring-primary/20 min-h-[52px]"
+                      required
+                    />
+                  </label>
+
+                  <div className="block space-y-1.5 md:col-span-2">
+                    <span className="text-sm font-semibold text-stone-700">จังหวัด <span className="text-rose-500">*</span></span>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={provinceSearch !== '' ? provinceSearch : registerForm.province}
+                        onChange={(e) => {
+                          setProvinceSearch(e.target.value);
+                          setProvinceOpen(true);
+                          setRegisterForm((prev) => ({ ...prev, province: '' }));
+                        }}
+                        onFocus={() => { setProvinceSearch(registerForm.province); setProvinceOpen(true); }}
+                        onBlur={() => setTimeout(() => setProvinceOpen(false), 150)}
+                        placeholder="พิมพ์เพื่อค้นหาจังหวัด"
+                        className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3.5 text-base outline-none focus:ring-2 focus:ring-primary/20 min-h-[52px]"
+                        required={!registerForm.province}
+                      />
+                      {provinceOpen && (
+                        <ul className="absolute z-50 bottom-full mb-1 max-h-56 w-full overflow-y-auto rounded-xl border border-outline-variant/20 bg-white shadow-lg">
+                          {THAI_PROVINCES.filter((p) =>
+                            !provinceSearch || p.includes(provinceSearch)
+                          ).map((p) => (
+                            <li
+                              key={p}
+                              onMouseDown={() => {
+                                setRegisterForm((prev) => ({ ...prev, province: p }));
+                                setProvinceSearch('');
+                                setProvinceOpen(false);
+                              }}
+                              className="cursor-pointer px-4 py-3 text-base hover:bg-emerald-50 hover:text-emerald-900"
+                            >
+                              {p}
+                            </li>
+                          ))}
+                          {THAI_PROVINCES.filter((p) => !provinceSearch || p.includes(provinceSearch)).length === 0 && (
+                            <li className="px-4 py-3 text-base text-stone-400">ไม่พบจังหวัด</li>
+                          )}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Account fields */}
-                <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4 space-y-4">
-                  <h3 className="text-base font-semibold text-stone-900">ข้อมูลบัญชีและข้อมูลติดต่อ</h3>
+                <div className="border-t border-outline-variant/15" />
+
+                {/* Account credentials */}
+                <div className="space-y-4">
+                  <label className="block space-y-1.5">
+                    <span className="text-sm font-semibold text-stone-700">อีเมล <span className="text-rose-500">*</span></span>
+                    <input
+                      type="email"
+                      value={registerForm.email}
+                      onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))}
+                      autoComplete="email"
+                      placeholder="name@example.com"
+                      className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3.5 text-base outline-none focus:ring-2 focus:ring-primary/20 min-h-[52px]"
+                      required
+                    />
+                  </label>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <label className="block space-y-2">
-                      <span className="text-base font-semibold text-stone-800">อีเมล <span className="text-rose-500">*</span></span>
-                      <input
-                        type="email"
-                        value={registerForm.email}
-                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))}
-                        autoComplete="email"
-                        placeholder="name@example.com"
-                        className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
-                        required
-                      />
-                    </label>
-
-                    <label className="block space-y-2">
-                      <span className="text-base font-semibold text-stone-800">รหัสผ่าน <span className="text-rose-500">*</span></span>
+                    <label className="block space-y-1.5">
+                      <span className="text-sm font-semibold text-stone-700">รหัสผ่าน <span className="text-rose-500">*</span></span>
                       <div className="relative">
                         <input
                           type={showRegisterPassword ? 'text' : 'password'}
                           value={registerForm.password}
                           onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))}
                           autoComplete="new-password"
-                          placeholder="รหัสผ่านของคุณ"
-                          className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 pr-14 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
+                          placeholder="อย่างน้อย 6 ตัวอักษร"
+                          className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3.5 pr-14 text-base outline-none focus:ring-2 focus:ring-primary/20 min-h-[52px]"
                           required
                           minLength={6}
                         />
                         <button
                           type="button"
                           onClick={() => setShowRegisterPassword((v) => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-stone-500 hover:bg-surface-container hover:text-stone-800 transition"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-stone-400 hover:text-stone-700 transition"
                           aria-label={showRegisterPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
                         >
                           {showRegisterPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                         </button>
                       </div>
-                      <p className="text-sm text-stone-500">อย่างน้อย 6 ตัวอักษร</p>
                     </label>
 
-                    <label className="block space-y-2">
-                      <span className="text-base font-semibold text-stone-800">ชื่อผู้ใช้งาน <span className="text-rose-500">*</span></span>
-                      <input
-                        type="text"
-                        value={registerForm.display_name}
-                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, display_name: e.target.value }))}
-                        autoComplete="name"
-                        placeholder="เช่น นายสมชาย ใจดี"
-                        className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
-                        required
-                      />
-                    </label>
-
-                    <label className="block space-y-2">
-                      <span className="text-base font-semibold text-stone-800">เบอร์โทร <span className="text-rose-500">*</span></span>
-                      <input
-                        type="tel"
-                        value={registerForm.phone}
-                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, phone: e.target.value }))}
-                        autoComplete="tel"
-                        placeholder="เช่น 08xxxxxxxx"
-                        className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
-                        required
-                      />
-                    </label>
-
-                    <div className="block space-y-2 md:col-span-2">
-                      <span className="text-base font-semibold text-stone-800">จังหวัด <span className="text-rose-500">*</span></span>
+                    <label className="block space-y-1.5">
+                      <span className="text-sm font-semibold text-stone-700">ยืนยันรหัสผ่าน <span className="text-rose-500">*</span></span>
                       <div className="relative">
                         <input
-                          type="text"
-                          value={provinceSearch !== '' ? provinceSearch : registerForm.province}
-                          onChange={(e) => {
-                            setProvinceSearch(e.target.value);
-                            setProvinceOpen(true);
-                            setRegisterForm((prev) => ({ ...prev, province: '' }));
-                          }}
-                          onFocus={() => { setProvinceSearch(registerForm.province); setProvinceOpen(true); }}
-                          onBlur={() => setTimeout(() => setProvinceOpen(false), 150)}
-                          placeholder="พิมพ์เพื่อค้นหาจังหวัด"
-                          className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
-                          required={!registerForm.province}
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={registerForm.confirmPassword}
+                          onChange={(e) => setRegisterForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                          autoComplete="new-password"
+                          placeholder="กรอกรหัสผ่านอีกครั้ง"
+                          className={`w-full rounded-xl border bg-surface-container-low px-4 py-3.5 pr-14 text-base outline-none focus:ring-2 focus:ring-primary/20 min-h-[52px] ${
+                            registerForm.confirmPassword && registerForm.confirmPassword !== registerForm.password
+                              ? 'border-rose-400'
+                              : 'border-outline-variant/30'
+                          }`}
+                          required
                         />
-                        {provinceOpen && (
-                          <ul className="absolute z-50 bottom-full mb-1 max-h-56 w-full overflow-y-auto rounded-xl border border-outline-variant/20 bg-white shadow-lg">
-                            {THAI_PROVINCES.filter((p) =>
-                              !provinceSearch || p.includes(provinceSearch)
-                            ).map((p) => (
-                              <li
-                                key={p}
-                                onMouseDown={() => {
-                                  setRegisterForm((prev) => ({ ...prev, province: p }));
-                                  setProvinceSearch('');
-                                  setProvinceOpen(false);
-                                }}
-                                className="cursor-pointer px-4 py-3 text-base hover:bg-emerald-50 hover:text-emerald-900"
-                              >
-                                {p}
-                              </li>
-                            ))}
-                            {THAI_PROVINCES.filter((p) => !provinceSearch || p.includes(provinceSearch)).length === 0 && (
-                              <li className="px-4 py-3 text-base text-stone-400">ไม่พบจังหวัด</li>
-                            )}
-                          </ul>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-stone-400 hover:text-stone-700 transition"
+                          aria-label={showConfirmPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
                       </div>
-                    </div>
+                      {registerForm.confirmPassword && registerForm.confirmPassword !== registerForm.password && (
+                        <p className="text-sm text-rose-500">รหัสผ่านไม่ตรงกัน</p>
+                      )}
+                    </label>
                   </div>
                 </div>
 
-                {/* Factory / Logistics fields */}
+                {/* Factory / Logistics fields — hidden, kept for future use */}
                 {(registerRole === 'factory' || registerRole === 'logistics') ? (
                   <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 space-y-4">
                     <div>
                       <h3 className="text-base font-semibold text-stone-900">
                         {registerRole === 'factory' ? 'ข้อมูลโรงงาน' : 'ข้อมูลบริษัทขนส่ง'}
                       </h3>
-                      <p className="mt-1 text-sm leading-relaxed text-stone-600">
-                        {registerRole === 'factory'
-                          ? 'ระบุชื่อโรงงาน และเลือกตำแหน่งบนแผนที่ได้เลย'
-                          : 'ระบุชื่อบริษัท และเลือกตำแหน่งบนแผนที่ได้เลย'}
-                      </p>
                     </div>
-
                     <label className="block space-y-2">
                       <span className="text-base font-semibold text-stone-800">
                         {registerRole === 'factory' ? 'ชื่อโรงงาน' : 'ชื่อบริษัทขนส่ง'} <span className="text-rose-500">*</span>
@@ -564,7 +585,6 @@ export default function LoginView() {
                         required
                       />
                     </label>
-
                     <label className="block space-y-2">
                       <span className="text-base font-semibold text-stone-800">
                         {registerRole === 'factory' ? 'ที่อยู่โรงงาน' : 'ที่อยู่บริษัท'}
@@ -577,7 +597,6 @@ export default function LoginView() {
                         className="w-full rounded-xl border border-outline-variant/30 bg-white px-4 py-4 text-lg outline-none focus:ring-2 focus:ring-primary/20 min-h-[56px]"
                       />
                     </label>
-
                     <PickupLocationMapPicker
                       lat={registerForm.lat}
                       lng={registerForm.lng}

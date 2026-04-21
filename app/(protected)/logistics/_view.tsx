@@ -36,6 +36,14 @@ function isConnectivityError(message: string): boolean {
   return message.includes('เชื่อมต่อข้อมูลไม่สำเร็จ') || message.includes('กรุณาลองใหม่อีกครั้ง');
 }
 
+function extractWorkflowMessage(raw: string): string {
+  try {
+    const match = raw.match(/'message':\s*'([^']+)'/);
+    if (match) return match[1];
+  } catch { /* ignore */ }
+  return raw;
+}
+
 function formatLoadIssue(label: string, error: unknown): string {
   if (error instanceof ApiError) {
     if (isConnectivityError(error.message)) return `ยังโหลด${label}ไม่สำเร็จในขณะนี้ โปรดกดรีเฟรชอีกครั้ง`;
@@ -184,14 +192,20 @@ export default function LogisticsTracking() {
   const handleMarkPickedUp = async (jobId: string) => {
     setUpdatingPickupJobId(jobId); setMessage(null);
     try { await logisticsApi.markPickedUp(jobId); setMessage('อัปเดตสถานะเป็นรับวัสดุแล้ว'); await loadAll(true); }
-    catch (error) { setMessage(error instanceof ApiError ? `อัปเดตสถานะไม่สำเร็จ: ${error.message}` : 'อัปเดตสถานะไม่สำเร็จ'); }
+    catch (error) {
+      await loadAll(true);
+      setMessage(error instanceof ApiError ? `อัปเดตสถานะไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'อัปเดตสถานะไม่สำเร็จ');
+    }
     finally { setUpdatingPickupJobId(null); }
   };
 
   const handleMarkDeliveredToFactory = async (jobId: string) => {
     setUpdatingPickupJobId(jobId); setMessage(null);
     try { await logisticsApi.markDeliveredToFactory(jobId); setMessage('อัปเดตสถานะเป็นส่งถึงโรงงานแล้ว'); await loadAll(true); }
-    catch (error) { setMessage(error instanceof ApiError ? `อัปเดตสถานะไม่สำเร็จ: ${error.message}` : 'อัปเดตสถานะไม่สำเร็จ'); }
+    catch (error) {
+      await loadAll(true);
+      setMessage(error instanceof ApiError ? `อัปเดตสถานะไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'อัปเดตสถานะไม่สำเร็จ');
+    }
     finally { setUpdatingPickupJobId(null); }
   };
 
@@ -208,7 +222,8 @@ export default function LogisticsTracking() {
       setMessage('แก้ไขตารางรับวัสดุสำเร็จแล้ว');
       await loadAll(true);
     } catch (error) {
-      setMessage(error instanceof ApiError ? `แก้ไขไม่สำเร็จ: ${error.message}` : 'แก้ไขไม่สำเร็จ');
+      await loadAll(true);
+      setMessage(error instanceof ApiError ? `แก้ไขไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'แก้ไขไม่สำเร็จ');
     } finally { setReschedulingPickupJobId(null); }
   };
 
@@ -233,14 +248,20 @@ export default function LogisticsTracking() {
   const handleMarkOutForDelivery = async (jobId: string) => {
     setUpdatingDeliveryJobId(jobId); setMessage(null);
     try { await logisticsApi.markRewardOutForDelivery(jobId); setMessage('อัปเดตสถานะรางวัลเป็นกำลังนำส่งแล้ว'); await loadAll(true); }
-    catch (error) { setMessage(error instanceof ApiError ? `อัปเดตสถานะรางวัลไม่สำเร็จ: ${error.message}` : 'อัปเดตสถานะรางวัลไม่สำเร็จ'); }
+    catch (error) {
+      await loadAll(true);
+      setMessage(error instanceof ApiError ? `อัปเดตสถานะรางวัลไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'อัปเดตสถานะรางวัลไม่สำเร็จ');
+    }
     finally { setUpdatingDeliveryJobId(null); }
   };
 
   const handleMarkDelivered = async (jobId: string) => {
     setUpdatingDeliveryJobId(jobId); setMessage(null);
     try { await logisticsApi.markRewardDelivered(jobId); setMessage('ยืนยันส่งมอบรางวัลสำเร็จแล้ว'); await loadAll(true); }
-    catch (error) { setMessage(error instanceof ApiError ? `ยืนยันส่งมอบรางวัลไม่สำเร็จ: ${error.message}` : 'ยืนยันส่งมอบรางวัลไม่สำเร็จ'); }
+    catch (error) {
+      await loadAll(true);
+      setMessage(error instanceof ApiError ? `ยืนยันส่งมอบรางวัลไม่สำเร็จ: ${extractWorkflowMessage(error.message)}` : 'ยืนยันส่งมอบรางวัลไม่สำเร็จ');
+    }
     finally { setUpdatingDeliveryJobId(null); }
   };
 

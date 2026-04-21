@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Truck,
   User,
+  ZoomIn,
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import DateRangePicker, { type DateRangeValue } from '@/app/_components/DateRangePicker';
@@ -101,6 +102,7 @@ export default function PickupJobsTab({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copyLoadingId, setCopyLoadingId] = useState<string | null>(null);
   const [pdfLoadingId] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   function toggleSort(key: typeof sort.key) {
     setSort((cur) => cur.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
@@ -127,6 +129,7 @@ export default function PickupJobsTab({
   });
 
   return (
+    <>
     <div className="space-y-1.5">
       {loadIssue && <AlertBanner message={loadIssue} tone="info" title="บอร์ดงานขนส่งวัสดุยังไม่พร้อม" />}
       {!isLoading && active.length > 0 && (
@@ -338,7 +341,23 @@ export default function PickupJobsTab({
                   </div>
                 }
               >
-                <div className="space-y-1">
+                <div className="flex items-start gap-2">
+                  {item.image_url && (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); setLightboxUrl(item.image_url!); }}
+                      onKeyDown={(e) => e.key === 'Enter' && setLightboxUrl(item.image_url!)}
+                      className="shrink-0 h-12 w-12 overflow-hidden rounded-xl border border-stone-200 bg-stone-100 hover:opacity-80 transition relative cursor-pointer"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.image_url} alt="ภาพวัสดุ" className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 flex items-end justify-end p-0.5">
+                        <ZoomIn className="h-3 w-3 text-white drop-shadow" />
+                      </div>
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center gap-1.5 min-w-0">
                     {isLive && (
                       <span className="relative flex h-2 w-2 shrink-0">
@@ -386,6 +405,7 @@ export default function PickupJobsTab({
                       </div>
                     </div>
                   </div>
+                  </div>
                 </div>
               </ExpandableCard>
             </div>
@@ -393,5 +413,25 @@ export default function PickupJobsTab({
         })
       )}
     </div>
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightboxUrl && (
+          <motion.div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLightboxUrl(null)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={lightboxUrl} alt="ภาพวัสดุ" className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+            <button type="button" onClick={() => setLightboxUrl(null)} className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white">
+              <ZoomIn className="h-5 w-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

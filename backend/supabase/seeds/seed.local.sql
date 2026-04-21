@@ -984,4 +984,31 @@ create policy "Auth users can delete reward images"
   on storage.objects for delete
   using (bucket_id = 'reward-images' and auth.role() = 'authenticated');
 
+-- ── Storage: submission-images bucket ──────────────────────────────────────
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'submission-images', 'submission-images', true, 10485760,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+)
+on conflict (id) do update set
+  public             = excluded.public,
+  file_size_limit    = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+create policy "Public read submission images"
+  on storage.objects for select
+  using (bucket_id = 'submission-images');
+
+create policy "Auth users can upload submission images"
+  on storage.objects for insert
+  with check (bucket_id = 'submission-images' and auth.role() = 'authenticated');
+
+create policy "Auth users can update submission images"
+  on storage.objects for update
+  using (bucket_id = 'submission-images' and auth.role() = 'authenticated');
+
+create policy "Auth users can delete submission images"
+  on storage.objects for delete
+  using (bucket_id = 'submission-images' and auth.role() = 'authenticated');
+
 commit;

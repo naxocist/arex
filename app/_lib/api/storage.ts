@@ -18,6 +18,34 @@ export async function uploadRewardImage(file: File): Promise<string> {
   return `${SUPABASE_URL}/storage/v1/object/public/reward-images/${fileName}`;
 }
 
+export async function uploadSubmissionImage(file: File): Promise<string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
+  if (!token) throw new Error('Not authenticated');
+  const ext = file.name.split('.').pop() ?? 'jpg';
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const uploadUrl = `${SUPABASE_URL}/storage/v1/object/submission-images/${fileName}`;
+  const res = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type },
+    body: file,
+  });
+  if (!res.ok) throw new Error(`Upload failed: ${await res.text()}`);
+  return `${SUPABASE_URL}/storage/v1/object/public/submission-images/${fileName}`;
+}
+
+export async function deleteSubmissionImage(imageUrl: string): Promise<void> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
+  if (!token) return;
+  const marker = '/submission-images/';
+  const idx = imageUrl.indexOf(marker);
+  if (idx === -1) return;
+  const fileName = imageUrl.slice(idx + marker.length);
+  await fetch(`${SUPABASE_URL}/storage/v1/object/submission-images/${fileName}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function deleteRewardImage(imageUrl: string): Promise<void> {
   const token = typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
   if (!token) return;

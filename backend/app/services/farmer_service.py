@@ -102,6 +102,7 @@ class FarmerService(BaseService):
                     "pickup_lat": payload.pickup_lat,
                     "pickup_lng": payload.pickup_lng,
                     "notes": payload.notes,
+                    "image_url": payload.image_url,
                     "status": "submitted",
                 })
                 .execute()
@@ -130,7 +131,7 @@ class FarmerService(BaseService):
                 self.client.table("submissions")
                 .select(
                     "id, material_type, quantity_value, quantity_unit, pickup_location_text, "
-                    "pickup_lat, pickup_lng, status, created_at"
+                    "pickup_lat, pickup_lng, status, created_at, image_url"
                 )
                 .eq("farmer_profile_id", farmer_profile_id)
                 .order("created_at", desc=True)

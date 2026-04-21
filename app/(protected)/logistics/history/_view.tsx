@@ -16,6 +16,8 @@ import {
   RefreshCw,
   Truck,
   User,
+  X,
+  ZoomIn,
 } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import EmptyState from '@/app/_components/EmptyState';
@@ -218,6 +220,7 @@ export default function LogisticsHistory() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copyLoadingId, setCopyLoadingId] = useState<string | null>(null);
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'material' | 'reward'>('material');
   const [materialSort, setMaterialSort] = useState<{ key: 'planned_pickup_at' | 'material' | 'weight'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'desc' });
   const [rewardSort, setRewardSort] = useState<{ key: 'planned_delivery_at' | 'reward_name'; dir: SortDir }>({ key: 'planned_delivery_at', dir: 'desc' });
@@ -288,6 +291,15 @@ export default function LogisticsHistory() {
   return (
     <ErrorBoundary>
       {routeModal && <RouteModal title={routeModal.title} stops={routeModal.stops} onClose={() => setRouteModal(null)} />}
+      {lightboxUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightboxUrl(null)}>
+          <button type="button" onClick={() => setLightboxUrl(null)} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition">
+            <X className="h-5 w-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightboxUrl} alt="ภาพวัสดุ" className="max-h-full max-w-full rounded-xl object-contain" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
       <div className="space-y-6 pb-10">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
@@ -411,7 +423,23 @@ export default function LogisticsHistory() {
                       accent="emerald"
                       expandedContent={null}
                     >
-                      <div className="space-y-1">
+                      <div className="flex items-start gap-2">
+                        {item.image_url && (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); setLightboxUrl(item.image_url!); }}
+                            onKeyDown={(e) => e.key === 'Enter' && setLightboxUrl(item.image_url!)}
+                            className="shrink-0 h-12 w-12 overflow-hidden rounded-xl border border-stone-200 bg-stone-100 hover:opacity-80 transition relative cursor-pointer"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={item.image_url} alt="ภาพวัสดุ" className="h-full w-full object-cover" />
+                            <div className="absolute inset-0 flex items-end justify-end p-0.5">
+                              <ZoomIn className="h-3 w-3 text-white drop-shadow" />
+                            </div>
+                          </div>
+                        )}
+                      <div className="min-w-0 flex-1 space-y-1">
                         {/* Row 1: name + route + status */}
                         <div className="flex items-center gap-1.5 min-w-0">
                           <p className="text-sm font-semibold text-on-surface leading-tight truncate">
@@ -464,6 +492,7 @@ export default function LogisticsHistory() {
                             </button>
                           </div>
                         </div>
+                      </div>
                       </div>
                     </HistoryCard>
                   </div>

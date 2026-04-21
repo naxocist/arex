@@ -11,6 +11,7 @@ class CreateSubmissionRequest(BaseModel):
     pickup_lat: float | None = Field(default=None, ge=-90, le=90)
     pickup_lng: float | None = Field(default=None, ge=-180, le=180)
     notes: str | None = Field(default=None, max_length=1000)
+    image_url: str | None = Field(default=None, max_length=2048)
 
 
 class SchedulePickupRequest(BaseModel):

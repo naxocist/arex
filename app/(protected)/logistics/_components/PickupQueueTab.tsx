@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
-import { CalendarRange, Factory, MapPin, Navigation, Truck, User } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { CalendarRange, Factory, MapPin, Navigation, Truck, User, ZoomIn, X } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import DateRangePicker, { type DateRangeValue } from '@/app/_components/DateRangePicker';
 import EmptyState from '@/app/_components/EmptyState';
@@ -57,6 +57,7 @@ export default function PickupQueueTab({
   const [leg2KmById, setLeg2KmById] = useState<Record<string, number | null>>({});
   const [sort, setSort] = useState<{ key: 'created_at' | 'material' | 'weight' | 'distance'; dir: SortDir }>({ key: 'created_at', dir: 'desc' });
   const [distMode, setDistMode] = useState<'leg1' | 'leg2' | 'sum'>('leg1');
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // Seed default factory for each new queue item
   useEffect(() => {
@@ -112,6 +113,7 @@ export default function PickupQueueTab({
   }), [items, sort, distMode, leg2KmById]);
 
   return (
+    <>
     <div className="space-y-1.5">
       {loadIssue && <AlertBanner message={loadIssue} tone="info" title="บอร์ดคิวรับวัสดุยังไม่พร้อม" />}
       {!isLoading && items.length > 0 && (
@@ -211,7 +213,23 @@ export default function PickupQueueTab({
                   </div>
                 }
               >
-                <div className="space-y-1">
+                <div className="flex items-start gap-2">
+                  {item.image_url && (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); setLightboxUrl(item.image_url!); }}
+                      onKeyDown={(e) => e.key === 'Enter' && setLightboxUrl(item.image_url!)}
+                      className="shrink-0 h-12 w-12 overflow-hidden rounded-xl border border-stone-200 bg-stone-100 hover:opacity-80 transition relative cursor-pointer"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.image_url} alt="ภาพวัสดุ" className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 flex items-end justify-end p-0.5">
+                        <ZoomIn className="h-3 w-3 text-white drop-shadow" />
+                      </div>
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center gap-2 min-w-0">
                     <p className="text-sm font-semibold text-on-surface leading-tight truncate">
                       {item.material_name_th || item.material_type}
@@ -241,6 +259,7 @@ export default function PickupQueueTab({
                       </span>
                     )}
                   </div>
+                  </div>
                 </div>
               </ExpandableCard>
             </div>
@@ -248,5 +267,22 @@ export default function PickupQueueTab({
         })
       )}
     </div>
+
+      <AnimatePresence>
+        {lightboxUrl && (
+          <motion.div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setLightboxUrl(null)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={lightboxUrl} alt="ภาพวัสดุ" className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+            <button type="button" onClick={() => setLightboxUrl(null)} className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white">
+              <X className="h-5 w-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

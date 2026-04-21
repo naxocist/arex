@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
-import { ArrowDownAZ, CalendarCheck, ClipboardList, Coins, Factory, Gift, MapPin, PackagePlus, RefreshCw, Truck, User, X } from 'lucide-react';
+import { ArrowDownAZ, CalendarCheck, Camera, ClipboardList, Coins, Factory, Gift, MapPin, PackagePlus, RefreshCw, Truck, User, X, ZoomIn } from 'lucide-react';
+
 import AlertBanner from '@/app/_components/AlertBanner';
 import ConfirmDialog from '@/app/_components/ConfirmDialog';
 import EmptyState from '@/app/_components/EmptyState';
@@ -22,10 +23,31 @@ import {
   type FarmerMeasurementUnitItem,
   type FarmerSubmissionItem,
 } from '@/app/_lib/api';
+import { deleteSubmissionImage, uploadSubmissionImage } from '@/app/_lib/api/storage';
 import { fallbackThaiUnit, formatDate, formatDateTime } from '@/app/_lib/utils';
 
+async function resizeImageFile(file: File, maxPx = 1600, quality = 0.85): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+      canvas.toBlob((blob) => {
+        resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 const ACTIVE_STATUSES = new Set(['submitted', 'pickup_scheduled', 'picked_up', 'delivered_to_factory', 'factory_confirmed']);
-const LIVE_DOT_STATUSES = new Set(['pickup_scheduled', 'picked_up']);
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'submitted',            label: 'รอจัดคิวรถ',   Icon: ClipboardList, color: 'amber'   },
@@ -84,22 +106,7 @@ function inferMessageTone(message: string | null): 'info' | 'success' | 'error' 
   return 'info';
 }
 
-/* ── Status dot ── */
-function StatusDot({ status }: { status: string }) {
-  const isLive = LIVE_DOT_STATUSES.has(status);
-  const isActive = ACTIVE_STATUSES.has(status);
-  if (isLive) {
-    return (
-      <span className="relative flex h-3 w-3">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-        <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
-      </span>
-    );
-  }
-  if (status === 'points_credited') return <span className="h-3 w-3 rounded-full bg-emerald-300" />;
-  if (isActive) return <span className="h-3 w-3 rounded-full bg-amber-400" />;
-  return <span className="h-3 w-3 rounded-full bg-stone-200" />;
-}
+
 
 export default function FarmerHome() {
   const reduceMotion = useReducedMotion();
@@ -111,6 +118,11 @@ export default function FarmerHome() {
   const [pickupLocation, setPickupLocation] = useState<string>('');
   const [pickupLat, setPickupLat] = useState<number | null>(null);
   const [pickupLng, setPickupLng] = useState<number | null>(null);
+  const [submissionImagePreview, setSubmissionImagePreview] = useState<string | null>(null);
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [isSubmittingMaterial, setIsSubmittingMaterial] = useState(false);
   const [submissions, setSubmissions] = useState<FarmerSubmissionItem[]>([]);
@@ -213,6 +225,36 @@ export default function FarmerHome() {
     });
   };
 
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset input so re-selecting the same file fires onChange again
+    if (imageInputRef.current) imageInputRef.current.value = '';
+    if (!file) return;
+    if (pendingImageUrl) { void deleteSubmissionImage(pendingImageUrl); setPendingImageUrl(null); }
+    const previewUrl = URL.createObjectURL(file);
+    setSubmissionImagePreview(previewUrl);
+    setIsUploadingImage(true);
+    try {
+      const resized = await resizeImageFile(file);
+      const url = await uploadSubmissionImage(resized);
+      setPendingImageUrl(url);
+    } catch {
+      // Keep preview so user can see what they picked; just show the error
+      setMessage('อัปโหลดรูปภาพไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const resetForm = () => {
+    setQuantityValue('');
+    setPickupLocation('');
+    setPickupLat(null);
+    setPickupLng(null);
+    setSubmissionImagePreview(null);
+    if (pendingImageUrl) { void deleteSubmissionImage(pendingImageUrl); setPendingImageUrl(null); }
+  };
+
   const submitMaterial = async () => {
     const parsedQuantity = Number(quantityValue);
     setIsSubmittingMaterial(true);
@@ -223,9 +265,12 @@ export default function FarmerHome() {
         quantity_value: parsedQuantity,
         quantity_unit: quantityUnit,
         pickup_location_text: pickupLocation,
-        pickup_lat: pickupLat,
-        pickup_lng: pickupLng,
+        pickup_lat: pickupLat!,
+        pickup_lng: pickupLng!,
+        image_url: pendingImageUrl ?? undefined,
       });
+      setPendingImageUrl(null);
+      setSubmissionImagePreview(null);
       setQuantityValue('');
       setMessage('ส่งรายการวัสดุสำเร็จแล้ว');
       setShowForm(false);
@@ -401,10 +446,19 @@ export default function FarmerHome() {
                   const pickupWindow = formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at);
                   const showPickupDate = isActiveStatus && item.pickup_window_start_at;
 
+                  const stripeColor: Record<string, string> = {
+                    submitted: 'border-l-amber-400',
+                    pickup_scheduled: 'border-l-sky-400',
+                    picked_up: 'border-l-blue-400',
+                    delivered_to_factory: 'border-l-violet-400',
+                    factory_confirmed: 'border-l-violet-300',
+                    points_credited: 'border-l-emerald-400',
+                    cancelled: 'border-l-stone-300',
+                  };
+
                   return (
-                    <article key={item.id} className={`px-4 py-2.5 ${isCredited ? 'bg-emerald-50/30' : ''}`}>
+                    <article key={item.id} className={`border-l-4 ${stripeColor[item.status] ?? 'border-l-stone-300'} px-4 py-2.5 ${isCredited ? 'bg-emerald-50/30' : ''}`}>
                       <div className="flex items-start gap-2.5">
-                        <StatusDot status={item.status} />
 
                         {/* Main content */}
                         <div className="min-w-0 flex-1 space-y-1">
@@ -416,17 +470,32 @@ export default function FarmerHome() {
                               </p>
                               <span className="text-xs text-stone-400 shrink-0">ส่งเมื่อ {formatDateTime(item.created_at)}</span>
                             </div>
-                            {hasMap && (
-                              <a
-                                href={`https://www.google.com/maps?q=${item.pickup_lat},${item.pickup_lng}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="shrink-0 flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700"
-                              >
-                                <MapPin className="h-3 w-3" />
-                                จุดนัดรับ
-                              </a>
-                            )}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {item.image_url && (
+                                <button
+                                  type="button"
+                                  onClick={() => setLightboxUrl(item.image_url!)}
+                                  className="relative h-10 w-10 overflow-hidden rounded-lg border border-stone-200 bg-stone-100 hover:opacity-80 transition"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={item.image_url} alt="ภาพวัสดุ" className="h-full w-full object-cover" />
+                                  <div className="absolute inset-0 flex items-end justify-end p-0.5">
+                                    <ZoomIn className="h-2.5 w-2.5 text-white drop-shadow" />
+                                  </div>
+                                </button>
+                              )}
+                              {hasMap && (
+                                <a
+                                  href={`https://www.google.com/maps?q=${item.pickup_lat},${item.pickup_lng}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700"
+                                >
+                                  <MapPin className="h-3 w-3" />
+                                  จุดนัดรับ
+                                </a>
+                              )}
+                            </div>
                           </div>
 
                           {/* Row 2: qty + badge/points + pickup window */}
@@ -477,7 +546,7 @@ export default function FarmerHome() {
                 initial={reduceMotion ? {} : { opacity: 0 }}
                 animate={reduceMotion ? {} : { opacity: 1 }}
                 exit={reduceMotion ? {} : { opacity: 0 }}
-                onClick={() => setShowForm(false)}
+                onClick={() => { resetForm(); setShowForm(false); }}
               />
               {/* Bottom sheet */}
               <motion.div
@@ -501,7 +570,7 @@ export default function FarmerHome() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowForm(false)}
+                    onClick={() => { resetForm(); setShowForm(false); }}
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-500"
                   >
                     <X className="h-5 w-5" />
@@ -588,14 +657,51 @@ export default function FarmerHome() {
                     currentLocationButtonLabel="ใช้ตำแหน่งปัจจุบัน"
                   />
 
+                  {/* Image upload */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-stone-700">
+                      ภาพถ่ายวัสดุ
+                    </label>
+                    {submissionImagePreview ? (
+                      <div className="relative w-full overflow-hidden rounded-2xl border border-stone-200 bg-stone-50">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={submissionImagePreview} alt="ภาพวัสดุ" className="w-full object-contain max-h-[60dvh]" />
+                        {isUploadingImage && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { setSubmissionImagePreview(null); if (pendingImageUrl) { void deleteSubmissionImage(pendingImageUrl); setPendingImageUrl(null); } }}
+                          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-200 bg-stone-50 py-8 transition hover:border-primary/40 hover:bg-primary/5">
+                        <Camera className="h-8 w-8 text-stone-300" />
+                        <span className="text-sm font-medium text-stone-400">แตะเพื่อถ่ายภาพหรือเลือกไฟล์</span>
+                        <input
+                          ref={imageInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={handleImageChange}
+                        />
+                      </label>
+                    )}
+                  </div>
+
                   {/* Submit */}
                   <button
                     type="submit"
-                    disabled={isSubmittingMaterial || !quantityValue.trim() || !quantityUnit || !materialType}
+                    disabled={isSubmittingMaterial || isUploadingImage || !quantityValue.trim() || !quantityUnit || !materialType || !pendingImageUrl}
                     className="flex w-full min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-bold text-white shadow-md shadow-primary/20 transition hover:opacity-90 disabled:opacity-50"
                   >
                     <PackagePlus className="h-5 w-5" />
-                    {isSubmittingMaterial ? 'กำลังส่งรายการ...' : 'ส่งรายการวัสดุ'}
+                    {isUploadingImage ? 'กำลังอัปโหลดภาพ...' : isSubmittingMaterial ? 'กำลังส่งรายการ...' : 'ส่งรายการวัสดุ'}
                   </button>
                 </form>
               </motion.div>
@@ -618,6 +724,35 @@ export default function FarmerHome() {
           ส่งรายการวัสดุใหม่
         </motion.button>
       </div>
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightboxUrl && (
+          <motion.div
+            key="lightbox"
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4"
+            initial={reduceMotion ? {} : { opacity: 0 }}
+            animate={reduceMotion ? {} : { opacity: 1 }}
+            exit={reduceMotion ? {} : { opacity: 0 }}
+            onClick={() => setLightboxUrl(null)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={lightboxUrl}
+              alt="ภาพวัสดุ"
+              className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              type="button"
+              onClick={() => setLightboxUrl(null)}
+              className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ConfirmDialog
         open={confirmDialog.open}

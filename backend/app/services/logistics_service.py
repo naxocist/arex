@@ -22,7 +22,7 @@ class LogisticsService(DistanceService):
                 self.client.table("submissions")
                 .select(
                     "id, farmer_profile_id, material_type, quantity_value, quantity_unit, "
-                    "pickup_location_text, pickup_lat, pickup_lng, status, created_at"
+                    "pickup_location_text, pickup_lat, pickup_lng, status, created_at, image_url"
                 )
                 .in_("status", ["submitted", "pickup_scheduled"])
                 .order("created_at", desc=False)
@@ -57,6 +57,7 @@ class LogisticsService(DistanceService):
                     "pickup_lng": s.get("pickup_lng"),
                     "status": s.get("status"),
                     "created_at": s.get("created_at"),
+                    "image_url": s.get("image_url"),
                     "distance_to_farmer_km": None,
                 }
                 for s in submissions
@@ -107,7 +108,7 @@ class LogisticsService(DistanceService):
                 self.client.table("submissions")
                 .select(
                     "id, farmer_profile_id, material_type, quantity_value, quantity_unit, "
-                    "pickup_location_text, pickup_lat, pickup_lng, status"
+                    "pickup_location_text, pickup_lat, pickup_lng, status, image_url"
                 )
                 .in_("id", submission_ids)
                 .execute()
@@ -214,6 +215,7 @@ class LogisticsService(DistanceService):
                     "submission_status": submission.get("status"),
                     "farmer_display_name": farmer.get("display_name"),
                     "farmer_phone": farmer.get("phone"),
+                    "image_url": submission.get("image_url"),
                     "distance_to_farmer_km": dist_map.get(sid),
                     "distance_farmer_to_factory_km": sub_factory_dist.get((sid, dest_id)),
                 })
