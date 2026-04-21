@@ -41,31 +41,41 @@ interface DraftRow {
   material_name_th: string;
   material_active: boolean;
   accepts: boolean;
-  capacity_value: string;
-  capacity_unit: string;
+  min_value: string;
+  max_value: string;
+  amount_unit: string;
   _saved_accepts: boolean;
-  _saved_capacity_value: string;
-  _saved_capacity_unit: string;
+  _saved_min_value: string;
+  _saved_max_value: string;
+  _saved_amount_unit: string;
 }
 
 function toDraft(p: FactoryMaterialPreferenceItem): DraftRow {
-  const cv = p.capacity_value != null ? String(p.capacity_value) : '';
-  const cu = p.capacity_unit ?? '';
+  const max = p.capacity_value != null ? String(p.capacity_value) : '';
+  const min = p.minimum_amount_value != null ? String(p.minimum_amount_value) : '';
+  const unit = p.capacity_unit ?? p.minimum_amount_unit ?? '';
   return {
     material_type_code: p.material_type_code,
     material_name_th: p.material_name_th,
     material_active: p.material_active,
     accepts: p.accepts,
-    capacity_value: cv,
-    capacity_unit: cu,
+    min_value: min,
+    max_value: max,
+    amount_unit: unit,
     _saved_accepts: p.accepts,
-    _saved_capacity_value: cv,
-    _saved_capacity_unit: cu,
+    _saved_min_value: min,
+    _saved_max_value: max,
+    _saved_amount_unit: unit,
   };
 }
 
 function isDirty(r: DraftRow) {
-  return r.accepts !== r._saved_accepts || r.capacity_value !== r._saved_capacity_value || r.capacity_unit !== r._saved_capacity_unit;
+  return (
+    r.accepts !== r._saved_accepts ||
+    r.min_value !== r._saved_min_value ||
+    r.max_value !== r._saved_max_value ||
+    r.amount_unit !== r._saved_amount_unit
+  );
 }
 
 // ─── Material row ─────────────────────────────────────────────────────────────
@@ -77,88 +87,98 @@ interface RowProps {
 }
 
 function MaterialRow({ row, units, onChange }: RowProps) {
-  const selUnit = units.find((u) => u.code === row.capacity_unit);
-  const val = parseFloat(row.capacity_value);
-  const kgEquiv = selUnit?.to_kg_factor != null && !isNaN(val) && val > 0 ? val * selUnit.to_kg_factor : null;
   const dirty = isDirty(row);
+  const selUnit = units.find((u) => u.code === row.amount_unit);
+  const f = selUnit?.to_kg_factor ?? null;
+  const minKg = f != null && row.min_value !== '' && parseFloat(row.min_value) > 0 ? parseFloat(row.min_value) * f : null;
+  const maxKg = f != null && row.max_value !== '' && parseFloat(row.max_value) > 0 ? parseFloat(row.max_value) * f : null;
 
   return (
     <div className={`rounded-xl border transition-colors ${row.accepts ? 'border-primary/20 bg-white' : 'border-outline-variant/15 bg-stone-50'} ${!row.material_active ? 'opacity-55' : ''}`}>
-      {/* Row: icon · name · capacity compound · toggle */}
-      <div className="flex items-center gap-3 px-3.5 py-2.5">
-        {/* Dirty dot */}
+      {/* Top row: icon · name · toggle */}
+      <div className="flex items-center gap-3 px-3.5 pt-2.5 pb-2">
         <div className="relative flex shrink-0 items-center">
           <div className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${row.accepts ? 'bg-primary/10 text-primary' : 'bg-stone-100 text-stone-400'}`}>
             <Package className="h-3.5 w-3.5" />
           </div>
           {dirty && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-white bg-amber-400" />}
         </div>
-
-        {/* Name */}
-        <p className={`w-36 shrink-0 text-sm font-medium leading-tight ${row.accepts ? 'text-on-surface' : 'text-stone-400'}`}>
+        <p className={`flex-1 text-sm font-medium ${row.accepts ? 'text-on-surface' : 'text-stone-400'}`}>
           {row.material_name_th}
         </p>
-
-        {/* Capacity compound field */}
-        <div className={`flex min-w-0 flex-1 overflow-hidden rounded-lg border transition ${row.accepts ? 'border-outline-variant/30 bg-stone-50' : 'border-transparent bg-transparent'}`}>
-          {row.accepts && (
-            <>
-              <input
-                type="number"
-                min={1}
-                step="any"
-                placeholder="ไม่จำกัด"
-                value={row.capacity_value}
-                onChange={(e) => onChange({ capacity_value: e.target.value })}
-                className="min-w-0 flex-1 bg-transparent px-3 py-1.5 text-sm text-on-surface outline-none placeholder:text-stone-400"
-              />
-              <div className="w-px self-stretch bg-outline-variant/20" />
-              <select
-                disabled={row.capacity_value === ''}
-                value={row.capacity_unit}
-                onChange={(e) => {
-                  const unit = e.target.value;
-                  onChange({ capacity_unit: unit, ...(unit === '' ? { capacity_value: '' } : {}) });
-                }}
-                className="shrink-0 cursor-pointer appearance-none bg-transparent py-1.5 pl-2.5 pr-7 text-sm text-on-surface outline-none disabled:cursor-not-allowed disabled:text-stone-400"
-              >
-                <option value="">หน่วย</option>
-                {units.map((u) => (
-                  <option key={u.code} value={u.code}>
-                    {u.name_th}{u.to_kg_factor != null && u.to_kg_factor !== 1 ? ` (1 ${u.name_th} = ${Number(u.to_kg_factor).toLocaleString('th-TH')} กก.)` : u.to_kg_factor === 1 ? ' (= 1 กก.)' : ''}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-          {!row.accepts && (
-            <span className="px-3 py-1.5 text-sm text-stone-400">—</span>
-          )}
-        </div>
-
-        {/* Toggle */}
         <button
           type="button"
           role="switch"
           aria-checked={row.accepts}
-          onClick={() => onChange({ accepts: !row.accepts, ...(!row.accepts ? {} : { capacity_value: '', capacity_unit: '' }) })}
-          className={`relative ml-1 inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${row.accepts ? 'bg-primary' : 'bg-stone-300'}`}
+          onClick={() => onChange({ accepts: !row.accepts, ...(!row.accepts ? {} : { min_value: '', max_value: '', amount_unit: '' }) })}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${row.accepts ? 'bg-primary' : 'bg-stone-300'}`}
         >
           <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition ${row.accepts ? 'translate-x-5' : 'translate-x-0.5'}`} />
         </button>
       </div>
 
-      {/* kg equivalent sub-line */}
+      {/* Range input — only when accepted */}
       <AnimatePresence>
-        {kgEquiv != null && (
-          <motion.p
+        {row.accepts && (
+          <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden px-3.5 pb-2 text-xs text-on-surface-variant"
+            className="overflow-hidden"
           >
-            เท่ากับ <span className="font-semibold text-on-surface">{kgEquiv.toLocaleString('th-TH')} กก.</span> ต่อรอบ
-          </motion.p>
+            {/* Labels */}
+            <div className="flex items-center gap-2 px-3.5 pb-0.5">
+              <span className="w-24 text-[10px] font-semibold uppercase tracking-wider text-stone-400">ขั้นต่ำ</span>
+              <span className="w-4 shrink-0" />
+              <span className="w-24 text-[10px] font-semibold uppercase tracking-wider text-stone-400">สูงสุด/รอบ</span>
+              <span className="flex-1" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">หน่วย</span>
+            </div>
+            {/* Inputs */}
+            <div className="flex items-center gap-2 px-3.5 pb-3">
+              <input
+                type="number"
+                min={0}
+                step="any"
+                placeholder="ไม่มี"
+                value={row.min_value}
+                onChange={(e) => onChange({ min_value: e.target.value })}
+                className="w-24 rounded-lg border border-outline-variant/30 bg-stone-50 px-2.5 py-1.5 text-sm text-on-surface outline-none placeholder:text-stone-400 focus:border-primary/40 focus:bg-white transition"
+              />
+              <span className="w-4 shrink-0 text-center text-stone-300 text-sm">—</span>
+              <input
+                type="number"
+                min={0}
+                step="any"
+                placeholder="ไม่จำกัด"
+                value={row.max_value}
+                onChange={(e) => onChange({ max_value: e.target.value })}
+                className="w-24 rounded-lg border border-outline-variant/30 bg-stone-50 px-2.5 py-1.5 text-sm text-on-surface outline-none placeholder:text-stone-400 focus:border-primary/40 focus:bg-white transition"
+              />
+              <select
+                disabled={row.min_value === '' && row.max_value === ''}
+                value={row.amount_unit}
+                onChange={(e) => {
+                  const u = e.target.value;
+                  onChange({ amount_unit: u, ...(u === '' ? { min_value: '', max_value: '' } : {}) });
+                }}
+                className="flex-1 cursor-pointer appearance-none rounded-lg border border-outline-variant/30 bg-stone-50 px-2.5 py-1.5 text-sm text-on-surface outline-none disabled:cursor-not-allowed disabled:text-stone-400 focus:border-primary/40 transition"
+              >
+                <option value="">เลือกหน่วย</option>
+                {units.map((u) => (
+                  <option key={u.code} value={u.code}>{u.name_th}</option>
+                ))}
+              </select>
+            </div>
+            {/* kg hint */}
+            {(minKg != null || maxKg != null) && (
+              <p className="px-3.5 pb-2.5 text-xs text-on-surface-variant">
+                {minKg != null && <>ขั้นต่ำ <span className="font-semibold text-on-surface">{minKg.toLocaleString('th-TH')} กก.</span></>}
+                {minKg != null && maxKg != null && <span className="mx-1.5 text-stone-300">·</span>}
+                {maxKg != null && <>สูงสุด <span className="font-semibold text-on-surface">{maxKg.toLocaleString('th-TH')} กก.</span></>}
+              </p>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
@@ -198,11 +218,14 @@ export default function FactoryPreferencesView() {
     const errors: string[] = [];
     for (const r of rows) {
       if (!r.accepts) continue;
-      const hasVal = r.capacity_value !== '' && parseFloat(r.capacity_value) > 0;
-      const hasUnit = !!r.capacity_unit;
-      if (hasVal && !hasUnit) errors.push(`"${r.material_name_th}": ยังไม่ได้เลือกหน่วย`);
-      if (hasUnit && !hasVal) errors.push(`"${r.material_name_th}": ยังไม่ได้ระบุปริมาณ`);
-      if (r.capacity_value !== '' && parseFloat(r.capacity_value) <= 0) errors.push(`"${r.material_name_th}": ปริมาณต้องมากกว่า 0`);
+      const hasMin = r.min_value !== '' && parseFloat(r.min_value) > 0;
+      const hasMax = r.max_value !== '' && parseFloat(r.max_value) > 0;
+      const hasUnit = !!r.amount_unit;
+      if ((hasMin || hasMax) && !hasUnit) errors.push(`"${r.material_name_th}": ยังไม่ได้เลือกหน่วย`);
+      if (r.min_value !== '' && parseFloat(r.min_value) <= 0) errors.push(`"${r.material_name_th}": ปริมาณขั้นต่ำต้องมากกว่า 0`);
+      if (r.max_value !== '' && parseFloat(r.max_value) <= 0) errors.push(`"${r.material_name_th}": ปริมาณสูงสุดต้องมากกว่า 0`);
+      if (hasMin && hasMax && parseFloat(r.min_value) > parseFloat(r.max_value))
+        errors.push(`"${r.material_name_th}": ขั้นต่ำต้องไม่มากกว่าสูงสุด`);
     }
     if (errors.length) {
       setToast({ tone: 'error', message: errors[0], id: ++toastId.current });
@@ -211,13 +234,16 @@ export default function FactoryPreferencesView() {
     setIsSaving(true);
     try {
       const items = rows.map((r) => {
-        const val = r.accepts && r.capacity_value !== '' ? parseFloat(r.capacity_value) : null;
-        const unit = r.accepts && r.capacity_unit ? r.capacity_unit : null;
+        const unit = r.accepts && r.amount_unit ? r.amount_unit : null;
+        const maxVal = r.accepts && r.max_value !== '' ? parseFloat(r.max_value) : null;
+        const minVal = r.accepts && r.min_value !== '' ? parseFloat(r.min_value) : null;
         return {
           material_type_code: r.material_type_code,
           accepts: r.accepts,
-          capacity_value: val != null && val > 0 && unit ? val : null,
-          capacity_unit: val != null && val > 0 && unit ? unit : null,
+          capacity_value: maxVal != null && maxVal > 0 && unit ? maxVal : null,
+          capacity_unit: maxVal != null && maxVal > 0 && unit ? unit : null,
+          minimum_amount_value: minVal != null && minVal > 0 && unit ? minVal : null,
+          minimum_amount_unit: minVal != null && minVal > 0 && unit ? unit : null,
         };
       });
       await factoryApi.updateMaterialPreferences(items);
@@ -279,14 +305,6 @@ export default function FactoryPreferencesView() {
           </div>
         ) : (
           <>
-            {/* Column labels */}
-            <div className="flex items-center gap-3 px-3.5 text-[11px] font-semibold uppercase tracking-wider text-stone-400">
-              <div className="h-7 w-7 shrink-0" />
-              <p className="w-36 shrink-0">วัสดุ</p>
-              <p className="flex-1">ปริมาณที่รับได้ต่อรอบ</p>
-              <p className="w-11 shrink-0 text-center">รับ</p>
-            </div>
-
             {/* Active rows */}
             <div className="space-y-1.5">
               {activeRows.map((row) => (

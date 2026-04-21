@@ -93,6 +93,8 @@ class FactoryMaterialPreferenceItem(BaseModel):
     accepts: bool
     capacity_value: float | None = None
     capacity_unit: str | None = None
+    minimum_amount_value: float | None = None
+    minimum_amount_unit: str | None = None
 
 
 class UpsertFactoryMaterialPreferencesRequest(BaseModel):

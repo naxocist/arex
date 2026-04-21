@@ -301,6 +301,27 @@ export default function FarmerHome() {
     }
   };
 
+  const handleCancelSubmission = (item: FarmerSubmissionItem) => {
+    setConfirmDialog({
+      open: true,
+      title: 'ยืนยันการยกเลิก',
+      message: `ต้องการยกเลิกรายการ "${materialNameByCode[item.material_type] ?? item.material_type}" ใช่หรือไม่?`,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, open: false }));
+        try {
+          const res = await farmerApi.deleteSubmission(item.id);
+          if (res.result.image_url) {
+            void deleteSubmissionImage(res.result.image_url);
+          }
+          setToast({ tone: 'success', message: 'ยกเลิกรายการเรียบร้อยแล้ว', id: ++toastId.current });
+          await loadDashboard(true);
+        } catch (err) {
+          setToast({ tone: 'error', message: err instanceof ApiError ? `ยกเลิกรายการไม่สำเร็จ: ${err.message}` : 'ยกเลิกรายการไม่สำเร็จ', id: ++toastId.current });
+        }
+      },
+    });
+  };
+
   const selectedUnit = measurementUnits.find((u) => u.code === quantityUnit);
   const approxKg = (() => {
     if (!selectedUnit || !selectedUnit.to_kg_factor) return null;
@@ -529,6 +550,20 @@ export default function FarmerHome() {
                               <MapPin className="h-3 w-3 shrink-0" />
                               {item.pickup_location_text}
                             </p>
+                          )}
+
+                          {/* Cancel button for pending submissions */}
+                          {item.status === 'submitted' && (
+                            <div className="flex justify-end pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleCancelSubmission(item)}
+                                className="flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition"
+                              >
+                                <X className="h-3 w-3" />
+                                ยกเลิก
+                              </button>
+                            </div>
                           )}
 
                           {/* Cancellation reason */}

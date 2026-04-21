@@ -76,9 +76,9 @@ export interface ValueChainItem { id: string; product_name_th: string; producer_
 
 export interface SchedulePickupPayload { pickup_window_start_at: string; pickup_window_end_at: string; destination_factory_id: string; notes?: string }
 export interface SchedulePickupResponse { message: string; result: { pickup_job_id: string; submission_status: string; pickup_status: string } }
-export interface FactoryMaterialPreferenceItem { material_type_code: string; material_name_th: string; material_active: boolean; accepts: boolean; capacity_value: number | null; capacity_unit: string | null }
+export interface FactoryMaterialPreferenceItem { material_type_code: string; material_name_th: string; material_active: boolean; accepts: boolean; capacity_value: number | null; capacity_unit: string | null; minimum_amount_value: number | null; minimum_amount_unit: string | null }
 export interface FactoryMeasurementUnitOption { code: string; name_th: string; to_kg_factor: number | null; active: boolean }
-export interface UpsertFactoryMaterialPreferencePayload { material_type_code: string; accepts: boolean; capacity_value: number | null; capacity_unit: string | null }
+export interface UpsertFactoryMaterialPreferencePayload { material_type_code: string; accepts: boolean; capacity_value: number | null; capacity_unit: string | null; minimum_amount_value: number | null; minimum_amount_unit: string | null }
 
 export interface FactoryMaterialPreference { accepts: boolean; capacity_value: number | null; capacity_unit: string | null; capacity_kg: number | null; has_capacity: boolean }
 export interface LogisticsFactoryOptionItem { id: string; name_th: string; location_text?: string | null; lat?: number | null; lng?: number | null; active: boolean; is_focal_point?: boolean; preference?: FactoryMaterialPreference }
@@ -137,6 +137,7 @@ export interface LogisticsRewardDeliveryJobItem {
   pickup_location_text?: string | null; pickup_lat?: number | null; pickup_lng?: number | null;
   quantity: number; requested_points: number;
   distance_to_farmer_km?: number | null;
+  reward_instruction_notes?: string | null;
 }
 
 export interface ConfirmFactoryIntakePayload { pickup_job_id: string; measured_weight_kg: number; discrepancy_note?: string }

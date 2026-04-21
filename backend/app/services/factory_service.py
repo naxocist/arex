@@ -317,7 +317,7 @@ class FactoryService(BaseService):
 
             prefs_rows = (
                 self.client.table("factory_material_preferences")
-                .select("material_type_code, accepts, capacity_value, capacity_unit")
+                .select("material_type_code, accepts, capacity_value, capacity_unit, minimum_amount_value, minimum_amount_unit")
                 .eq("factory_id", factory_id)
                 .execute()
             ).data or []
@@ -341,6 +341,8 @@ class FactoryService(BaseService):
                     "accepts": pref["accepts"] if pref is not None else True,
                     "capacity_value": float(pref["capacity_value"]) if pref and pref.get("capacity_value") is not None else None,
                     "capacity_unit": pref.get("capacity_unit") if pref else None,
+                    "minimum_amount_value": float(pref["minimum_amount_value"]) if pref and pref.get("minimum_amount_value") is not None else None,
+                    "minimum_amount_unit": pref.get("minimum_amount_unit") if pref else None,
                 })
             return result, units_rows
         except WorkflowError:
@@ -362,6 +364,8 @@ class FactoryService(BaseService):
                     "accepts": item.accepts,
                     "capacity_value": item.capacity_value,
                     "capacity_unit": item.capacity_unit,
+                    "minimum_amount_value": item.minimum_amount_value,
+                    "minimum_amount_unit": item.minimum_amount_unit,
                     "updated_at": "now()",
                 }
                 for item in payload.items

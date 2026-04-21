@@ -233,6 +233,29 @@ class FarmerService(BaseService):
         except Exception as exc:
             raise WorkflowError(f"Failed to list farmer submissions: {exc}") from exc
 
+    def delete_submission(self, farmer_profile_id: str, submission_id: str) -> dict[str, Any]:
+        try:
+            rows = (
+                self.client.table("submissions")
+                .select("id, status, farmer_profile_id, image_url")
+                .eq("id", submission_id)
+                .eq("farmer_profile_id", farmer_profile_id)
+                .limit(1)
+                .execute()
+            ).data
+            if not rows:
+                raise WorkflowError("Submission not found")
+            submission = rows[0]
+            if submission["status"] != "submitted":
+                raise WorkflowError("Only submissions with status 'submitted' can be deleted")
+
+            self.client.table("submissions").delete().eq("id", submission_id).execute()
+            return {"deleted_id": submission_id, "image_url": submission.get("image_url")}
+        except WorkflowError:
+            raise
+        except Exception as exc:
+            raise WorkflowError(f"Failed to delete submission: {exc}") from exc
+
     def get_farmer_points(self, farmer_profile_id: str) -> dict[str, Any]:
         try:
             points_response = self.client.rpc(

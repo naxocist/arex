@@ -56,6 +56,16 @@ def list_submissions(
     return {"submissions": workflow_service.list_farmer_submissions(current_user.user_id)}
 
 
+@router.delete("/submissions/{submission_id}")
+def delete_submission(
+    submission_id: str,
+    current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),
+    workflow_service: FarmerDomainService = Depends(get_farmer_domain_service),
+) -> dict[str, Any]:
+    result = workflow_service.delete_submission(current_user.user_id, submission_id)
+    return {"message": "Submission deleted", "result": result}
+
+
 @router.get("/material-types")
 def list_material_types(
     current_user: AuthenticatedUser = Depends(require_roles(Role.FARMER)),

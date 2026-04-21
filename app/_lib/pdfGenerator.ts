@@ -251,6 +251,7 @@ export function generateDeliveryJobPdf(item: LogisticsRewardDeliveryJobItem, rou
   addSectionLabel(w, 'รายละเอียดรางวัล');
   addField(w, 'ชื่อรางวัล', item.reward_name_th || 'รางวัล');
   addField(w, 'จำนวน', `${Number(item.quantity).toLocaleString('th-TH')} ชิ้น`);
+  if (item.reward_instruction_notes?.trim()) addField(w, 'หมายเหตุการรับของ', item.reward_instruction_notes.trim());
 
   addSectionLabel(w, 'ข้อมูลผู้รับ');
   if (item.farmer_display_name) addField(w, 'ชื่อผู้รับ', item.farmer_display_name);

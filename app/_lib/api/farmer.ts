@@ -20,6 +20,8 @@ export const farmerApi = {
     apiRequest<{ available_points: number; ledger: unknown[] }>('/farmer/points', options),
   createRewardRequest: (payload: CreateRewardRequestPayload) =>
     apiRequest<{ message: string; request: FarmerRewardRequestItem }>('/farmer/reward-requests', { method: 'POST', body: JSON.stringify(payload) }),
+  deleteSubmission: (submissionId: string) =>
+    apiRequest<{ message: string; result: { deleted_id: string; image_url: string | null } }>(`/farmer/submissions/${submissionId}`, { method: 'DELETE' }),
   cancelRewardRequest: (requestId: string) =>
     apiRequest<{ message: string; result: { request_id: string; request_status: string; available_points: number } }>(
       `/farmer/reward-requests/${requestId}/cancel`, { method: 'POST' }),

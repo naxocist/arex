@@ -685,7 +685,7 @@ class LogisticsService(DistanceService):
             if reward_ids:
                 for row in (
                     self.client.table("rewards")
-                    .select("id, name_th")
+                    .select("id, name_th, instruction_notes")
                     .in_("id", reward_ids)
                     .execute()
                 ).data or []:
@@ -731,6 +731,7 @@ class LogisticsService(DistanceService):
                     "farmer_phone": profile.get("phone"),
                     "reward_id": reward_id,
                     "reward_name_th": rewards_by_id.get(reward_id, {}).get("name_th") if reward_id else None,
+                    "reward_instruction_notes": rewards_by_id.get(reward_id, {}).get("instruction_notes") if reward_id else None,
                     "quantity": request.get("quantity"),
                     "requested_points": request.get("requested_points"),
                     "pickup_location_text": request.get("delivery_location_text"),

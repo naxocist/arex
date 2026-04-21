@@ -137,6 +137,7 @@ export default function DeliveryJobsTab({
               ``,
               `รางวัล: ${item.reward_name_th || 'รางวัล'}`,
               `จำนวน: ${Number(item.quantity).toLocaleString('th-TH')} ชิ้น`,
+              item.reward_instruction_notes?.trim() ? `หมายเหตุการรับของ: ${item.reward_instruction_notes.trim()}` : null,
               ``,
               item.farmer_display_name ? `ผู้รับ: ${item.farmer_display_name}` : null,
               item.farmer_phone ? `เบอร์โทร: ${item.farmer_phone}` : null,
@@ -158,6 +159,12 @@ export default function DeliveryJobsTab({
                 accent={isOnRoute ? 'emerald' : 'violet'}
                 expandedContent={
                   <div className="space-y-3">
+                    {item.reward_instruction_notes?.trim() && (
+                      <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 space-y-0.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">หมายเหตุการรับของ</p>
+                        <p className="text-sm text-on-surface whitespace-pre-wrap">{item.reward_instruction_notes}</p>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2.5">
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0 ${item.status === 'reward_delivery_scheduled' ? 'bg-violet-500 text-white' : 'bg-emerald-500 text-white'}`}>
