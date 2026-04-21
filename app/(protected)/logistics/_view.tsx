@@ -124,7 +124,7 @@ export default function LogisticsTracking() {
   const [updatingDeliveryJobId, setUpdatingDeliveryJobId] = useState<string | null>(null);
   const [reschedulingDeliveryJobId, setReschedulingDeliveryJobId] = useState<string | null>(null);
 
-  const submittedQueue = useMemo(() => pickupQueue, [pickupQueue]);
+  const submittedQueue = useMemo(() => pickupQueue.filter((i) => i.status === 'submitted'), [pickupQueue]);
   const activePickupJobs = useMemo(() => pickupJobs.filter((i) => i.status !== 'delivered_to_factory'), [pickupJobs]);
   const activeDeliveryJobs = useMemo(
     () => rewardDeliveryJobs.filter((i) => i.status === 'reward_delivery_scheduled' || i.status === 'out_for_delivery'),

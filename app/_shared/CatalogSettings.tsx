@@ -6,6 +6,7 @@ import { ClipboardList, Gift, ImagePlus, Plus, RefreshCw, Ruler, Save, Shapes, T
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import SectionCard from '@/app/_components/SectionCard';
+import { SkeletonBadge, SkeletonCard } from '@/app/_components/Skeleton';
 import {
   ApiError,
   executiveApi,
@@ -508,23 +509,42 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
 
       {/* Summary pills */}
       <div className="flex flex-wrap gap-2">
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
-          <Shapes className="h-4 w-4 text-emerald-600" />
-          <span className="text-lg font-semibold text-stone-950">{activeMaterialCount}</span>
-          <span className="text-sm text-stone-600">ประเภทวัสดุ</span>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
-          <Ruler className="h-4 w-4 text-emerald-600" />
-          <span className="text-lg font-semibold text-stone-950">{activeUnitCount}</span>
-          <span className="text-sm text-stone-600">หน่วยวัด</span>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2">
-            <Gift className="h-4 w-4 text-amber-600" />
-            <span className="text-lg font-semibold text-stone-950">{rewardRows.filter((r) => r.active).length}</span>
-            <span className="text-sm text-stone-600">รางวัล</span>
-          </div>
+        {isLoading ? (
+          <><SkeletonBadge className="w-32" /><SkeletonBadge className="w-28" /><SkeletonBadge className="w-24" /></>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+              <Shapes className="h-4 w-4 text-emerald-600" />
+              <span className="text-lg font-semibold text-stone-950">{activeMaterialCount}</span>
+              <span className="text-sm text-stone-600">ประเภทวัสดุ</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+              <Ruler className="h-4 w-4 text-emerald-600" />
+              <span className="text-lg font-semibold text-stone-950">{activeUnitCount}</span>
+              <span className="text-sm text-stone-600">หน่วยวัด</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2">
+              <Gift className="h-4 w-4 text-amber-600" />
+              <span className="text-lg font-semibold text-stone-950">{rewardRows.filter((r) => r.active).length}</span>
+              <span className="text-sm text-stone-600">รางวัล</span>
+            </div>
+          </>
+        )}
       </div>
 
+      {isLoading ? (
+        <div className="grid gap-5">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-3">
+            <div className="h-5 w-48 animate-pulse rounded-full bg-surface-container" />
+            {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-3">
+            <div className="h-5 w-32 animate-pulse rounded-full bg-surface-container" />
+            {Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="grid gap-5">
         <SectionCard
           title="ประเภทวัสดุและอัตราแต้ม"
@@ -662,7 +682,6 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
           </div>
         </SectionCard>
       </div>
-
       <SectionCard
           title="จัดการรางวัล"
           description={<>เพิ่ม แก้ไข และเปิด/ปิดใช้งานรางวัลที่เกษตรกรเห็น{' '}<span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-600 ring-1 ring-amber-200">แนะนำ: 1 แต้ม ≈ 1 บาท</span></>}
@@ -1083,6 +1102,8 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
             })}
           </div>
         </SectionCard>
+      </>
+      )}
     </div>
 
     {/* ── Reward image modal ── */}

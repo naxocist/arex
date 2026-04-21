@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { CalendarRange, MapPin, Navigation, PackageCheck, Phone, User } from 'lucide-react';
+import { CalendarRange, MapPin, Navigation, PackageCheck, Phone, StickyNote, User } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import DateRangePicker, { type DateRangeValue } from '@/app/_components/DateRangePicker';
 import EmptyState from '@/app/_components/EmptyState';
@@ -97,6 +97,12 @@ export default function RewardQueueTab({
                 accent="violet"
                 expandedContent={
                   <div className="space-y-4">
+                    {item.reward_instruction_notes && (
+                      <div className="flex gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                        <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                        <span className="whitespace-pre-line leading-relaxed">{item.reward_instruction_notes}</span>
+                      </div>
+                    )}
                     <div className="space-y-1.5">
                       <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">ช่วงวันนำส่ง</p>
                       <DateRangePicker

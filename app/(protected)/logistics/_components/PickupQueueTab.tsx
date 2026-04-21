@@ -9,7 +9,6 @@ import EmptyState from '@/app/_components/EmptyState';
 import { SkeletonCard } from '@/app/_components/Skeleton';
 import SortHeaderBar, { type SortDir } from '@/app/_components/SortHeaderBar';
 import {
-  logisticsApi,
   type LogisticsFactoryOptionItem,
   type LogisticsInfoItem,
   type LogisticsPickupQueueItem,
@@ -70,46 +69,22 @@ export default function PickupQueueTab({
   const [distMode, setDistMode] = useState<'leg1' | 'leg2' | 'sum'>('leg1');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  // Seed default factory from global list for each new queue item
+  // Keep factoryNamesById in sync when a factory is selected
   useEffect(() => {
     if (!factoryOptions.length) return;
-    setDestFactoryById((prev) => {
+    setFactoryNamesById((prev) => {
       const next = { ...prev };
-      const defaultFactory = factoryOptions[0];
       for (const item of items) {
-        const exists = next[item.id] ? factoryOptions.some((f) => f.id === next[item.id]) : false;
-        if (!exists && defaultFactory) {
-          next[item.id] = defaultFactory.id;
+        const selectedId = destFactoryById[item.id];
+        if (selectedId) {
+          const f = factoryOptions.find((f) => f.id === selectedId);
+          if (f) next[item.id] = f.name_th;
         }
       }
       return next;
     });
-    setFactoryNamesById((prev) => {
-      const next = { ...prev };
-      for (const item of items) {
-        if (!next[item.id] && factoryOptions[0]) next[item.id] = factoryOptions[0].name_th;
-      }
-      return next;
-    });
-  }, [items, factoryOptions]);
+  }, [items, factoryOptions, destFactoryById]);
 
-  // Fetch leg2 distance whenever factory selection changes
-  useEffect(() => {
-    const entries = Object.entries(destFactoryById);
-    if (!entries.length) return;
-    void (async () => {
-      for (const [submissionId, factoryId] of entries) {
-        if (!factoryId) continue;
-        const item = items.find((q) => q.id === submissionId);
-        const factory = factoryOptions.find((f) => f.id === factoryId);
-        if (!item || !factory || item.pickup_lat == null || item.pickup_lng == null || factory.lat == null || factory.lng == null) continue;
-        try {
-          const res = await logisticsApi.getRouteDistance(item.pickup_lat, item.pickup_lng, factory.lat as number, factory.lng as number);
-          setLeg2KmById((prev) => ({ ...prev, [submissionId]: res.distance_km }));
-        } catch { /* ignore */ }
-      }
-    })();
-  }, [destFactoryById]);
 
   function toggleSort(key: typeof sort.key) {
     setSort((cur) => cur.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
@@ -376,10 +351,11 @@ export default function PickupQueueTab({
             key={pickerSubmission.id}
             submission={pickerSubmission}
             initialFactoryId={destFactoryById[pickerSubmission.id] || ''}
-            onConfirm={(factoryId) => {
+            onConfirm={(factoryId, distanceKm) => {
               const name = factoryOptions.find((f) => f.id === factoryId)?.name_th ?? factoryId;
               setDestFactoryById((prev) => ({ ...prev, [pickerSubmission.id]: factoryId }));
               setFactoryNamesById((prev) => ({ ...prev, [pickerSubmission.id]: name }));
+              setLeg2KmById((prev) => ({ ...prev, [pickerSubmission.id]: distanceKm }));
               setPickerSubmissionId(null);
             }}
             onClose={() => setPickerSubmissionId(null)}

@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic';
 const PickupLocationMapPicker = dynamic(() => import('@/app/_components/PickupLocationMapPicker'), { ssr: false });
 import { ApiError, hasAccessToken, logisticsApi } from '@/app/_lib/api';
 import { clearApiCache } from '@/app/_lib/api/core';
+import { SkeletonFormField } from '@/app/_components/Skeleton';
 
 function Toast({ tone, message, onDone }: { tone: 'success' | 'error'; message: string; onDone: () => void }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -144,6 +145,23 @@ export default function LogisticsSettings() {
             </div>
           </div>
 
+          {isLoading ? (
+            <div className="grid gap-0 xl:grid-cols-2">
+              <div className="space-y-5 p-6">
+                <SkeletonFormField />
+                <SkeletonFormField />
+                <div className="h-11 w-full animate-pulse rounded-xl bg-surface-container-low border border-outline-variant/20" />
+                <div className="flex gap-2 pt-1">
+                  <div className="h-11 w-28 animate-pulse rounded-xl bg-surface-container" />
+                </div>
+              </div>
+              <div className="border-t border-stone-100 p-6 xl:border-l xl:border-t-0">
+                <div className="mb-3 h-3 w-1/4 animate-pulse rounded-full bg-surface-container-low" />
+                <div className="mb-4 h-3 w-3/4 animate-pulse rounded-full bg-surface-container-low" />
+                <div className="h-[260px] w-full animate-pulse rounded-xl bg-surface-container-low sm:h-[320px]" />
+              </div>
+            </div>
+          ) : (
           <div className="grid gap-0 xl:grid-cols-2">
             {/* Left: fields */}
             <div className="space-y-5 p-6">
@@ -243,6 +261,7 @@ export default function LogisticsSettings() {
               />
             </div>
           </div>
+          )}
         </motion.div>
 
       </div>

@@ -30,10 +30,11 @@ def get_pickup_jobs(
 def get_factories(
     material_type: str | None = Query(default=None),
     quantity_kg: float | None = Query(default=None, gt=0),
+    submission_id: str | None = Query(default=None),
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
-    return {"factories": workflow_service.list_active_factories(material_type, quantity_kg), "actor": current_user.role.value}
+    return {"factories": workflow_service.list_active_factories(material_type, quantity_kg, submission_id), "actor": current_user.role.value}
 
 
 @router.get("/reward-requests/approved")

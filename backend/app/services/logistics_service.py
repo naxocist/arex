@@ -104,6 +104,7 @@ class LogisticsService(DistanceService):
         self,
         material_type_code: str | None = None,
         quantity_kg: float | None = None,
+        submission_id: str | None = None,
     ) -> list[dict[str, Any]]:
         try:
             factories = (
@@ -170,6 +171,43 @@ class LogisticsService(DistanceService):
                         "capacity_kg": capacity_kg,
                         "has_capacity": has_capacity,
                     }
+
+            if submission_id:
+                submission_rows = (
+                    self.client.table("submissions")
+                    .select("pickup_lat, pickup_lng")
+                    .eq("id", submission_id)
+                    .limit(1)
+                    .execute()
+                ).data or []
+                sub = submission_rows[0] if submission_rows else {}
+                pickup_lat = sub.get("pickup_lat")
+                pickup_lng = sub.get("pickup_lng")
+
+                if pickup_lat is not None and pickup_lng is not None:
+                    factory_ids = [str(f["id"]) for f in factories if f.get("id")]
+                    cached_rows = (
+                        self.client.table("submission_factory_distances")
+                        .select("factory_id, distance_km")
+                        .eq("submission_id", submission_id)
+                        .in_("factory_id", factory_ids)
+                        .execute()
+                    ).data or []
+                    dist_by_id: dict[str, float | None] = {str(r["factory_id"]): r.get("distance_km") for r in cached_rows}
+
+                    missing = [f for f in factories if str(f["id"]) not in dist_by_id and f.get("lat") is not None and f.get("lng") is not None]
+                    if missing:
+                        from concurrent.futures import ThreadPoolExecutor, as_completed
+                        def _dist(f: dict[str, Any]) -> tuple[str, float | None]:
+                            return str(f["id"]), self._fetch_osrm_distance(float(pickup_lat), float(pickup_lng), float(f["lat"]), float(f["lng"]))  # type: ignore[arg-type]
+                        with ThreadPoolExecutor(max_workers=8) as pool:
+                            for fut in as_completed({pool.submit(_dist, f): f for f in missing}):
+                                fid, km = fut.result()
+                                dist_by_id[fid] = km
+                                self._upsert_submission_factory(submission_id, fid, km)
+
+                    for f in factories:
+                        f["distance_km"] = dist_by_id.get(str(f["id"]))
 
             return factories
         except Exception as exc:
@@ -603,7 +641,7 @@ class LogisticsService(DistanceService):
             if reward_ids:
                 for row in (
                     self.client.table("rewards")
-                    .select("id, name_th, description_th, points_cost")
+                    .select("id, name_th, description_th, points_cost, instruction_notes")
                     .in_("id", reward_ids)
                     .execute()
                 ).data or []:
@@ -634,6 +672,7 @@ class LogisticsService(DistanceService):
                     "reward_name_th": reward.get("name_th"),
                     "reward_description_th": reward.get("description_th"),
                     "reward_points_cost": reward.get("points_cost"),
+                    "reward_instruction_notes": reward.get("instruction_notes"),
                     "farmer_display_name": profile.get("display_name"),
                     "farmer_phone": profile.get("phone"),
                     "pickup_location_text": item.get("delivery_location_text"),

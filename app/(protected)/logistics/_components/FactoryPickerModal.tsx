@@ -97,10 +97,6 @@ function FactoryCard({ factory: f, tier, isSelected, leg2Km, quantityKg, onPick,
         type="button"
         onClick={tier === 'decline' ? undefined : onPick}
         disabled={tier === 'decline'}
-        layout
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -4 }}
         whileTap={tier === 'decline' ? undefined : { scale: 0.985 }}
         className={[
           'w-full rounded-2xl border-2 p-4 text-left transition-all duration-150',
@@ -203,7 +199,7 @@ type SortDir = 'asc' | 'desc';
 interface Props {
   submission: LogisticsPickupQueueItem;
   initialFactoryId: string;
-  onConfirm: (factoryId: string) => void;
+  onConfirm: (factoryId: string, distanceKm: number | null) => void;
   onClose: () => void;
 }
 
@@ -224,34 +220,23 @@ export default function FactoryPickerModal({ submission, initialFactoryId, onCon
     return v;
   }, [submission]);
 
-  // Fetch enriched factory list
+  // Fetch enriched factory list with distances in one call
   useEffect(() => {
     setIsLoading(true);
-    logisticsApi.listFactories({ material_type: submission.material_type, quantity_kg: quantityKg })
-      .then((res) => { setFactories(res.factories); })
+    logisticsApi.listFactories({
+      material_type: submission.material_type,
+      quantity_kg: quantityKg,
+      submission_id: submission.id,
+    })
+      .then((res) => {
+        setFactories(res.factories);
+        const distMap: Record<string, number | null> = {};
+        for (const f of res.factories) distMap[f.id] = f.distance_km ?? null;
+        setLeg2KmById(distMap);
+      })
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, [submission.material_type, quantityKg]);
-
-  // Fetch leg2 distances for all factories once list is ready
-  useEffect(() => {
-    if (!factories.length || submission.pickup_lat == null || submission.pickup_lng == null) return;
-    void (async () => {
-      for (const f of factories) {
-        if (f.lat == null || f.lng == null) continue;
-        if (leg2KmById[f.id] !== undefined) continue;
-        try {
-          const res = await logisticsApi.getRouteDistance(
-            submission.pickup_lat as number, submission.pickup_lng as number,
-            f.lat as number, f.lng as number,
-          );
-          setLeg2KmById((prev) => ({ ...prev, [f.id]: res.distance_km }));
-        } catch {
-          setLeg2KmById((prev) => ({ ...prev, [f.id]: null }));
-        }
-      }
-    })();
-  }, [factories]);
 
   // Close on Escape
   useEffect(() => {
@@ -339,7 +324,8 @@ export default function FactoryPickerModal({ submission, initialFactoryId, onCon
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ค้นหาโรงงาน..."
-              className="w-full rounded-xl border border-outline-variant/30 bg-stone-50 py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={isLoading}
+              className="w-full rounded-xl border border-outline-variant/30 bg-stone-50 py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
             />
           </div>
           {/* Sort pills */}
@@ -354,12 +340,13 @@ export default function FactoryPickerModal({ submission, initialFactoryId, onCon
                 <button
                   key={key}
                   type="button"
+                  disabled={isLoading}
                   onClick={() => {
                     if (sortKey === key) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
                     else { setSortKey(key); setSortDir('asc'); }
                   }}
                   className={[
-                    'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition',
+                    'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50',
                     active ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:bg-stone-100',
                   ].join(' ')}
                 >
@@ -390,7 +377,7 @@ export default function FactoryPickerModal({ submission, initialFactoryId, onCon
             </div>
           ) : (
             <div className="pt-2">
-              <AnimatePresence mode="popLayout">
+              <AnimatePresence initial={false}>
                 {sorted.filter((f) => getTier(f) !== 'decline').map((f) => (
                   <div key={f.id} className="mb-2">
                     <FactoryCard
@@ -411,7 +398,7 @@ export default function FactoryPickerModal({ submission, initialFactoryId, onCon
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">ไม่รับวัสดุนี้</span>
                     <div className="h-px flex-1 bg-outline-variant/20" />
                   </div>
-                  <AnimatePresence mode="popLayout">
+                  <AnimatePresence initial={false}>
                     {sorted.filter((f) => getTier(f) === 'decline').map((f) => (
                       <div key={f.id} className="mb-2">
                         <FactoryCard
@@ -432,7 +419,7 @@ export default function FactoryPickerModal({ submission, initialFactoryId, onCon
         </div>
 
         {/* Footer CTA */}
-        <div className="border-t border-outline-variant/20 bg-surface px-5 py-4">
+        <div className="rounded-b-3xl border-t border-outline-variant/20 bg-surface px-5 py-4">
           {selectedFactory ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2 rounded-xl bg-primary/5 px-3 py-2">
@@ -455,7 +442,7 @@ export default function FactoryPickerModal({ submission, initialFactoryId, onCon
               ) : (
                 <motion.button
                   type="button"
-                  onClick={() => onConfirm(selectedId)}
+                  onClick={() => onConfirm(selectedId, leg2KmById[selectedId] ?? null)}
                   className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-white shadow-sm shadow-primary/20 transition hover:opacity-90"
                   whileTap={{ scale: 0.97 }}
                 >

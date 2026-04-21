@@ -101,7 +101,7 @@ export async function apiRequest<T>(
   const method = (requestOptions.method || 'GET').toUpperCase();
   const isGet = method === 'GET';
   const cacheKey = isGet ? buildCacheKey(path, token) : null;
-  const showLoading = showGlobalLoading ?? isGet;
+  const showLoading = showGlobalLoading ?? false;
 
   if (isGet && cacheKey && !forceRefresh) {
     const cached = getCachedResponse<T>(cacheKey);

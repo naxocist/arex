@@ -470,7 +470,7 @@ export default function FarmerHome() {
                   const isCredited = item.status === 'points_credited';
                   const hasMap = item.pickup_lat != null && item.pickup_lng != null;
                   const pickupWindow = formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at);
-                  const showPickupDate = isActiveStatus && item.pickup_window_start_at;
+                  const showPickupDate = isActiveStatus && item.pickup_window_start_at && item.status !== 'delivered_to_factory' && item.status !== 'factory_confirmed';
 
                   const stripeColor: Record<string, string> = {
                     submitted: 'border-l-amber-400',

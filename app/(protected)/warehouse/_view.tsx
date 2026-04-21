@@ -6,6 +6,7 @@ import { CheckCircle2, Gift, RefreshCw, XCircle } from 'lucide-react';
 import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import { ApiError, hasAccessToken, warehouseApi, type WarehousePendingRequestItem } from '@/app/_lib/api';
+import { SkeletonBadge } from '@/app/_components/Skeleton';
 import AnsweredTab from './_components/AnsweredTab';
 import PendingTab from './_components/PendingTab';
 
@@ -149,22 +150,30 @@ export default function WarehouseApproval() {
 
         {error && <AlertBanner message={error} tone="error" />}
 
-        {!isLoading && (
-          <div className="flex flex-wrap gap-2">
-            <span className="flex items-center gap-1.5 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
-              <Gift className="h-3.5 w-3.5" />
-              รอตรวจสอบ {pendingRequests.length} คำขอ · {summary.totalPoints.toLocaleString('th-TH')} แต้ม
-            </span>
-            <span className="flex items-center gap-1.5 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              อนุมัติแล้ว {summary.approvedCount.toLocaleString('th-TH')} คำขอ
-            </span>
-            <span className="flex items-center gap-1.5 rounded-md bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600">
-              <XCircle className="h-3.5 w-3.5" />
-              ปฏิเสธแล้ว {summary.rejectedCount.toLocaleString('th-TH')} คำขอ
-            </span>
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {isLoading ? (
+            <>
+              <SkeletonBadge />
+              <SkeletonBadge className="w-28" />
+              <SkeletonBadge className="w-28" />
+            </>
+          ) : (
+            <>
+              <span className="flex items-center gap-1.5 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
+                <Gift className="h-3.5 w-3.5" />
+                รอตรวจสอบ {pendingRequests.length} คำขอ · {summary.totalPoints.toLocaleString('th-TH')} แต้ม
+              </span>
+              <span className="flex items-center gap-1.5 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                อนุมัติแล้ว {summary.approvedCount.toLocaleString('th-TH')} คำขอ
+              </span>
+              <span className="flex items-center gap-1.5 rounded-md bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600">
+                <XCircle className="h-3.5 w-3.5" />
+                ปฏิเสธแล้ว {summary.rejectedCount.toLocaleString('th-TH')} คำขอ
+              </span>
+            </>
+          )}
+        </div>
 
         <div className="flex rounded-xl bg-stone-100 p-0.5 gap-0.5">
           {tabs.map((tab) => (

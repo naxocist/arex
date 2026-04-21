@@ -81,7 +81,7 @@ export interface FactoryMeasurementUnitOption { code: string; name_th: string; t
 export interface UpsertFactoryMaterialPreferencePayload { material_type_code: string; accepts: boolean; capacity_value: number | null; capacity_unit: string | null; minimum_amount_value: number | null; minimum_amount_unit: string | null }
 
 export interface FactoryMaterialPreference { accepts: boolean; capacity_value: number | null; capacity_unit: string | null; capacity_kg: number | null; has_capacity: boolean }
-export interface LogisticsFactoryOptionItem { id: string; name_th: string; location_text?: string | null; lat?: number | null; lng?: number | null; active: boolean; is_focal_point?: boolean; preference?: FactoryMaterialPreference }
+export interface LogisticsFactoryOptionItem { id: string; name_th: string; location_text?: string | null; lat?: number | null; lng?: number | null; active: boolean; is_focal_point?: boolean; preference?: FactoryMaterialPreference; distance_km?: number | null }
 export interface LogisticsPickupQueueItem {
   id: string; farmer_profile_id: string;
   material_type: 'rice_straw' | 'cassava_root' | 'sugarcane_bagasse' | 'corn_stover' | string;
@@ -126,6 +126,7 @@ export interface LogisticsApprovedRewardRequestItem {
   quantity: number; requested_points: number; status: string; requested_at: string;
   farmer_display_name?: string | null; farmer_phone?: string | null;
   distance_to_farmer_km?: number | null;
+  reward_instruction_notes?: string | null;
 }
 export interface LogisticsRewardDeliveryJobItem {
   id: string; reward_request_id: string; logistics_profile_id: string;

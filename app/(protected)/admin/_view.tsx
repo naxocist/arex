@@ -159,12 +159,7 @@ export default function AdminDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const params: { role_filter?: string; approval_filter?: string } = {};
-      if (roleFilter !== 'all') params.role_filter = roleFilter;
-      if (statusFilter !== 'all') params.approval_filter = statusFilter;
-      const res = force
-        ? await adminApi.listAllAccounts(params)
-        : await adminApi.listAllAccounts(params);
+      const res = await adminApi.listAllAccounts(force ? { forceRefresh: true } : undefined);
       setAccounts(res.accounts ?? []);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'โหลดข้อมูลไม่สำเร็จ');
@@ -173,7 +168,7 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => { load(); }, [roleFilter, statusFilter]);
+  useEffect(() => { load(); }, []);
 
   const handleToggle = async (id: string) => {
     setBusyId(id);
@@ -189,6 +184,11 @@ export default function AdminDashboard() {
     }
   };
 
+  const filtered = accounts.filter((a) => {
+    if (roleFilter !== 'all' && a.role !== roleFilter) return false;
+    if (statusFilter !== 'all' && a.approval_status !== statusFilter) return false;
+    return true;
+  });
   const activeCount = accounts.filter((a) => a.approval_status === 'active').length;
   const inactiveCount = accounts.filter((a) => a.approval_status === 'inactive').length;
 
@@ -254,7 +254,7 @@ export default function AdminDashboard() {
           <div className="space-y-3">
             {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
           </div>
-        ) : accounts.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon={Users}
             title="ไม่พบบัญชีผู้ใช้"
@@ -262,7 +262,7 @@ export default function AdminDashboard() {
           />
         ) : (
           <div className="space-y-3">
-            {accounts.map((a) => (
+            {filtered.map((a) => (
               <AccountCard
                 key={a.id}
                 item={a}

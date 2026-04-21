@@ -7,6 +7,7 @@ import AlertBanner from '@/app/_components/AlertBanner';
 import ErrorBoundary from '@/app/_components/ErrorBoundary';
 import { adminApi, ApiError, hasAccessToken } from '@/app/_lib/api';
 import { roleMeta } from '@/app/_lib/roleConfig';
+import { SkeletonToggleRow } from '@/app/_components/Skeleton';
 
 const APPROVABLE_ROLES = ['farmer', 'logistics', 'factory'] as const;
 
@@ -93,7 +94,9 @@ export default function AdminSettingsView() {
             <span className="font-semibold text-stone-800 text-sm">บทบาทที่ต้องรอเปิดใช้งานเมื่อสมัครใหม่</span>
           </div>
           {loading ? (
-            <div className="px-4 py-6 text-sm text-stone-400">กำลังโหลด...</div>
+            <div className="divide-y divide-stone-100">
+              {APPROVABLE_ROLES.map((role) => <SkeletonToggleRow key={role} />)}
+            </div>
           ) : (
             <div className="divide-y divide-stone-100">
               {APPROVABLE_ROLES.map((role) => {
