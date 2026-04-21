@@ -959,14 +959,14 @@ on conflict (id) do update set
   allowed_mime_types = excluded.allowed_mime_types;
 
 -- Drop ALL existing storage.objects policies (clears any UI-generated blanket policies)
-do $$ declare r record; begin
-  for r in
-    select policyname from pg_policies
-    where schemaname = 'storage' and tablename = 'objects'
-  loop
-    execute format('drop policy if exists %I on storage.objects', r.policyname);
-  end loop;
-end $$;
+drop policy if exists "Public read reward images" on storage.objects;
+drop policy if exists "Auth users can upload reward images" on storage.objects;
+drop policy if exists "Auth users can update reward images" on storage.objects;
+drop policy if exists "Auth users can delete reward images" on storage.objects;
+drop policy if exists "Public read submission images" on storage.objects;
+drop policy if exists "Auth users can upload submission images" on storage.objects;
+drop policy if exists "Auth users can update submission images" on storage.objects;
+drop policy if exists "Auth users can delete submission images" on storage.objects;
 
 create policy "Public read reward images"
   on storage.objects for select
