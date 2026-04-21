@@ -110,6 +110,8 @@ function mergeMaterialRows(materials: ExecutiveMaterialTypeItem[]): MaterialDraf
   }));
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+
 export default function CatalogSettings({ mode = 'executive' }: { mode?: 'executive' | 'factory' }) {
   const [isLoading, setIsLoading] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -523,11 +525,10 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
           </div>
       </div>
 
-      {/* Materials + Units 2-col grid */}
-      <div className="grid gap-5 xl:grid-cols-[1.18fr,0.82fr]">
+      <div className="grid gap-5">
         <SectionCard
           title="ประเภทวัสดุและอัตราแต้ม"
-          description="วัสดุแต่ละชนิดได้แต้มต่างกัน — ยิ่งน้ำหนักมาก ยิ่งได้แต้มมาก ตัวเลขในช่อง &quot;แต้ม/กก.&quot; คือแต้มที่เกษตรกรได้ต่อวัสดุ 1 กิโลกรัม"
+          description={<>วัสดุแต่ละชนิดได้แต้มต่างกัน — ยิ่งน้ำหนักมาก ยิ่งได้แต้มมาก ตัวเลขในช่อง &quot;แต้ม/กก.&quot; คือแต้มที่เกษตรกรได้ต่อวัสดุ 1 กิโลกรัม{' '}<span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-600 ring-1 ring-amber-200">แนะนำ: 1 แต้ม ≈ 1 บาท</span></>}
           className="h-full"
           actions={
             !isAddingMaterial ? (
@@ -660,148 +661,11 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
             })}
           </div>
         </SectionCard>
-
-        <SectionCard
-          title="หน่วยวัด"
-          description="หน่วยที่เกษตรกรใช้แจ้งปริมาณ เช่น กิโลกรัม ตัน หรือก้อน — ระบบแปลงเป็นกิโลกรัมอัตโนมัติเพื่อคำนวณแต้ม"
-          className="h-full"
-          actions={
-            !isAddingUnit ? (
-              <button
-                type="button"
-                onClick={() => setIsAddingUnit(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-container"
-              >
-                <Plus className="h-4 w-4" />
-                เพิ่มหน่วย
-              </button>
-            ) : null
-          }
-        >
-          <AnimatePresence initial={false}>
-          {isAddingUnit ? (
-            <motion.div
-              key="add-unit-form"
-              initial={reduceMotion ? undefined : { opacity: 0, height: 0 }}
-              animate={reduceMotion ? undefined : { opacity: 1, height: 'auto' }}
-              exit={reduceMotion ? undefined : { opacity: 0, height: 0 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="overflow-hidden"
-            >
-            <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
-              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">เพิ่มหน่วยวัดใหม่</p>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">ชื่อหน่วย</label>
-                  <input
-                    value={newUnit.name_th}
-                    onChange={(event) => setNewUnit((prev) => ({ ...prev, name_th: event.target.value }))}
-                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                    placeholder="เช่น กิโลกรัม"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">เท่ากับกี่ กก.</label>
-                  <input
-                    value={newUnit.to_kg_factor}
-                    onChange={(event) => setNewUnit((prev) => ({ ...prev, to_kg_factor: event.target.value }))}
-                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
-                    placeholder="เช่น 1000 (สำหรับตัน)"
-                    type="number"
-                  />
-                  <p className="text-[11px] text-stone-400">1 หน่วยนี้ = กี่กิโลกรัม (เว้นว่างได้)</p>
-                </div>
-                <div className="space-y-1.5">
-                  <span className="block text-xs font-semibold uppercase tracking-wider text-transparent select-none">-</span>
-                  <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 w-full">
-                    <input
-                      type="checkbox"
-                      checked={newUnit.active}
-                      onChange={(event) => setNewUnit((prev) => ({ ...prev, active: event.target.checked }))}
-                      className="h-4 w-4 accent-primary"
-                    />
-                    <span className="font-medium">เปิดใช้งาน</span>
-                  </label>
-                </div>
-              </div>
-              <div className="mt-4 flex gap-2 border-t border-emerald-100 pt-4">
-                <button
-                  type="button"
-                  onClick={() => void handleCreateUnit()}
-                  disabled={savingKey === 'unit:new'}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
-                >
-                  <Save className="h-4 w-4" />
-                  บันทึก
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsAddingUnit(false); setNewUnit(defaultNewUnit); }}
-                  className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
-                >
-                  <X className="h-4 w-4" />
-                  ยกเลิก
-                </button>
-              </div>
-            </div>
-            </motion.div>
-          ) : null}
-          </AnimatePresence>
-
-          <div>
-            <div className="hidden md:flex md:items-center md:gap-3 px-2 pb-2 border-b border-stone-100">
-              <span className="flex-1 text-xs font-semibold text-stone-600">ชื่อหน่วย</span>
-              <span className="w-24 shrink-0 flex flex-col gap-0.5">
-                <span className="text-xs font-semibold text-stone-600">เท่ากับกี่ กก.</span>
-                <span className="text-[11px] text-stone-400">1 หน่วย = ? กก.</span>
-              </span>
-              <span className="w-14 shrink-0 text-xs font-semibold text-stone-600">เปิดใช้</span>
-              <span className="w-14 shrink-0" />
-            </div>
-            {unitRows.map((row, index) => {
-              const requestKey = `unit:${row.originalCode}`;
-              return (
-                <div key={row.originalCode} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
-                  <div className="flex flex-1 items-center gap-3">
-                    <input
-                      value={row.name_th}
-                      onChange={(event) => updateUnitRow(index, { name_th: event.target.value })}
-                      className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                      placeholder="ชื่อหน่วย"
-                    />
-                    <input
-                      value={row.to_kg_factor}
-                      onChange={(event) => updateUnitRow(index, { to_kg_factor: event.target.value })}
-                      className="w-24 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                      placeholder="กก."
-                      type="number"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="flex w-14 shrink-0 cursor-pointer items-center gap-1.5 text-sm text-stone-500">
-                      <input type="checkbox" checked={row.active} onChange={(event) => updateUnitRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
-                      <span className="text-xs">ใช้</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => void saveUnitRow(row)}
-                      disabled={savingKey === requestKey}
-                      className="w-14 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-                    >
-                      {savingKey === requestKey ? '...' : 'บันทึก'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </SectionCard>
       </div>
 
-      {/* Rewards — full width */}
       <SectionCard
           title="จัดการรางวัล"
-          description="เพิ่ม แก้ไข และเปิด/ปิดใช้งานรางวัลที่เกษตรกรเห็น"
+          description={<>เพิ่ม แก้ไข และเปิด/ปิดใช้งานรางวัลที่เกษตรกรเห็น{' '}<span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-600 ring-1 ring-amber-200">แนะนำ: 1 แต้ม ≈ 1 บาท</span></>}
           actions={
             !isAddingReward ? (
               <button
@@ -1074,6 +938,142 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                       onClick={() => void saveRewardRow(row)}
                       disabled={savingKey === requestKey}
                       className="w-full rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                    >
+                      {savingKey === requestKey ? '...' : 'บันทึก'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+      <SectionCard
+          title="หน่วยวัด"
+          description="หน่วยที่เกษตรกรใช้แจ้งปริมาณ เช่น กิโลกรัม ตัน หรือก้อน — ระบบแปลงเป็นกิโลกรัมอัตโนมัติเพื่อคำนวณแต้ม"
+          className="h-full"
+          actions={
+            !isAddingUnit ? (
+              <button
+                type="button"
+                onClick={() => setIsAddingUnit(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-container"
+              >
+                <Plus className="h-4 w-4" />
+                เพิ่มหน่วย
+              </button>
+            ) : null
+          }
+        >
+          <AnimatePresence initial={false}>
+          {isAddingUnit ? (
+            <motion.div
+              key="add-unit-form"
+              initial={reduceMotion ? undefined : { opacity: 0, height: 0 }}
+              animate={reduceMotion ? undefined : { opacity: 1, height: 'auto' }}
+              exit={reduceMotion ? undefined : { opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="overflow-hidden"
+            >
+            <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-emerald-700">เพิ่มหน่วยวัดใหม่</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">ชื่อหน่วย</label>
+                  <input
+                    value={newUnit.name_th}
+                    onChange={(event) => setNewUnit((prev) => ({ ...prev, name_th: event.target.value }))}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    placeholder="เช่น กิโลกรัม"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">เท่ากับกี่ กก.</label>
+                  <input
+                    value={newUnit.to_kg_factor}
+                    onChange={(event) => setNewUnit((prev) => ({ ...prev, to_kg_factor: event.target.value }))}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    placeholder="เช่น 1000 (สำหรับตัน)"
+                    type="number"
+                  />
+                  <p className="text-[11px] text-stone-400">1 หน่วยนี้ = กี่กิโลกรัม (เว้นว่างได้)</p>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="block text-xs font-semibold uppercase tracking-wider text-transparent select-none">-</span>
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 w-full">
+                    <input
+                      type="checkbox"
+                      checked={newUnit.active}
+                      onChange={(event) => setNewUnit((prev) => ({ ...prev, active: event.target.checked }))}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span className="font-medium">เปิดใช้งาน</span>
+                  </label>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2 border-t border-emerald-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => void handleCreateUnit()}
+                  disabled={savingKey === 'unit:new'}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
+                >
+                  <Save className="h-4 w-4" />
+                  บันทึก
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsAddingUnit(false); setNewUnit(defaultNewUnit); }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
+                >
+                  <X className="h-4 w-4" />
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
+            </motion.div>
+          ) : null}
+          </AnimatePresence>
+
+          <div>
+            <div className="hidden md:flex md:items-center md:gap-3 px-2 pb-2 border-b border-stone-100">
+              <span className="flex-1 text-xs font-semibold text-stone-600">ชื่อหน่วย</span>
+              <span className="w-24 shrink-0 flex flex-col gap-0.5">
+                <span className="text-xs font-semibold text-stone-600">เท่ากับกี่ กก.</span>
+                <span className="text-[11px] text-stone-400">1 หน่วย = ? กก.</span>
+              </span>
+              <span className="w-14 shrink-0 text-xs font-semibold text-stone-600">เปิดใช้</span>
+              <span className="w-14 shrink-0" />
+            </div>
+            {unitRows.map((row, index) => {
+              const requestKey = `unit:${row.originalCode}`;
+              return (
+                <div key={row.originalCode} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
+                  <div className="flex flex-1 items-center gap-3">
+                    <input
+                      value={row.name_th}
+                      onChange={(event) => updateUnitRow(index, { name_th: event.target.value })}
+                      className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      placeholder="ชื่อหน่วย"
+                    />
+                    <input
+                      value={row.to_kg_factor}
+                      onChange={(event) => updateUnitRow(index, { to_kg_factor: event.target.value })}
+                      className="w-24 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      placeholder="กก."
+                      type="number"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="flex w-14 shrink-0 cursor-pointer items-center gap-1.5 text-sm text-stone-500">
+                      <input type="checkbox" checked={row.active} onChange={(event) => updateUnitRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
+                      <span className="text-xs">ใช้</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void saveUnitRow(row)}
+                      disabled={savingKey === requestKey}
+                      className="w-14 rounded-lg bg-primary px-2 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
                     >
                       {savingKey === requestKey ? '...' : 'บันทึก'}
                     </button>

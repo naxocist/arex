@@ -4,7 +4,7 @@ import { cn } from '@/app/_lib/utils';
 
 interface SectionCardProps {
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   actions?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
