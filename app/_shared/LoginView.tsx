@@ -358,7 +358,7 @@ export default function LoginView() {
             <p className="mt-3 text-base leading-relaxed text-stone-600">
               {mode === 'login'
                 ? 'กรอกอีเมลและรหัสผ่าน ระบบจะพาไปยังหน้าของคุณโดยอัตโนมัติ'
-                : 'กรอกข้อมูลพื้นฐาน แล้วกด "สมัครสมาชิก" เพื่อเริ่มใช้งาน'}
+                : <><span className="inline-block rounded-full bg-primary/10 px-3 py-0.5 text-sm font-bold text-primary">เกษตรกร</span><span className="ml-2">กรอกข้อมูลพื้นฐาน แล้วกด "สมัครสมาชิก" เพื่อเริ่มใช้งาน</span></>}
             </p>
           </div>
 
