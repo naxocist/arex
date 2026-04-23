@@ -51,3 +51,5 @@ backend/supabase/snippets/
 backend/supabase/seeds/seed.prod.sql
 backend/cloud_storage/credential/*
 !backend/cloud_storage/credential/.gitkeep
+
+seed.local.sql.bak*
