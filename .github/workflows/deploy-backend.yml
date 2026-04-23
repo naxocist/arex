@@ -27,8 +27,8 @@ env:
   BACKEND_PATH: backend
   ARTIFACT_REPOSITORY: arex-backend
   IMAGE_NAME: arex-backend
-  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
-  GCP_REGION: ${{ vars.GCP_REGION || secrets.GCP_REGION }}
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ secrets.GCP_REGION }}
 
 jobs:
   deploy:
