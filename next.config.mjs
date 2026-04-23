@@ -16,8 +16,8 @@ const nextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob: https://*.supabase.co http://127.0.0.1:54321 https://*.tile.openstreetmap.org https://unpkg.com",
-              "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co http://127.0.0.1:54321 http://localhost:8000 https://*.run.app https://nominatim.openstreetmap.org",
+              "img-src 'self' data: blob: https://storage.googleapis.com https://*.tile.openstreetmap.org https://unpkg.com",
+              "connect-src 'self' http://127.0.0.1:54321 http://localhost:8000 https://*.run.app https://nominatim.openstreetmap.org https://storage.googleapis.com",
               "frame-ancestors 'none'",
             ].join('; '),
           },
@@ -28,10 +28,7 @@ const nextConfig = {
   transpilePackages: ['leaflet', 'react-leaflet'],
   images: {
     remotePatterns: [
-      // Local Supabase storage
-      { protocol: 'http', hostname: '127.0.0.1', port: '54321', pathname: '/storage/v1/object/public/**' },
-      // Supabase Cloud (production)
-      { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/object/public/**' },
+      { protocol: 'https', hostname: 'storage.googleapis.com', pathname: '/**' },
     ],
   },
 };
