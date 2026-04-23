@@ -49,3 +49,5 @@ backend/supabase/snippets/
 
 # Production seed
 backend/supabase/seeds/seed.prod.sql
+backend/cloud_storage/credential/*
+!backend/cloud_storage/credential/.gitkeep

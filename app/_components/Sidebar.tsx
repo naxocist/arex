@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LogOut, Leaf } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import Image from 'next/image';
 import { cn } from '@/app/_lib/utils';
 import { roleNavItems, roleMeta } from '@/app/_lib/roleConfig';
 import { useUser } from '@/app/_contexts/UserContext';
@@ -90,7 +89,8 @@ function SidebarContent({
               <Leaf className="h-4 w-4 fill-current" />
             </div>
             <div className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-stone-200 bg-white p-0.5 shadow-sm">
-              <Image src="/assets/pmuc_logo.png" alt="บพข" width={14} height={14} className="object-contain" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/assets/pmuc_logo.png" alt="บพข" width={14} height={14} />
             </div>
           </div>
           <div>
@@ -208,7 +208,8 @@ export function MobileTopBar({ onOpen }: { onOpen: () => void }) {
             <Leaf className="h-4 w-4 fill-current" />
           </div>
           <div className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-stone-200 bg-white p-0.5 shadow-sm">
-            <Image src="/assets/pmuc_logo.png" alt="บพข" width={14} height={14} className="object-contain" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/assets/pmuc_logo.png" alt="บพข" width={14} height={14} />
           </div>
         </div>
         <div>
