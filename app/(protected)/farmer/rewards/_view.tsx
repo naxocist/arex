@@ -125,24 +125,30 @@ export default function FarmerRewards() {
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-emerald-600 px-5 py-5 shadow-md shadow-primary/15">
           <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/5" />
           <div className="pointer-events-none absolute -bottom-6 right-12 h-20 w-20 rounded-full bg-white/5" />
-          <div className="relative flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-white/70">PMUC Coin คงเหลือ</p>
-              <div className="mt-1 flex items-end gap-1.5">
-                <span className="text-5xl font-light tabular-nums text-white">{availablePoints.toLocaleString('th-TH')}</span>
-                <span className="mb-1.5 text-base font-medium text-white/70">แต้ม</span>
+          <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start justify-between gap-2 sm:block">
+              <div>
+                <p className="text-sm font-medium text-white/70">PMUC Coin คงเหลือ</p>
+                <div className="mt-1 flex items-end gap-1.5">
+                  <span className="text-4xl font-light tabular-nums text-white sm:text-5xl">{availablePoints.toLocaleString('th-TH')}</span>
+                  <span className="mb-1.5 text-base font-medium text-white/70">แต้ม</span>
+                </div>
+                {activeCount > 0 && (
+                  <p className="mt-1.5 text-sm text-white/70">คำขอที่กำลังดำเนินการ{' '}<span className="font-bold text-white">{activeCount} รายการ</span></p>
+                )}
               </div>
-              {activeCount > 0 && (
-                <p className="mt-1.5 text-sm text-white/70">คำขอที่กำลังดำเนินการ{' '}<span className="font-bold text-white">{activeCount} รายการ</span></p>
-              )}
-            </div>
-            <div className="flex flex-col items-end gap-2">
               <button type="button" onClick={() => void loadRewards(true)} disabled={isLoading} aria-label="รีเฟรชข้อมูล"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 disabled:opacity-50">
+                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 disabled:opacity-50 sm:hidden">
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 sm:flex-col sm:items-end">
+              <button type="button" onClick={() => void loadRewards(true)} disabled={isLoading} aria-label="รีเฟรชข้อมูล"
+                className="hidden h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 disabled:opacity-50 sm:flex">
                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
               <button type="button" onClick={openProfile}
-                className="flex items-center gap-2 rounded-full bg-white/20 border border-white/40 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/30 active:scale-95">
+                className="flex items-center gap-2 rounded-full bg-white/20 border border-white/40 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/30 active:scale-95 sm:px-4 sm:py-2">
                 <User className="h-4 w-4" />ข้อมูลส่วนตัว
               </button>
             </div>

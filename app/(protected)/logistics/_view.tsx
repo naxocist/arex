@@ -379,9 +379,9 @@ export default function LogisticsTracking() {
                 return (
                   <button key={tab.id} type="button"
                     onClick={() => { setActiveTab(tab.id); setExpandedId(null); }}
-                    className={`flex flex-1 items-center justify-center gap-2 px-3 py-3 text-sm font-semibold transition-colors ${isActive ? 'text-amber-700 bg-amber-50/60' : 'text-stone-400 hover:text-stone-600 hover:bg-stone-50'}`}
+                    className={`flex flex-1 flex-col items-center justify-center gap-1 px-1 py-2.5 text-xs font-semibold transition-colors ${isActive ? 'text-amber-700 bg-amber-50/60' : 'text-stone-400 hover:text-stone-600 hover:bg-stone-50'}`}
                   >
-                    <span>{tab.sublabel}</span>
+                    <span className="whitespace-nowrap">{tab.sublabel}</span>
                     <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none ${isActive ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-400'}`}>{tab.count}</span>
                   </button>
                 );
@@ -400,9 +400,9 @@ export default function LogisticsTracking() {
                 return (
                   <button key={tab.id} type="button"
                     onClick={() => { setActiveTab(tab.id); setExpandedId(null); }}
-                    className={`flex flex-1 items-center justify-center gap-2 px-3 py-3 text-sm font-semibold transition-colors ${isActive ? 'text-violet-700 bg-violet-50/60' : 'text-stone-400 hover:text-stone-600 hover:bg-stone-50'}`}
+                    className={`flex flex-1 flex-col items-center justify-center gap-1 px-1 py-2.5 text-xs font-semibold transition-colors ${isActive ? 'text-violet-700 bg-violet-50/60' : 'text-stone-400 hover:text-stone-600 hover:bg-stone-50'}`}
                   >
-                    <span>{tab.sublabel}</span>
+                    <span className="whitespace-nowrap">{tab.sublabel}</span>
                     <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none ${isActive ? 'bg-violet-100 text-violet-700' : 'bg-stone-100 text-stone-400'}`}>{tab.count}</span>
                   </button>
                 );

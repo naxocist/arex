@@ -47,8 +47,8 @@ const MATERIAL_COLORS = [
 ];
 
 interface DonutLabelProps {
-  cx: number;
-  cy: number;
+  cx: number | string;
+  cy: number | string;
   innerLabel: string;
   innerValue: string;
 }
@@ -136,7 +136,7 @@ export default function OverviewDashboard() {
         >
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">ผู้บริหาร</p>
-            <h1 className="mt-0.5 text-4xl font-light tracking-tight text-on-surface">ภาพรวมระบบ</h1>
+            <h1 className="mt-0.5 text-3xl font-light tracking-tight text-on-surface sm:text-4xl">ภาพรวมระบบ</h1>
             <p className="mt-1 text-sm text-on-surface-variant">ข้อมูลสรุประบบ Zero Burn to Earn ทั้งหมดแบบเรียลไทม์</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -355,8 +355,8 @@ export default function OverviewDashboard() {
             ) : (
               <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
                 {/* Donut */}
-                <div className="mx-auto shrink-0 sm:mx-0">
-                  <ResponsiveContainer width={220} height={220}>
+                <div className="mx-auto w-full shrink-0 sm:mx-0 sm:w-[220px]">
+                  <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
                       <Pie
                         data={materialChartData}
@@ -402,8 +402,8 @@ export default function OverviewDashboard() {
                         const totalWeight = materialChartData.reduce((s, d) => s + d.weight, 0);
                         return (
                           <DonutCenterLabel
-                            cx={110}
-                            cy={110}
+                            cx="50%"
+                            cy="50%"
                             innerValue={`${formatNumber(Math.round(totalWeight))}`}
                             innerLabel="กก. รวม"
                           />

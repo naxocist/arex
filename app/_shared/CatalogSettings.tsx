@@ -510,7 +510,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
           <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
             {mode === 'factory' ? 'โรงงาน' : 'ผู้บริหาร'}
           </p>
-          <h1 className="mt-0.5 text-4xl font-light tracking-tight text-on-surface">ตั้งค่าวัสดุ / รางวัล</h1>
+          <h1 className="mt-0.5 text-3xl font-light tracking-tight text-on-surface sm:text-4xl">ตั้งค่าวัสดุ / รางวัล</h1>
           <p className="mt-1 text-sm text-on-surface-variant">
             จัดการประเภทวัสดุ อัตราแต้ม หน่วยวัด และรางวัลในระบบ
           </p>
@@ -669,23 +669,21 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
               const dirty = isMaterialDirty(row, index);
               return (
                 <div key={row.originalCode} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
-                  <div className="flex flex-1 items-center gap-3">
-                    <input
-                      value={row.name_th}
-                      onChange={(event) => updateMaterialRow(index, { name_th: event.target.value })}
-                      className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                      placeholder="ชื่อวัสดุ"
-                    />
+                  <input
+                    value={row.name_th}
+                    onChange={(event) => updateMaterialRow(index, { name_th: event.target.value })}
+                    className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 md:flex-1"
+                    placeholder="ชื่อวัสดุ"
+                  />
+                  <div className="flex items-center gap-3">
                     <input
                       value={row.points_per_kg}
                       onChange={(event) => updateMaterialRow(index, { points_per_kg: event.target.value })}
-                      className="w-24 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      className="w-28 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 md:w-24"
                       placeholder="แต้ม/กก."
                       type="number"
                     />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="flex w-14 shrink-0 cursor-pointer items-center gap-1.5 text-sm text-stone-500">
+                    <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-sm text-stone-500">
                       <input type="checkbox" checked={row.active} onChange={(event) => updateMaterialRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
                       <span className="text-xs">ใช้</span>
                     </label>
@@ -693,7 +691,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                       type="button"
                       onClick={() => void saveMaterialRow(row)}
                       disabled={savingKey === requestKey}
-                      className={`w-14 rounded-lg px-2 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50 ${dirty ? 'bg-amber-500 shadow-sm shadow-amber-200 ring-2 ring-amber-300 hover:bg-amber-600' : 'bg-stone-300 hover:bg-stone-400'}`}
+                      className={`ml-auto rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50 md:w-14 ${dirty ? 'bg-amber-500 shadow-sm shadow-amber-200 ring-2 ring-amber-300 hover:bg-amber-600' : 'bg-stone-300 hover:bg-stone-400'}`}
                     >
                       {savingKey === requestKey ? '...' : 'บันทึก'}
                     </button>
@@ -1089,23 +1087,21 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
               const dirty = isUnitDirty(row, index);
               return (
                 <div key={row.originalCode} className="group flex flex-col gap-2 border-b border-stone-100 py-2.5 last:border-0 md:flex-row md:items-center md:gap-3 md:px-2">
-                  <div className="flex flex-1 items-center gap-3">
-                    <input
-                      value={row.name_th}
-                      onChange={(event) => updateUnitRow(index, { name_th: event.target.value })}
-                      className="flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
-                      placeholder="ชื่อหน่วย"
-                    />
+                  <input
+                    value={row.name_th}
+                    onChange={(event) => updateUnitRow(index, { name_th: event.target.value })}
+                    className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 md:flex-1"
+                    placeholder="ชื่อหน่วย"
+                  />
+                  <div className="flex items-center gap-3">
                     <input
                       value={row.to_kg_factor}
                       onChange={(event) => updateUnitRow(index, { to_kg_factor: event.target.value })}
-                      className="w-24 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+                      className="w-28 shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 md:w-24"
                       placeholder="กก."
                       type="number"
                     />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="flex w-14 shrink-0 cursor-pointer items-center gap-1.5 text-sm text-stone-500">
+                    <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-sm text-stone-500">
                       <input type="checkbox" checked={row.active} onChange={(event) => updateUnitRow(index, { active: event.target.checked })} className="h-4 w-4 accent-primary" />
                       <span className="text-xs">ใช้</span>
                     </label>
@@ -1113,7 +1109,7 @@ export default function CatalogSettings({ mode = 'executive' }: { mode?: 'execut
                       type="button"
                       onClick={() => void saveUnitRow(row)}
                       disabled={savingKey === requestKey}
-                      className={`w-14 rounded-lg px-2 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50 ${dirty ? 'bg-amber-500 shadow-sm shadow-amber-200 ring-2 ring-amber-300 hover:bg-amber-600' : 'bg-stone-300 hover:bg-stone-400'}`}
+                      className={`ml-auto rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50 md:w-14 ${dirty ? 'bg-amber-500 shadow-sm shadow-amber-200 ring-2 ring-amber-300 hover:bg-amber-600' : 'bg-stone-300 hover:bg-stone-400'}`}
                     >
                       {savingKey === requestKey ? '...' : 'บันทึก'}
                     </button>
