@@ -1,59 +1,65 @@
+import { API_BASE_URL } from './core';
 import { ACCESS_TOKEN_KEY } from './auth-session';
 
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || 'http://127.0.0.1:54321';
+function getToken(): string | null {
+  return typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
+}
 
-export async function uploadRewardImage(file: File): Promise<string> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
-  if (!token) throw new Error('Not authenticated');
-  const ext = file.name.split('.').pop() ?? 'jpg';
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const uploadUrl = `${SUPABASE_URL}/storage/v1/object/reward-images/${fileName}`;
-  const res = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type },
-    body: file,
-  });
-  if (!res.ok) throw new Error(`Upload failed: ${await res.text()}`);
-  return `${SUPABASE_URL}/storage/v1/object/public/reward-images/${fileName}`;
+function extractGcsPath(urlOrPath: string): string | null {
+  if (!urlOrPath) return null;
+  if (!urlOrPath.startsWith('http')) return urlOrPath;
+  const m = urlOrPath.match(/storage\.googleapis\.com\/[^/]+\/([^?]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
 }
 
 export async function uploadSubmissionImage(file: File): Promise<string> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
+  const token = getToken();
   if (!token) throw new Error('Not authenticated');
-  const ext = file.name.split('.').pop() ?? 'jpg';
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const uploadUrl = `${SUPABASE_URL}/storage/v1/object/submission-images/${fileName}`;
-  const res = await fetch(uploadUrl, {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE_URL}/images/upload/submission`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type },
-    body: file,
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
   });
   if (!res.ok) throw new Error(`Upload failed: ${await res.text()}`);
-  return `${SUPABASE_URL}/storage/v1/object/public/submission-images/${fileName}`;
+  const data = await res.json();
+  return data.path as string;
 }
 
-export async function deleteSubmissionImage(imageUrl: string): Promise<void> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
+export async function uploadRewardImage(file: File): Promise<string> {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE_URL}/images/upload/reward`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Upload failed: ${await res.text()}`);
+  const data = await res.json();
+  // Return signed URL for immediate display; backend re-signs on subsequent reads
+  return data.url as string;
+}
+
+export async function deleteSubmissionImage(urlOrPath: string): Promise<void> {
+  const path = extractGcsPath(urlOrPath);
+  if (!path) return;
+  const token = getToken();
   if (!token) return;
-  const marker = '/submission-images/';
-  const idx = imageUrl.indexOf(marker);
-  if (idx === -1) return;
-  const fileName = imageUrl.slice(idx + marker.length);
-  await fetch(`${SUPABASE_URL}/storage/v1/object/submission-images/${fileName}`, {
+  await fetch(`${API_BASE_URL}/images?path=${encodeURIComponent(path)}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
-export async function deleteRewardImage(imageUrl: string): Promise<void> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_KEY) : null;
+export async function deleteRewardImage(urlOrPath: string): Promise<void> {
+  const path = extractGcsPath(urlOrPath);
+  if (!path) return;
+  const token = getToken();
   if (!token) return;
-  const marker = '/reward-images/';
-  const idx = imageUrl.indexOf(marker);
-  if (idx === -1) return;
-  const fileName = imageUrl.slice(idx + marker.length);
-  await fetch(`${SUPABASE_URL}/storage/v1/object/reward-images/${fileName}`, {
+  await fetch(`${API_BASE_URL}/images?path=${encodeURIComponent(path)}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });

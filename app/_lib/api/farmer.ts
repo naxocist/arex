@@ -21,7 +21,7 @@ export const farmerApi = {
   createRewardRequest: (payload: CreateRewardRequestPayload) =>
     apiRequest<{ message: string; request: FarmerRewardRequestItem }>('/farmer/reward-requests', { method: 'POST', body: JSON.stringify(payload) }),
   deleteSubmission: (submissionId: string) =>
-    apiRequest<{ message: string; result: { deleted_id: string; image_url: string | null } }>(`/farmer/submissions/${submissionId}`, { method: 'DELETE' }),
+    apiRequest<{ message: string; result: { deleted_id: string } }>(`/farmer/submissions/${submissionId}`, { method: 'DELETE' }),
   cancelRewardRequest: (requestId: string) =>
     apiRequest<{ message: string; result: { request_id: string; request_status: string; available_points: number } }>(
       `/farmer/reward-requests/${requestId}/cancel`, { method: 'POST' }),
