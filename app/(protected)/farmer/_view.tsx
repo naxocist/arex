@@ -309,10 +309,7 @@ export default function FarmerHome() {
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, open: false }));
         try {
-          const res = await farmerApi.deleteSubmission(item.id);
-          if (res.result.image_url) {
-            void deleteSubmissionImage(res.result.image_url);
-          }
+          await farmerApi.deleteSubmission(item.id);
           setToast({ tone: 'success', message: 'ยกเลิกรายการเรียบร้อยแล้ว', id: ++toastId.current });
           await loadDashboard(true);
         } catch (err) {
@@ -524,7 +521,7 @@ export default function FarmerHome() {
                             </div>
                           </div>
 
-                          {/* Row 2: qty + badge/points + pickup window */}
+                          {/* Row 2: qty + badge/points + pickup window + cancel */}
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-xs text-stone-700 font-semibold">
                               {Number(item.quantity_value).toLocaleString('th-TH')} {unitNameByCode[item.quantity_unit] ?? fallbackThaiUnit(item.quantity_unit)}
@@ -542,6 +539,16 @@ export default function FarmerHome() {
                                 🗒 นัดรับ {pickupWindow}
                               </span>
                             )}
+                            {item.status === 'submitted' && (
+                              <button
+                                type="button"
+                                onClick={() => handleCancelSubmission(item)}
+                                className="ml-auto flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition"
+                              >
+                                <X className="h-3 w-3" />
+                                ยกเลิก
+                              </button>
+                            )}
                           </div>
 
                           {/* pickup location text (no coords) */}
@@ -550,20 +557,6 @@ export default function FarmerHome() {
                               <MapPin className="h-3 w-3 shrink-0" />
                               {item.pickup_location_text}
                             </p>
-                          )}
-
-                          {/* Cancel button for pending submissions */}
-                          {item.status === 'submitted' && (
-                            <div className="flex justify-end pt-0.5">
-                              <button
-                                type="button"
-                                onClick={() => handleCancelSubmission(item)}
-                                className="flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition"
-                              >
-                                <X className="h-3 w-3" />
-                                ยกเลิก
-                              </button>
-                            </div>
                           )}
 
                           {/* Cancellation reason */}
