@@ -1,6 +1,7 @@
 from typing import Any
 
 from app.core.errors import WorkflowError
+from app.core.image_utils import resolve_image_url
 from app.db.supabase import get_service_client
 from app.models.workflow import ConfirmFactoryIntakeRequest, UpsertFactoryInfoRequest, UpsertFactoryMaterialPreferencesRequest
 from app.services._base import BaseService, _first_row
@@ -202,7 +203,7 @@ class FactoryService(BaseService):
                     "quantity_unit": submission.get("quantity_unit"),
                     "quantity_to_kg_factor": unit_meta.get("to_kg_factor") if unit_meta else None,
                     "pickup_location_text": submission.get("pickup_location_text"),
-                    "image_url": submission.get("image_url"),
+                    "image_url": resolve_image_url(submission.get("image_url")),
                 })
 
             confirmed: list[dict[str, Any]] = []
@@ -231,7 +232,7 @@ class FactoryService(BaseService):
                     "status": intake.get("status"),
                     "factory_profile_id": intake.get("factory_profile_id"),
                     "discrepancy_note": intake.get("discrepancy_note"),
-                    "image_url": submission.get("image_url"),
+                    "image_url": resolve_image_url(submission.get("image_url")),
                 })
 
             arrived_estimated_weight_kg_total = 0.0

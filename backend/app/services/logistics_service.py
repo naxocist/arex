@@ -1,6 +1,7 @@
 from typing import Any
 
 from app.core.errors import WorkflowError
+from app.core.image_utils import resolve_image_url
 from app.db.supabase import get_service_client
 from app.models.workflow import (
     SchedulePickupRequest,
@@ -84,7 +85,7 @@ class LogisticsService(DistanceService):
                     "pickup_lng": s.get("pickup_lng"),
                     "status": s.get("status"),
                     "created_at": s.get("created_at"),
-                    "image_url": s.get("image_url"),
+                    "image_url": resolve_image_url(s.get("image_url")),
                     "distance_to_farmer_km": None,
                     "pickup_job_id": pickup_job_id_by_submission.get(str(s["id"])),
                     "farmer_display_name": farmer_by_id.get(str(s.get("farmer_profile_id") or ""), {}).get("display_name"),
@@ -345,7 +346,7 @@ class LogisticsService(DistanceService):
                     "submission_status": submission.get("status"),
                     "farmer_display_name": farmer.get("display_name"),
                     "farmer_phone": farmer.get("phone"),
-                    "image_url": submission.get("image_url"),
+                    "image_url": resolve_image_url(submission.get("image_url")),
                     "distance_to_farmer_km": dist_map.get(sid),
                     "distance_farmer_to_factory_km": sub_factory_dist.get((sid, dest_id)),
                 })
@@ -546,7 +547,7 @@ class LogisticsService(DistanceService):
                     "pickup_lng": submission.get("pickup_lng"),
                     "farmer_display_name": farmer.get("display_name"),
                     "farmer_phone": farmer.get("phone"),
-                    "image_url": submission.get("image_url"),
+                    "image_url": resolve_image_url(submission.get("image_url")),
                 })
 
             return result

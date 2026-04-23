@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     supabase_secret_key: str
     osrm_url: str = "https://router.project-osrm.org/route/v1/driving"
 
+    gcs_bucket_name: str = "arex-dev"
+    service_account_json: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env.local",
         env_file_encoding="utf-8",

@@ -1,13 +1,14 @@
 from typing import Any
 
 from app.core.errors import WorkflowError
+from app.core.image_utils import resolve_image_url
 from app.services._base import BaseService, _first_row
 
 
 class RewardsService(BaseService):
     def list_rewards(self) -> list[dict[str, Any]]:
         try:
-            return (
+            rows = (
                 self.client.table("rewards")
                 .select("id, name_th, description_th, points_cost, stock_qty, active, image_url, instruction_notes")
                 .eq("active", True)
@@ -15,17 +16,23 @@ class RewardsService(BaseService):
                 .order("points_cost", desc=False)
                 .execute()
             ).data or []
+            for row in rows:
+                row["image_url"] = resolve_image_url(row.get("image_url"))
+            return rows
         except Exception as exc:
             raise WorkflowError(f"Failed to list rewards catalog: {exc}") from exc
 
     def list_all_rewards(self) -> list[dict[str, Any]]:
         try:
-            return (
+            rows = (
                 self.client.table("rewards")
                 .select("id, name_th, description_th, points_cost, stock_qty, active, image_url, instruction_notes, created_at, updated_at")
                 .order("points_cost", desc=False)
                 .execute()
             ).data or []
+            for row in rows:
+                row["image_url"] = resolve_image_url(row.get("image_url"))
+            return rows
         except Exception as exc:
             raise WorkflowError(f"Failed to list all rewards catalog: {exc}") from exc
 
@@ -55,9 +62,11 @@ class RewardsService(BaseService):
             if "instruction_notes" in payload:
                 insert_data["instruction_notes"] = payload["instruction_notes"] or None
 
-            return _first_row(
+            row = _first_row(
                 self.client.table("rewards").insert(insert_data).execute().data
             )
+            row["image_url"] = resolve_image_url(row.get("image_url"))
+            return row
         except WorkflowError:
             raise
         except Exception as exc:
@@ -109,7 +118,9 @@ class RewardsService(BaseService):
             )
             if not (updated.data or []):
                 raise WorkflowError("Reward not found")
-            return _first_row(updated.data)
+            row = _first_row(updated.data)
+            row["image_url"] = resolve_image_url(row.get("image_url"))
+            return row
         except WorkflowError:
             raise
         except Exception as exc:

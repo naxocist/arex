@@ -6,6 +6,7 @@ from app.api.routes.executive import router as executive_router
 from app.api.routes.factory import router as factory_router
 from app.api.routes.farmer import router as farmer_router
 from app.api.routes.health import router as health_router
+from app.api.routes.images import router as images_router
 from app.api.routes.logistics import router as logistics_router
 from app.api.routes.warehouse import router as warehouse_router
 from app.core.config import get_settings
@@ -21,3 +22,4 @@ api_router.include_router(factory_router)
 api_router.include_router(warehouse_router)
 api_router.include_router(executive_router)
 api_router.include_router(admin_router)
+api_router.include_router(images_router)

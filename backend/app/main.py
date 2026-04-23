@@ -9,7 +9,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.errors import WorkflowError
 
-_MAX_REQUEST_BODY_BYTES = 1 * 1024 * 1024  # 1 MB
+_MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024  # 10 MB (allows image uploads)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

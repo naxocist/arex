@@ -1,6 +1,7 @@
 from typing import Any
 
 from app.core.errors import WorkflowError
+from app.core.image_utils import resolve_image_url
 from app.db.supabase import get_service_client
 from app.models.workflow import (
     CreateRewardRequest,
@@ -227,6 +228,7 @@ class FarmerService(BaseService):
                     ).get("status"),
                     "credited_points": points_by_submission.get(str(item.get("id") or ""), None),
                     "cancel_reason": cancel_reason_by_submission.get(str(item.get("id") or ""), None),
+                    "image_url": resolve_image_url(item.get("image_url")),
                 }
                 for item in submissions
             ]
@@ -250,7 +252,16 @@ class FarmerService(BaseService):
                 raise WorkflowError("Only submissions with status 'submitted' can be deleted")
 
             self.client.table("submissions").delete().eq("id", submission_id).execute()
-            return {"deleted_id": submission_id, "image_url": submission.get("image_url")}
+
+            image_path = submission.get("image_url")
+            if image_path and not image_path.startswith("http"):
+                try:
+                    from cloud_storage.client import get_storage_client
+                    get_storage_client().delete_blob(image_path)
+                except Exception:
+                    pass
+
+            return {"deleted_id": submission_id}
         except WorkflowError:
             raise
         except Exception as exc:
