@@ -14,8 +14,7 @@ class FactoryUser(ArexClient):
     _password = config.FACTORY_PASSWORD
 
     def setup(self) -> None:
-        # Accept all material types with generous capacity
-        self.client.put(
+        r = self.client.put(
             "/api/v1/factory/material-preferences",
             json={
                 "items": [
@@ -32,6 +31,9 @@ class FactoryUser(ArexClient):
             },
             name="PUT /factory/material-preferences",
         )
+        if r.status_code != 200:
+            import logging
+            logging.warning("FactoryUser setup failed: %s %s", r.status_code, r.text[:200])
 
     @task(3)
     def browse(self) -> None:
