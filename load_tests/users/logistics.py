@@ -35,7 +35,7 @@ class LogisticsUser(ArexClient):
         queue = r.json()
         if not queue:
             return
-        submission = queue[0]
+        submission = random.choice(queue)
         submission_id = submission["id"]
         material_type = submission.get("material_type_code", "rice_straw")
         qty_kg = submission.get("quantity_kg", 100)
@@ -64,7 +64,8 @@ class LogisticsUser(ArexClient):
         )
         if r.status_code != 200:
             return
-        job_id = r.json().get("id") or r.json().get("pickup_job_id")
+        body = r.json()
+        job_id = body.get("id") or body.get("pickup_job_id")
         if not job_id:
             return
 
@@ -106,7 +107,8 @@ class LogisticsUser(ArexClient):
         )
         if r.status_code != 200:
             return
-        job_id = r.json().get("id") or r.json().get("delivery_job_id")
+        body = r.json()
+        job_id = body.get("id") or body.get("delivery_job_id")
         if not job_id:
             return
 
