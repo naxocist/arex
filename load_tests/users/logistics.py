@@ -64,8 +64,7 @@ class LogisticsUser(ArexClient):
         )
         if r.status_code != 200:
             return
-        body = r.json()
-        job_id = body.get("id") or body.get("pickup_job_id")
+        job_id = r.json().get("result", {}).get("pickup_job_id")
         if not job_id:
             return
 
@@ -107,8 +106,7 @@ class LogisticsUser(ArexClient):
         )
         if r.status_code != 200:
             return
-        body = r.json()
-        job_id = body.get("id") or body.get("delivery_job_id")
+        job_id = r.json().get("result", {}).get("delivery_job_id")
         if not job_id:
             return
 
