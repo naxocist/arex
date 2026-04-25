@@ -53,3 +53,6 @@ backend/cloud_storage/credential/*
 !backend/cloud_storage/credential/.gitkeep
 
 seed.local.sql.bak*
+
+# Git worktrees
+.worktrees/
