@@ -104,3 +104,13 @@ run = "cd backend && docker compose -f docker-compose.prod.yml logs -f"
 [tasks.check]
 description = "Run frontend and backend checks"
 run = "npx tsc --noEmit && npm run build && cd backend && uv run python -m compileall app scripts"
+
+[tasks."load-test"]
+description = "Run Locust web UI against staging (opens localhost:8089)"
+dir = "load_tests"
+run = "ENV=staging uv run locust"
+
+[tasks."load-test:headless"]
+description = "Run Locust headless against staging, outputs load_tests/report.html"
+dir = "load_tests"
+run = "ENV=staging uv run locust --headless -u ${LOCUST_USERS:-50} -r ${LOCUST_SPAWN_RATE:-5} -t ${LOCUST_RUN_TIME:-5m} --html report.html"
