@@ -59,7 +59,7 @@ class FarmerUser(ArexClient):
         r = self.client.get("/api/v1/farmer/rewards", name="GET /farmer/rewards")
         if r.status_code != 200:
             return
-        rewards = [rw for rw in r.json() if rw.get("points_cost", 9999) <= points]
+        rewards = [rw for rw in r.json() if rw.get("points_cost", float("inf")) <= points]
         if not rewards:
             return
 
