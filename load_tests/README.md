@@ -29,6 +29,8 @@ Override defaults:
 LOCUST_USERS=100 LOCUST_SPAWN_RATE=10 LOCUST_RUN_TIME=10m mise run load-test:headless
 ```
 
+> **Note:** Supabase JWT tokens expire after 1 hour. Keep `LOCUST_RUN_TIME` under 55 minutes to avoid 401 failures mid-run.
+
 ## Run via GitHub Actions
 
 1. Go to **Actions → Load Test → Run workflow**
