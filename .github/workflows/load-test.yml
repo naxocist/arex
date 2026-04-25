@@ -50,12 +50,15 @@ jobs:
           LOAD_TEST_FACTORY_PASSWORD: ${{ secrets.STAGING_LOAD_TEST_FACTORY_PASSWORD }}
           LOAD_TEST_WAREHOUSE_EMAIL: ${{ secrets.STAGING_LOAD_TEST_WAREHOUSE_EMAIL }}
           LOAD_TEST_WAREHOUSE_PASSWORD: ${{ secrets.STAGING_LOAD_TEST_WAREHOUSE_PASSWORD }}
+          LOCUST_USERS: ${{ inputs.users }}
+          LOCUST_SPAWN_RATE: ${{ inputs.spawn_rate }}
+          LOCUST_RUN_TIME: ${{ inputs.run_time }}
         run: |
           uv run locust \
             --headless \
-            -u ${{ inputs.users }} \
-            -r ${{ inputs.spawn_rate }} \
-            -t ${{ inputs.run_time }} \
+            -u "$LOCUST_USERS" \
+            -r "$LOCUST_SPAWN_RATE" \
+            -t "$LOCUST_RUN_TIME" \
             --html report.html
 
       - name: Upload report

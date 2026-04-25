@@ -1,3 +1,4 @@
+import logging
 import random
 from locust import task, between
 from common.client import ArexClient
@@ -32,7 +33,6 @@ class FactoryUser(ArexClient):
             name="PUT /factory/material-preferences",
         )
         if r.status_code != 200:
-            import logging
             logging.warning("FactoryUser setup failed: %s %s", r.status_code, r.text[:200])
 
     @task(3)
