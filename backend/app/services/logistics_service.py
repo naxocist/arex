@@ -362,19 +362,6 @@ class LogisticsService(DistanceService):
         payload: SchedulePickupRequest,
     ) -> dict[str, Any]:
         try:
-            dest_rows = (
-                self.client.table("org_accounts")
-                .select("id, active")
-                .eq("id", payload.destination_factory_id)
-                .eq("type", "factory")
-                .limit(1)
-                .execute()
-            ).data or []
-            if not dest_rows:
-                raise WorkflowError("Destination factory not found")
-            if not bool(dest_rows[0].get("active")):
-                raise WorkflowError("Destination factory is inactive")
-
             result = _first_row(
                 self.client.rpc(
                     "schedule_pickup_job",

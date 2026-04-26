@@ -45,7 +45,7 @@ class FactoryUser(ArexClient):
         r = self.client.get("/api/v1/factory/intakes/pending", name="GET /factory/intakes/pending")
         if r.status_code != 200:
             return
-        intakes = r.json()
+        intakes = r.json().get("queue", [])
         if not intakes:
             return
         intake = random.choice(intakes)

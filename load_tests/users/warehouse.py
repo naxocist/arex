@@ -25,7 +25,7 @@ class WarehouseUser(ArexClient):
         )
         if r.status_code != 200:
             return
-        requests = r.json()
+        requests = r.json().get("requests", [])
         if not requests:
             return
         request_id = random.choice(requests)["id"]

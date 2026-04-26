@@ -178,7 +178,7 @@ jobs:
               --platform managed \
               --allow-unauthenticated \
               --set-secrets "SUPABASE_URL=AREX_PROD_SUPABASE_URL:latest,SUPABASE_PUBLISHABLE_KEY=AREX_PROD_SUPABASE_PUBLISHABLE_KEY:latest,SUPABASE_SECRET_KEY=AREX_PROD_SUPABASE_SECRET_KEY:latest,CORS_ORIGINS=AREX_PROD_CORS_ORIGINS:latest,/secrets/gcs-sa.json=AREX_PROD_GCS_SA_JSON:latest" \
-              --set-env-vars "SERVICE_ACCOUNT_JSON=/secrets/gcs-sa.json,GCS_BUCKET_NAME=arex-prod" \
+              --set-env-vars "SERVICE_ACCOUNT_JSON=/secrets/gcs-sa.json,GCS_BUCKET_NAME=arex-platform-prod" \
               --quiet \
               --format=json
           } 2>&1 | tee deploy-report/deploy.log

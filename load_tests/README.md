@@ -43,14 +43,14 @@ Required GitHub secrets (set once in repo Settings → Secrets → Actions):
 | Secret | Description |
 |--------|-------------|
 | `STAGING_TARGET_HOST` | Cloud Run staging URL |
-| `STAGING_LOAD_TEST_FARMER_EMAIL` | Staging farmer account email |
-| `STAGING_LOAD_TEST_FARMER_PASSWORD` | Staging farmer account password |
 | `STAGING_LOAD_TEST_LOGISTICS_EMAIL` | Staging logistics account email |
 | `STAGING_LOAD_TEST_LOGISTICS_PASSWORD` | Staging logistics account password |
 | `STAGING_LOAD_TEST_FACTORY_EMAIL` | Staging factory account email |
 | `STAGING_LOAD_TEST_FACTORY_PASSWORD` | Staging factory account password |
 | `STAGING_LOAD_TEST_WAREHOUSE_EMAIL` | Staging warehouse account email |
 | `STAGING_LOAD_TEST_WAREHOUSE_PASSWORD` | Staging warehouse account password |
+| `STAGING_LOAD_TEST_ADMIN_EMAIL` | Staging admin account email (approves load test farmers) |
+| `STAGING_LOAD_TEST_ADMIN_PASSWORD` | Staging admin account password |
 
 ## Maintenance
 
@@ -69,7 +69,35 @@ When an API endpoint changes, find the corresponding file:
 
 | User class | Weight | Simulates |
 |------------|--------|-----------|
-| FarmerUser | 5 | Browse, submit material, request reward |
+| FarmerUser | 5 | Self-register, get approved, browse, submit material, request/cancel reward |
 | LogisticsUser | 2 | Queue check, full pickup cycle, reward delivery cycle |
 | FactoryUser | 2 | Browse intakes, confirm intake |
 | WarehouseUser | 1 | Review + approve reward requests |
+
+## Post-run cleanup
+
+Each load test run creates real DB records that must be manually removed.
+
+### 1. Delete farmer accounts (cascades everything)
+
+In **Supabase Dashboard → Authentication → Users**, filter by email and delete all `loadtest.farmer.*@arex-load.test` accounts.
+
+This cascades:
+`profiles` → `submissions` → `pickup_jobs` → `factory_intakes` → `points_ledger` → `reward_requests` → `reward_delivery_jobs`
+
+### 2. Clean orphaned status_events (not covered by cascade)
+
+`status_events` stores audit trail rows keyed by `entity_id` (bare UUID, no FK). Deleting submissions leaves orphan rows behind.
+
+```sql
+DELETE FROM status_events
+WHERE entity_type = 'submission'
+  AND entity_id NOT IN (SELECT id FROM submissions);
+```
+
+Run this in **Supabase Dashboard → SQL Editor** after step 1.
+
+### Notes
+
+- Logistics, factory, and warehouse users are pre-existing seeded accounts — no cleanup needed for those roles.
+- At typical load (50 users, 5 min run), expect ~500–1000 orphan `status_events` rows.

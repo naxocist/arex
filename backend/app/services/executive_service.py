@@ -59,9 +59,12 @@ class ExecutiveService(BaseService):
             submissions_convertible_count = 0
             submissions_non_convertible_count = 0
             submissions_non_convertible_quantity_total = 0.0
+            submissions_pending_pickup = 0
             unique_farmers: set[str] = set()
 
             for row in submissions:
+                if row.get("status") == "submitted":
+                    submissions_pending_pickup += 1
                 if row.get("farmer_profile_id") is not None:
                     unique_farmers.add(str(row["farmer_profile_id"]))
 
@@ -102,56 +105,56 @@ class ExecutiveService(BaseService):
                 reverse=True,
             )
 
+            rr_status: dict[str, int] = {}
+            reward_requested_points_total = 0
+            reward_approved_points_total = 0
+            for r in reward_requests:
+                st = r.get("status") or ""
+                rr_status[st] = rr_status.get(st, 0) + 1
+                pts = int(_to_float(r.get("requested_points")))
+                reward_requested_points_total += pts
+                if st == "warehouse_approved":
+                    reward_approved_points_total += pts
             reward_requests_status_summary = {
-                "requested": sum(1 for r in reward_requests if r.get("status") == "requested"),
-                "warehouse_approved": sum(1 for r in reward_requests if r.get("status") == "warehouse_approved"),
-                "warehouse_rejected": sum(1 for r in reward_requests if r.get("status") == "warehouse_rejected"),
-                "cancelled": sum(1 for r in reward_requests if r.get("status") == "cancelled"),
+                "requested": rr_status.get("requested", 0),
+                "warehouse_approved": rr_status.get("warehouse_approved", 0),
+                "warehouse_rejected": rr_status.get("warehouse_rejected", 0),
+                "cancelled": rr_status.get("cancelled", 0),
             }
-            reward_requested_points_total = sum(int(_to_float(r.get("requested_points"))) for r in reward_requests)
-            reward_approved_points_total = sum(
-                int(_to_float(r.get("requested_points")))
-                for r in reward_requests
-                if r.get("status") == "warehouse_approved"
-            )
 
-            points_credited_total = sum(
-                int(_to_float(r.get("points_amount")))
-                for r in points_ledger
-                if r.get("entry_type") in {"intake_credit", "adjustment"}
-            )
-            points_spent_total = sum(
-                int(_to_float(r.get("points_amount")))
-                for r in points_ledger
-                if r.get("entry_type") == "reward_spend"
-            )
-            points_reserved_total = sum(
-                int(_to_float(r.get("points_amount")))
-                for r in points_ledger
-                if r.get("entry_type") == "reward_reserve"
-            ) - sum(
-                int(_to_float(r.get("points_amount")))
-                for r in points_ledger
-                if r.get("entry_type") == "reward_release"
-            )
+            points_credited_total = 0
+            points_spent_total = 0
+            points_reserved_total = 0
+            for r in points_ledger:
+                entry_type = r.get("entry_type") or ""
+                amt = int(_to_float(r.get("points_amount")))
+                if entry_type in {"intake_credit", "adjustment"}:
+                    points_credited_total += amt
+                elif entry_type == "reward_spend":
+                    points_spent_total += amt
+                elif entry_type == "reward_reserve":
+                    points_reserved_total += amt
+                elif entry_type == "reward_release":
+                    points_reserved_total -= amt
 
             factory_confirmed_weight_kg_total = sum(_to_float(r.get("measured_weight_kg")) for r in intakes)
+            pj_status: dict[str, int] = {}
+            for r in pickup_jobs:
+                st = r.get("status") or ""
+                pj_status[st] = pj_status.get(st, 0) + 1
             pickup_jobs_status_summary = {
-                "pickup_scheduled": sum(1 for r in pickup_jobs if r.get("status") == "pickup_scheduled"),
-                "picked_up": sum(1 for r in pickup_jobs if r.get("status") == "picked_up"),
-                "delivered_to_factory": sum(1 for r in pickup_jobs if r.get("status") == "delivered_to_factory"),
+                "pickup_scheduled": pj_status.get("pickup_scheduled", 0),
+                "picked_up": pj_status.get("picked_up", 0),
+                "delivered_to_factory": pj_status.get("delivered_to_factory", 0),
             }
 
             return {
                 "submissions_total": len(submissions),
                 "unique_farmers_total": len(unique_farmers),
-                "submissions_pending_pickup": sum(1 for r in submissions if r.get("status") == "submitted"),
-                "pickup_jobs_active": sum(
-                    1 for r in pickup_jobs
-                    if r.get("status") in {"pickup_scheduled", "picked_up", "delivered_to_factory"}
-                ),
+                "submissions_pending_pickup": submissions_pending_pickup,
+                "pickup_jobs_active": sum(pj_status.get(s, 0) for s in {"pickup_scheduled", "picked_up", "delivered_to_factory"}),
                 "pickup_jobs_status_summary": pickup_jobs_status_summary,
-                "reward_requests_pending_warehouse": sum(1 for r in reward_requests if r.get("status") == "requested"),
+                "reward_requests_pending_warehouse": rr_status.get("requested", 0),
                 "submitted_weight_estimated_kg_total": round(submitted_weight_estimated_kg_total, 3),
                 "submitted_weight_estimated_ton_total": round(submitted_weight_estimated_kg_total / 1000, 3),
                 "submissions_convertible_count": submissions_convertible_count,

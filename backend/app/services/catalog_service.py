@@ -69,33 +69,19 @@ class CatalogService(BaseService):
             if not name_th:
                 raise WorkflowError("Material name is required")
 
-            if not (
-                self.client.table("material_types")
-                .select("code")
-                .eq("code", source_code)
-                .limit(1)
-                .execute()
-            ).data:
-                raise WorkflowError("Material type not found")
-
             update_data: dict[str, Any] = {"name_th": name_th, "active": payload.active}
             if payload.points_per_kg is not None:
                 update_data["points_per_kg"] = payload.points_per_kg
 
-            (
+            rows = (
                 self.client.table("material_types")
                 .update(update_data)
                 .eq("code", source_code)
                 .execute()
-            )
-            updated = (
-                self.client.table("material_types")
-                .select("code, name_th, active, points_per_kg")
-                .eq("code", source_code)
-                .limit(1)
-                .execute()
-            )
-            return _first_row(updated.data)
+            ).data or []
+            if not rows:
+                raise WorkflowError("Material type not found")
+            return rows[0]
         except WorkflowError:
             raise
         except Exception as exc:
@@ -134,16 +120,7 @@ class CatalogService(BaseService):
             if not name_th:
                 raise WorkflowError("Unit name is required")
 
-            if not (
-                self.client.table("measurement_units")
-                .select("code")
-                .eq("code", source_code)
-                .limit(1)
-                .execute()
-            ).data:
-                raise WorkflowError("Measurement unit not found")
-
-            (
+            rows = (
                 self.client.table("measurement_units")
                 .update({
                     "name_th": name_th,
@@ -152,15 +129,10 @@ class CatalogService(BaseService):
                 })
                 .eq("code", source_code)
                 .execute()
-            )
-            updated = (
-                self.client.table("measurement_units")
-                .select("code, name_th, to_kg_factor, active")
-                .eq("code", source_code)
-                .limit(1)
-                .execute()
-            )
-            return _first_row(updated.data)
+            ).data or []
+            if not rows:
+                raise WorkflowError("Measurement unit not found")
+            return rows[0]
         except WorkflowError:
             raise
         except Exception as exc:

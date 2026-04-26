@@ -25,6 +25,27 @@ class DistanceService(BaseService):
         except Exception:
             return None
 
+    def _fetch_osrm_distances_batch(
+        self,
+        source_lat: float,
+        source_lng: float,
+        destinations: list[tuple[float, float]],
+    ) -> list[float | None]:
+        """One OSRM /table call: source → N destinations. Returns distances in km."""
+        if not destinations:
+            return []
+        try:
+            base = get_settings().osrm_url.replace("/route/v1/driving", "/table/v1/driving")
+            coords = f"{source_lng},{source_lat};" + ";".join(f"{lng},{lat}" for lat, lng in destinations)
+            dest_indices = ";".join(str(i + 1) for i in range(len(destinations)))
+            url = f"{base}/{coords}?sources=0&destinations={dest_indices}&annotations=distance"
+            with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310
+                data = json.loads(resp.read())
+            row = data["distances"][0]
+            return [float(d) / 1000.0 if d is not None else None for d in row]
+        except Exception:
+            return [None] * len(destinations)
+
     def _upsert_to_farmer(
         self,
         logistics_profile_id: str,
@@ -215,22 +236,26 @@ class DistanceService(BaseService):
                 .execute()
             ).data or []
 
-            for job in pickup_jobs:
-                submission_rows = (
+            if pickup_jobs:
+                sids = list({str(j["submission_id"]) for j in pickup_jobs if j.get("submission_id")})
+                sub_rows = (
                     self.client.table("submissions")
-                    .select("pickup_lat, pickup_lng")
-                    .eq("id", job["submission_id"])
-                    .limit(1)
+                    .select("id, pickup_lat, pickup_lng")
+                    .in_("id", sids)
                     .execute()
                 ).data or []
-                submission = submission_rows[0] if submission_rows else {}
-
-                f_lat, f_lng = submission.get("pickup_lat"), submission.get("pickup_lng")
-                sid = str(job["submission_id"])
-
-                d1 = self._fetch_osrm_distance(new_lat, new_lng, f_lat, f_lng) if all(v is not None for v in [f_lat, f_lng]) else None
-                self._upsert_to_farmer(logistics_profile_id, "submission", sid, d1)
-                # farmer_to_factory is provider-independent — not recalculated here
+                valid = [(r, r["pickup_lat"], r["pickup_lng"]) for r in sub_rows if r.get("pickup_lat") is not None and r.get("pickup_lng") is not None]
+                if valid:
+                    distances = self._fetch_osrm_distances_batch(new_lat, new_lng, [(la, ln) for _, la, ln in valid])
+                    upserts = [
+                        {"logistics_profile_id": logistics_profile_id, "reference_type": "submission", "reference_id": str(r["id"]), "distance_km": km}
+                        for (r, _, _), km in zip(valid, distances)
+                    ]
+                    if upserts:
+                        try:
+                            self.client.table("logistics_to_farmer_distances").upsert(upserts).execute()
+                        except Exception:
+                            pass
 
             delivery_jobs = (
                 self.client.table("delivery_jobs")
@@ -241,19 +266,26 @@ class DistanceService(BaseService):
                 .execute()
             ).data or []
 
-            for job in delivery_jobs:
-                request_rows = (
+            if delivery_jobs:
+                rids = list({str(j["reward_request_id"]) for j in delivery_jobs if j.get("reward_request_id")})
+                req_rows = (
                     self.client.table("reward_requests")
-                    .select("delivery_lat, delivery_lng")
-                    .eq("id", job["reward_request_id"])
-                    .limit(1)
+                    .select("id, delivery_lat, delivery_lng")
+                    .in_("id", rids)
                     .execute()
                 ).data or []
-                request = request_rows[0] if request_rows else {}
-
-                d_lat, d_lng = request.get("delivery_lat"), request.get("delivery_lng")
-                d = self._fetch_osrm_distance(new_lat, new_lng, d_lat, d_lng) if all(v is not None for v in [d_lat, d_lng]) else None
-                self._upsert_to_farmer(logistics_profile_id, "reward_request", str(job["reward_request_id"]), d)
+                valid = [(r, r["delivery_lat"], r["delivery_lng"]) for r in req_rows if r.get("delivery_lat") is not None and r.get("delivery_lng") is not None]
+                if valid:
+                    distances = self._fetch_osrm_distances_batch(new_lat, new_lng, [(la, ln) for _, la, ln in valid])
+                    upserts = [
+                        {"logistics_profile_id": logistics_profile_id, "reference_type": "reward_request", "reference_id": str(r["id"]), "distance_km": km}
+                        for (r, _, _), km in zip(valid, distances)
+                    ]
+                    if upserts:
+                        try:
+                            self.client.table("logistics_to_farmer_distances").upsert(upserts).execute()
+                        except Exception:
+                            pass
         except Exception:
             pass
 
@@ -289,21 +321,44 @@ class DistanceService(BaseService):
             ).data or []
             reward_requests = [r for r in reward_requests if str(r.get("id", "")) not in request_ids_with_jobs]
 
+            valid_submissions = [(s, s["pickup_lat"], s["pickup_lng"]) for s in submissions if s.get("pickup_lat") is not None and s.get("pickup_lng") is not None]
+            if valid_submissions:
+                dests = [(s_lat, s_lng) for _, s_lat, s_lng in valid_submissions]
+                distances = self._fetch_osrm_distances_batch(lat, lng, dests)
+                upserts = [
+                    {"logistics_profile_id": logistics_profile_id, "reference_type": "submission", "reference_id": str(s["id"]), "distance_km": km}
+                    for (s, _, _), km in zip(valid_submissions, distances)
+                ]
+                if upserts:
+                    try:
+                        self.client.table("logistics_to_farmer_distances").upsert(upserts).execute()
+                    except Exception:
+                        pass
             for s in submissions:
-                s_lat, s_lng = s.get("pickup_lat"), s.get("pickup_lng")
-                km = self._fetch_osrm_distance(lat, lng, s_lat, s_lng) if all(v is not None for v in [s_lat, s_lng]) else None
-                self._upsert_to_farmer(logistics_profile_id, "submission", str(s["id"]), km)
+                if s.get("pickup_lat") is None or s.get("pickup_lng") is None:
+                    self._upsert_to_farmer(logistics_profile_id, "submission", str(s["id"]), None)
 
+            valid_requests = [(r, r["delivery_lat"], r["delivery_lng"]) for r in reward_requests if r.get("delivery_lat") is not None and r.get("delivery_lng") is not None]
+            if valid_requests:
+                dests = [(r_lat, r_lng) for _, r_lat, r_lng in valid_requests]
+                distances = self._fetch_osrm_distances_batch(lat, lng, dests)
+                upserts = [
+                    {"logistics_profile_id": logistics_profile_id, "reference_type": "reward_request", "reference_id": str(r["id"]), "distance_km": km}
+                    for (r, _, _), km in zip(valid_requests, distances)
+                ]
+                if upserts:
+                    try:
+                        self.client.table("logistics_to_farmer_distances").upsert(upserts).execute()
+                    except Exception:
+                        pass
             for r in reward_requests:
-                r_lat, r_lng = r.get("delivery_lat"), r.get("delivery_lng")
-                km = self._fetch_osrm_distance(lat, lng, r_lat, r_lng) if all(v is not None for v in [r_lat, r_lng]) else None
-                self._upsert_to_farmer(logistics_profile_id, "reward_request", str(r["id"]), km)
+                if r.get("delivery_lat") is None or r.get("delivery_lng") is None:
+                    self._upsert_to_farmer(logistics_profile_id, "reward_request", str(r["id"]), None)
         except Exception:
             pass
 
     def recalculate_distances_for_factory(self, factory_id: str, fac_lat: float, fac_lng: float) -> None:
         try:
-            # Get distinct submission_ids destined for this factory (active jobs only)
             job_rows = (
                 self.client.table("pickup_jobs")
                 .select("submission_id")
@@ -313,24 +368,32 @@ class DistanceService(BaseService):
                 .execute()
             ).data or []
 
-            seen: set[str] = set()
-            for job in job_rows:
-                sid = str(job["submission_id"])
-                if sid in seen:
-                    continue
-                seen.add(sid)
+            sids = list({str(j["submission_id"]) for j in job_rows if j.get("submission_id")})
+            if not sids:
+                return
 
-                submission_rows = (
-                    self.client.table("submissions")
-                    .select("pickup_lat, pickup_lng")
-                    .eq("id", sid)
-                    .limit(1)
-                    .execute()
-                ).data or []
-                sub = submission_rows[0] if submission_rows else {}
-                f_lat, f_lng = sub.get("pickup_lat"), sub.get("pickup_lng")
-                d2 = self._fetch_osrm_distance(f_lat, f_lng, fac_lat, fac_lng) if all(v is not None for v in [f_lat, f_lng]) else None
-                self._upsert_submission_factory(sid, factory_id, d2)
+            sub_rows = (
+                self.client.table("submissions")
+                .select("id, pickup_lat, pickup_lng")
+                .in_("id", sids)
+                .execute()
+            ).data or []
+
+            valid = [(r, r["pickup_lat"], r["pickup_lng"]) for r in sub_rows if r.get("pickup_lat") is not None and r.get("pickup_lng") is not None]
+            if not valid:
+                return
+
+            # farmer→factory: source is farmer pickup, destination is factory
+            distances = self._fetch_osrm_distances_batch(fac_lat, fac_lng, [(la, ln) for _, la, ln in valid])
+            upserts = [
+                {"submission_id": str(r["id"]), "factory_id": factory_id, "distance_km": km}
+                for (r, _, _), km in zip(valid, distances)
+            ]
+            if upserts:
+                try:
+                    self.client.table("submission_factory_distances").upsert(upserts).execute()
+                except Exception:
+                    pass
         except Exception:
             pass
 

@@ -32,7 +32,7 @@ class LogisticsUser(ArexClient):
         r = self.client.get("/api/v1/logistics/pickup-queue", name="GET /logistics/pickup-queue")
         if r.status_code != 200:
             return
-        queue = r.json()
+        queue = r.json().get("queue", [])
         if not queue:
             return
         submission = random.choice(queue)
@@ -46,9 +46,10 @@ class LogisticsUser(ArexClient):
             params={"material_type": material_type, "quantity_kg": qty_kg, "submission_id": submission_id},
             name="GET /logistics/factories",
         )
-        if r.status_code != 200 or not r.json():
+        factories = r.json().get("factories", []) if r.status_code == 200 else []
+        if not factories:
             return
-        factory_id = r.json()[0]["id"]
+        factory_id = factories[0]["id"]
 
         # 3. Schedule pickup
         start, end = _window()
@@ -89,9 +90,12 @@ class LogisticsUser(ArexClient):
             "/api/v1/logistics/reward-requests/approved",
             name="GET /logistics/reward-requests/approved",
         )
-        if r.status_code != 200 or not r.json():
+        if r.status_code != 200:
             return
-        request_id = r.json()[0]["id"]
+        approved = r.json().get("queue", [])
+        if not approved:
+            return
+        request_id = approved[0]["id"]
 
         # 2. Schedule delivery
         start, end = _window()
