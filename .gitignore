@@ -23,6 +23,7 @@ pnpm-debug.log*
 !backend/.env.staging.example
 backend/supabase/.env.supabase
 !backend/supabase/.env.supabase.example
+!load_tests/.env.example
 
 
 # Python caches and virtual envs

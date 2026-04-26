@@ -5,7 +5,7 @@ Locust-based load tests targeting the staging API.
 ## Prerequisites
 
 - Python 3.11+, uv (`mise run setup` covers this)
-- `backend/.env.staging` with `LOAD_TEST_*` vars filled in (see `backend/.env.staging.example`)
+- `load_tests/.env` with values filled in (copy from `load_tests/.env.example`)
 
 ## Run locally (web UI)
 
@@ -63,7 +63,7 @@ When an API endpoint changes, find the corresponding file:
 | `backend/app/api/routes/factory.py` | `load_tests/users/factory.py` |
 | `backend/app/api/routes/warehouse.py` | `load_tests/users/warehouse.py` |
 | Auth changes | `load_tests/common/auth.py` |
-| New env vars | `load_tests/common/config.py` + `backend/.env.staging.example` |
+| New env vars | `load_tests/common/config.py` + `load_tests/.env.example` |
 
 ## User weights
 

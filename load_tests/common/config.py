@@ -5,13 +5,11 @@ from dotenv import load_dotenv
 _env = os.getenv("ENV", "staging")
 
 if _env != "ci":
-    _env_file = Path(__file__).parent.parent.parent / "backend" / (
-        ".env.local" if _env == "local" else ".env.staging"
-    )
+    _env_file = Path(__file__).parent.parent / ".env"
     if not _env_file.exists():
         raise FileNotFoundError(
             f"Load test env file not found: {_env_file}\n"
-            f"Copy backend/.env.staging.example to backend/.env.staging and fill in LOAD_TEST_* vars.\n"
+            f"Copy load_tests/.env.example to load_tests/.env and fill in values.\n"
             f"Or set ENV=ci and inject all LOAD_TEST_* variables directly."
         )
     load_dotenv(_env_file)
