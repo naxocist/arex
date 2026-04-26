@@ -73,11 +73,21 @@ export default function LoginView() {
 
   const handleApiLogin = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsLoggingIn(true);
     setLoginMessage(null);
 
+    if (!email.trim()) {
+      setLoginMessage('กรุณากรอกอีเมล');
+      return;
+    }
+    if (!password) {
+      setLoginMessage('กรุณากรอกรหัสผ่าน');
+      return;
+    }
+
+    setIsLoggingIn(true);
+
     try {
-      const login = await authApi.login({ email, password });
+      const login = await authApi.login({ email: email.trim(), password });
       setAuthSession({
         accessToken: login.access_token,
         refreshToken: login.refresh_token,
@@ -94,7 +104,9 @@ export default function LoginView() {
 
       setLoginMessage('เข้าสู่ระบบสำเร็จ แต่บทบาทนี้ยังไม่มีหน้าใช้งานในระบบ');
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (error instanceof ApiError && error.status === 401) {
+        setLoginMessage('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+      } else if (error instanceof ApiError) {
         setLoginMessage(`เข้าสู่ระบบไม่สำเร็จ: ${error.message}`);
       } else {
         setLoginMessage('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่');
