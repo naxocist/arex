@@ -224,17 +224,17 @@ export default function LogisticsHistory() {
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'material' | 'reward' | 'cancelled'>('material');
-  const [materialSort, setMaterialSort] = useState<{ key: 'planned_pickup_at' | 'material' | 'weight'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'desc' });
-  const [rewardSort, setRewardSort] = useState<{ key: 'planned_delivery_at' | 'reward_name'; dir: SortDir }>({ key: 'planned_delivery_at', dir: 'desc' });
-  const [cancelledSort, setCancelledSort] = useState<{ key: 'planned_pickup_at' | 'material'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'desc' });
+  const [materialSort, setMaterialSort] = useState<{ key: 'scheduled_pickup_at' | 'material' | 'weight'; dir: SortDir }>({ key: 'scheduled_pickup_at', dir: 'desc' });
+  const [rewardSort, setRewardSort] = useState<{ key: 'scheduled_delivery_at' | 'reward_name'; dir: SortDir }>({ key: 'scheduled_delivery_at', dir: 'desc' });
+  const [cancelledSort, setCancelledSort] = useState<{ key: 'scheduled_pickup_at' | 'material'; dir: SortDir }>({ key: 'scheduled_pickup_at', dir: 'desc' });
 
   const deliveredPickupJobsRaw = useMemo(
-    () => pickupJobs.filter((i) => i.status === 'delivered_to_factory'),
+    () => pickupJobs.filter((i) => i.status === 'delivered'),
     [pickupJobs],
   );
 
   const completedDeliveryJobsRaw = useMemo(
-    () => deliveryJobs.filter((i) => i.status === 'reward_delivered'),
+    () => deliveryJobs.filter((i) => i.status === 'done'),
     [deliveryJobs],
   );
 
@@ -250,19 +250,19 @@ export default function LogisticsHistory() {
     const mul = materialSort.dir === 'asc' ? 1 : -1;
     if (materialSort.key === 'material') return mul * (a.material_type ?? '').localeCompare(b.material_type ?? '');
     if (materialSort.key === 'weight') return mul * (toKgForSort(a.quantity_value, a.quantity_unit) - toKgForSort(b.quantity_value, b.quantity_unit));
-    return mul * (new Date(a.planned_pickup_at ?? 0).getTime() - new Date(b.planned_pickup_at ?? 0).getTime());
+    return mul * (new Date(a.scheduled_pickup_at ?? 0).getTime() - new Date(b.scheduled_pickup_at ?? 0).getTime());
   }), [deliveredPickupJobsRaw, materialSort]);
 
   const completedDeliveryJobs = useMemo(() => [...completedDeliveryJobsRaw].sort((a, b) => {
     const mul = rewardSort.dir === 'asc' ? 1 : -1;
     if (rewardSort.key === 'reward_name') return mul * (a.reward_name_th ?? '').localeCompare(b.reward_name_th ?? '');
-    return mul * (new Date(a.planned_delivery_at ?? 0).getTime() - new Date(b.planned_delivery_at ?? 0).getTime());
+    return mul * (new Date(a.scheduled_delivery_at ?? 0).getTime() - new Date(b.scheduled_delivery_at ?? 0).getTime());
   }), [completedDeliveryJobsRaw, rewardSort]);
 
   const sortedCancelledJobs = useMemo(() => [...cancelledJobs].sort((a, b) => {
     const mul = cancelledSort.dir === 'asc' ? 1 : -1;
     if (cancelledSort.key === 'material') return mul * (a.material_type ?? '').localeCompare(b.material_type ?? '');
-    return mul * (new Date(a.planned_pickup_at ?? 0).getTime() - new Date(b.planned_pickup_at ?? 0).getTime());
+    return mul * (new Date(a.scheduled_pickup_at ?? 0).getTime() - new Date(b.scheduled_pickup_at ?? 0).getTime());
   }), [cancelledJobs, cancelledSort]);
 
   const loadJobs = async (forceRefresh = false) => {
@@ -368,7 +368,7 @@ export default function LogisticsHistory() {
             {!isLoading && deliveredPickupJobs.length > 0 && (
               <SortHeaderBar
                 cols={[
-                  { key: 'planned_pickup_at' as const, label: 'วันนัดรับ', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
+                  { key: 'scheduled_pickup_at' as const, label: 'วันนัดรับ', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
                   { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
                   { key: 'weight' as const, label: 'น้ำหนัก', dirLabels: ['น้อยก่อน', 'มากก่อน'] },
                 ]}
@@ -415,7 +415,7 @@ export default function LogisticsHistory() {
                     item.farmer_phone ? `เบอร์โทร: ${item.farmer_phone}` : null,
                     `จุดรับวัสดุ: ${item.pickup_location_text || '-'}`,
                     hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? `แผนที่จุดรับ: ${buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}` : null,
-                    `วันนัดรับ: ${formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}`,
+                    `วันนัดรับ: ${formatDateRange(item.scheduled_pickup_at, item.pickup_window_end_at)}`,
                     item.destination_factory_name_th ? `` : null,
                     item.destination_factory_name_th ? `โรงงานปลายทาง: ${item.destination_factory_name_th}` : null,
                     item.destination_factory_location_text ? `ที่อยู่โรงงาน: ${item.destination_factory_location_text}` : null,
@@ -470,7 +470,7 @@ export default function LogisticsHistory() {
                         <div className="flex items-center gap-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400 min-w-0 flex-1">
                             <span className="font-bold text-emerald-700">{Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</span>
-                            <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดรับ {formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}</span>
+                            <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดรับ {formatDateRange(item.scheduled_pickup_at, item.pickup_window_end_at)}</span>
                             {item.destination_factory_name_th && (
                               <span className="flex items-center gap-0.5"><Factory className="h-3 w-3" />{item.destination_factory_name_th}</span>
                             )}
@@ -520,7 +520,7 @@ export default function LogisticsHistory() {
             {!isLoading && sortedCancelledJobs.length > 0 && (
               <SortHeaderBar
                 cols={[
-                  { key: 'planned_pickup_at' as const, label: 'วันนัดรับ', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
+                  { key: 'scheduled_pickup_at' as const, label: 'วันนัดรับ', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
                   { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
                 ]}
                 sort={cancelledSort}
@@ -567,7 +567,7 @@ export default function LogisticsHistory() {
                           </div>
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400">
                             <span className="font-bold text-rose-600">{Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</span>
-                            <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดรับ {formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}</span>
+                            <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดรับ {formatDateRange(item.scheduled_pickup_at, item.pickup_window_end_at)}</span>
                             {item.destination_factory_name_th && (
                               <span className="flex items-center gap-0.5"><Factory className="h-3 w-3" />{item.destination_factory_name_th}</span>
                             )}
@@ -604,7 +604,7 @@ export default function LogisticsHistory() {
             {!isLoading && completedDeliveryJobs.length > 0 && (
               <SortHeaderBar
                 cols={[
-                  { key: 'planned_delivery_at' as const, label: 'วันนัดส่ง', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
+                  { key: 'scheduled_delivery_at' as const, label: 'วันนัดส่ง', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
                   { key: 'reward_name' as const, label: 'ชื่อรางวัล', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
                 ]}
                 sort={rewardSort}
@@ -644,7 +644,7 @@ export default function LogisticsHistory() {
                     item.farmer_phone ? `เบอร์โทร: ${item.farmer_phone}` : null,
                     `จุดส่งมอบ: ${item.pickup_location_text || '-'}`,
                     hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? `แผนที่จุดส่ง: ${buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}` : null,
-                    `วันนัดส่ง: ${formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}`,
+                    `วันนัดส่ง: ${formatDateRange(item.scheduled_delivery_at, item.delivery_window_end_at)}`,
                     hasDistance ? `` : null,
                     hasDistance ? `--- ระยะทาง (ทางถนน) ---` : null,
                     ...segments.map(s => s.distanceKm !== null ? `${s.label}: ${s.distanceKm.toFixed(1)} กม.` : `${s.label}: ไม่สามารถคำนวณได้`),
@@ -677,7 +677,7 @@ export default function LogisticsHistory() {
                         <div className="flex items-center gap-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400 min-w-0 flex-1">
                             <span className="font-bold text-violet-700">{Number(item.quantity).toLocaleString('th-TH')} ชิ้น</span>
-                            <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดส่ง {formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}</span>
+                            <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดส่ง {formatDateRange(item.scheduled_delivery_at, item.delivery_window_end_at)}</span>
                             {item.farmer_display_name && (
                               <span className="flex items-center gap-0.5">
                                 <User className="h-3 w-3" />{item.farmer_display_name}

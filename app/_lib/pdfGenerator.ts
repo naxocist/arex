@@ -160,19 +160,19 @@ export function generatePickupJobPdf(item: LogisticsPickupJobItem, route?: Route
 
   const statusMap: Record<string, string> = {
     pickup_scheduled: 'กำลังไปรับวัสดุ',
-    picked_up: 'รับวัสดุแล้ว',
-    delivered_to_factory: 'ส่งถึงโรงงานแล้ว',
+    received: 'รับวัสดุแล้ว',
+    delivered: 'ส่งถึงโรงงานแล้ว',
   };
   const statusColorMap: Record<string, [number, number, number]> = {
     pickup_scheduled: [59, 130, 246],
-    picked_up: [234, 179, 8],
-    delivered_to_factory: [22, 163, 74],
+    received: [234, 179, 8],
+    delivered: [22, 163, 74],
   };
 
   const statusLabel = statusMap[item.status] ?? item.status;
   const statusColor = statusColorMap[item.status] ?? [100, 100, 100];
-  const dateRange = item.planned_pickup_at
-    ? `${formatDate(item.planned_pickup_at)}${item.pickup_window_end_at ? ` ถึง ${formatDate(item.pickup_window_end_at)}` : ''}`
+  const dateRange = item.scheduled_pickup_at
+    ? `${formatDate(item.scheduled_pickup_at)}${item.pickup_window_end_at ? ` ถึง ${formatDate(item.pickup_window_end_at)}` : ''}`
     : '-';
 
   addHeaderBlock(w, 'ใบรับวัสดุ', item.id.slice(0, 8).toUpperCase(), statusLabel, statusColor);
@@ -230,20 +230,20 @@ export function generateDeliveryJobPdf(item: LogisticsRewardDeliveryJobItem, rou
     d ? new Date(d).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
 
   const statusMap: Record<string, string> = {
-    reward_delivery_scheduled: 'จัดรอบส่งแล้ว',
+    delivery_scheduled: 'จัดรอบส่งแล้ว',
     out_for_delivery: 'กำลังนำส่ง',
-    reward_delivered: 'ส่งมอบสำเร็จ',
+    done: 'ส่งมอบสำเร็จ',
   };
   const statusColorMap: Record<string, [number, number, number]> = {
-    reward_delivery_scheduled: [139, 92, 246],
+    delivery_scheduled: [139, 92, 246],
     out_for_delivery: [234, 179, 8],
-    reward_delivered: [22, 163, 74],
+    done: [22, 163, 74],
   };
 
   const statusLabel = statusMap[item.status] ?? item.status;
   const statusColor = statusColorMap[item.status] ?? [100, 100, 100];
-  const dateRange = item.planned_delivery_at
-    ? `${formatDate(item.planned_delivery_at)}${item.delivery_window_end_at ? ` ถึง ${formatDate(item.delivery_window_end_at)}` : ''}`
+  const dateRange = item.scheduled_delivery_at
+    ? `${formatDate(item.scheduled_delivery_at)}${item.delivery_window_end_at ? ` ถึง ${formatDate(item.delivery_window_end_at)}` : ''}`
     : '-';
 
   addHeaderBlock(w, 'ใบส่งรางวัล', item.id.slice(0, 8).toUpperCase(), statusLabel, statusColor);

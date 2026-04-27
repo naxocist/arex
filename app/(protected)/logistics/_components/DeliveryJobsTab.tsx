@@ -30,9 +30,9 @@ import { buildGoogleMapsDirectionsUrl, buildGoogleMapsUrl, formatDateRange, hasV
 
 function formatDeliveryStatus(status: string): string {
   const map: Record<string, string> = {
-    reward_delivery_scheduled: 'จัดรอบส่งแล้ว',
+    delivery_scheduled: 'จัดรอบส่งแล้ว',
     out_for_delivery: 'กำลังนำส่ง',
-    reward_delivered: 'ส่งมอบสำเร็จ',
+    done: 'ส่งมอบสำเร็จ',
   };
   return map[status] ?? status;
 }
@@ -68,7 +68,7 @@ export default function DeliveryJobsTab({
 }: Props) {
   const reduceMotion = useReducedMotion();
 
-  const [sort, setSort] = useState<{ key: 'planned_delivery_at' | 'status' | 'reward_name' | 'distance'; dir: SortDir }>({ key: 'planned_delivery_at', dir: 'asc' });
+  const [sort, setSort] = useState<{ key: 'scheduled_delivery_at' | 'status' | 'reward_name' | 'distance'; dir: SortDir }>({ key: 'scheduled_delivery_at', dir: 'asc' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRangeById, setEditRangeById] = useState<Record<string, DateRangeValue>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -84,7 +84,7 @@ export default function DeliveryJobsTab({
     if (sort.key === 'status') return mul * (a.status ?? '').localeCompare(b.status ?? '');
     if (sort.key === 'reward_name') return mul * (a.reward_name_th ?? '').localeCompare(b.reward_name_th ?? '');
     if (sort.key === 'distance') return mul * ((a.distance_to_farmer_km ?? Infinity) - (b.distance_to_farmer_km ?? Infinity));
-    return mul * (new Date(a.planned_delivery_at ?? 0).getTime() - new Date(b.planned_delivery_at ?? 0).getTime());
+    return mul * (new Date(a.scheduled_delivery_at ?? 0).getTime() - new Date(b.scheduled_delivery_at ?? 0).getTime());
   });
 
   return (
@@ -93,7 +93,7 @@ export default function DeliveryJobsTab({
       {!isLoading && items.length > 0 && (
         <SortHeaderBar
           cols={[
-            { key: 'planned_delivery_at' as const, label: 'วันนัดส่ง', dirLabels: ['เร็วก่อน', 'ช้าก่อน'] },
+            { key: 'scheduled_delivery_at' as const, label: 'วันนัดส่ง', dirLabels: ['เร็วก่อน', 'ช้าก่อน'] },
             { key: 'reward_name' as const, label: 'ชื่อรางวัล', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
             { key: 'distance' as const, label: 'ระยะทาง', dirLabels: ['ใกล้ก่อน', 'ไกลก่อน'] },
             { key: 'status' as const, label: 'สถานะ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
@@ -143,7 +143,7 @@ export default function DeliveryJobsTab({
               item.farmer_phone ? `เบอร์โทร: ${item.farmer_phone}` : null,
               `จุดส่งมอบ: ${item.pickup_location_text || '-'}`,
               hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? `แผนที่จุดส่ง: ${buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}` : null,
-              `วันนัดส่ง: ${formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}`,
+              `วันนัดส่ง: ${formatDateRange(item.scheduled_delivery_at, item.delivery_window_end_at)}`,
               hasDistance ? `` : null,
               hasDistance ? `--- ระยะทาง (ทางถนน) ---` : null,
               ...segments.map(s => s.distanceKm !== null ? `${s.label}: ${s.distanceKm.toFixed(1)} กม.` : `${s.label}: ไม่สามารถคำนวณได้`),
@@ -167,10 +167,10 @@ export default function DeliveryJobsTab({
                     )}
                     <div className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2.5">
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0 ${item.status === 'reward_delivery_scheduled' ? 'bg-violet-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                          {item.status === 'reward_delivery_scheduled' ? '1' : <CheckCheck className="h-2.5 w-2.5" />}
+                        <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0 ${item.status === 'delivery_scheduled' ? 'bg-violet-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                          {item.status === 'delivery_scheduled' ? '1' : <CheckCheck className="h-2.5 w-2.5" />}
                         </span>
-                        <span className={`text-xs font-semibold ${item.status === 'reward_delivery_scheduled' ? 'text-violet-700' : 'text-emerald-600'}`}>ออกนำส่ง</span>
+                        <span className={`text-xs font-semibold ${item.status === 'delivery_scheduled' ? 'text-violet-700' : 'text-emerald-600'}`}>ออกนำส่ง</span>
                       </div>
                       <span className="text-stone-300 text-xs shrink-0">──→</span>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -178,7 +178,7 @@ export default function DeliveryJobsTab({
                         <span className={`text-xs font-semibold ${item.status === 'out_for_delivery' ? 'text-emerald-700' : 'text-stone-400'}`}>ส่งมอบ</span>
                       </div>
                       <div className="ml-auto">
-                        {item.status === 'reward_delivery_scheduled' && (
+                        {item.status === 'delivery_scheduled' && (
                           <motion.button type="button"
                             onClick={() => confirm('ยืนยันออกนำส่งแล้ว?', () => onMarkOutForDelivery(item.id))}
                             disabled={isBusy}
@@ -200,14 +200,14 @@ export default function DeliveryJobsTab({
                         )}
                       </div>
                     </div>
-                    {item.status === 'reward_delivery_scheduled' && (
+                    {item.status === 'delivery_scheduled' && (
                       <div>
                         <button
                           type="button"
                           onClick={() => {
                             if (editingId === item.id) { setEditingId(null); return; }
                             setEditingId(item.id);
-                            setEditRangeById((p) => ({ ...p, [item.id]: { from: isoToDateOnly(item.planned_delivery_at), to: isoToDateOnly(item.delivery_window_end_at) } }));
+                            setEditRangeById((p) => ({ ...p, [item.id]: { from: isoToDateOnly(item.scheduled_delivery_at), to: isoToDateOnly(item.delivery_window_end_at) } }));
                           }}
                           className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors"
                         >
@@ -272,7 +272,7 @@ export default function DeliveryJobsTab({
                   <div className="flex items-center gap-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400 min-w-0 flex-1">
                       <span className="font-medium text-stone-600">{Number(item.quantity).toLocaleString('th-TH')} ชิ้น</span>
-                      <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดส่ง {formatDateRange(item.planned_delivery_at, item.delivery_window_end_at)}</span>
+                      <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดส่ง {formatDateRange(item.scheduled_delivery_at, item.delivery_window_end_at)}</span>
                       {item.farmer_display_name && (
                         <span className="flex items-center gap-0.5">
                           <User className="h-3 w-3" />{item.farmer_display_name}

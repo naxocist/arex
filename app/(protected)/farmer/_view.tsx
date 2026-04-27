@@ -47,15 +47,15 @@ async function resizeImageFile(file: File, maxPx = 1600, quality = 0.85): Promis
   });
 }
 
-const ACTIVE_STATUSES = new Set(['submitted', 'pickup_scheduled', 'picked_up', 'delivered_to_factory', 'factory_confirmed']);
+const ACTIVE_STATUSES = new Set(['submitted', 'pickup_scheduled', 'received', 'delivered']);
 
 const STATUS_FILTER_OPTIONS = [
-  { value: 'submitted',            label: 'รอจัดคิวรถ',   Icon: ClipboardList, color: 'amber'   },
-  { value: 'pickup_scheduled',     label: 'จัดคิวรถแล้ว', Icon: CalendarCheck, color: 'sky'     },
-  { value: 'picked_up',           label: 'รับวัสดุแล้ว', Icon: Truck,         color: 'blue'    },
-  { value: 'delivered_to_factory', label: 'ส่งถึงโรงงาน', Icon: Factory,       color: 'violet'  },
-  { value: 'points_credited',      label: 'ได้แต้มแล้ว',  Icon: Coins,         color: 'emerald' },
-  { value: 'cancelled',            label: 'ถูกยกเลิก',    Icon: Ban,           color: 'rose'    },
+  { value: 'submitted',        label: 'รอจัดคิวรถ',   Icon: ClipboardList, color: 'amber'   },
+  { value: 'pickup_scheduled', label: 'จัดคิวรถแล้ว', Icon: CalendarCheck, color: 'sky'     },
+  { value: 'received',         label: 'รับวัสดุแล้ว', Icon: Truck,         color: 'blue'    },
+  { value: 'delivered',        label: 'ส่งถึงโรงงาน', Icon: Factory,       color: 'violet'  },
+  { value: 'done',             label: 'ได้แต้มแล้ว',  Icon: Coins,         color: 'emerald' },
+  { value: 'cancelled',        label: 'ถูกยกเลิก',    Icon: Ban,           color: 'rose'    },
 ] as const;
 
 const TAB_ACTIVE_CLASSES: Record<string, string> = {
@@ -86,10 +86,9 @@ function formatSubmissionStatus(status: string): string {
   const map: Record<string, string> = {
     submitted: 'รอจัดคิวรถ',
     pickup_scheduled: 'จัดคิวรถแล้ว',
-    picked_up: 'รับวัสดุแล้ว',
-    delivered_to_factory: 'ส่งถึงโรงงานแล้ว',
-    factory_confirmed: 'โรงงานยืนยันแล้ว',
-    points_credited: 'ได้รับแต้มแล้ว',
+    received: 'รับวัสดุแล้ว',
+    delivered: 'ส่งถึงโรงงานแล้ว',
+    done: 'ได้รับแต้มแล้ว',
     cancelled: 'ถูกยกเลิก',
   };
   return map[status] ?? status;
@@ -475,18 +474,17 @@ export default function FarmerHome() {
               >
                 {filteredSubmissions.map((item) => {
                   const isActiveStatus = ACTIVE_STATUSES.has(item.status);
-                  const isCredited = item.status === 'points_credited';
+                  const isCredited = item.status === 'done';
                   const hasMap = item.pickup_lat != null && item.pickup_lng != null;
-                  const pickupWindow = formatPickupWindow(item.pickup_window_start_at, item.pickup_window_end_at);
-                  const showPickupDate = isActiveStatus && item.pickup_window_start_at && item.status !== 'delivered_to_factory' && item.status !== 'factory_confirmed';
+                  const pickupWindow = formatPickupWindow(item.scheduled_pickup_at, item.pickup_window_end_at);
+                  const showPickupDate = isActiveStatus && item.scheduled_pickup_at && item.status !== 'delivered' && item.status !== 'done';
 
                   const stripeColor: Record<string, string> = {
                     submitted: 'border-l-amber-400',
                     pickup_scheduled: 'border-l-sky-400',
-                    picked_up: 'border-l-blue-400',
-                    delivered_to_factory: 'border-l-violet-400',
-                    factory_confirmed: 'border-l-violet-300',
-                    points_credited: 'border-l-emerald-400',
+                    received: 'border-l-blue-400',
+                    delivered: 'border-l-violet-400',
+                    done: 'border-l-emerald-400',
                     cancelled: 'border-l-stone-300',
                   };
 
@@ -571,10 +569,10 @@ export default function FarmerHome() {
                           )}
 
                           {/* Cancellation reason */}
-                          {item.status === 'cancelled' && item.cancel_reason && (
+                          {item.status === 'cancelled' && item.cancellation_reason && (
                             <p className="flex items-start gap-1 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs text-rose-700">
                               <X className="h-3 w-3 shrink-0 mt-0.5" />
-                              <span><span className="font-semibold">เหตุผลที่ยกเลิก:</span> {item.cancel_reason}</span>
+                              <span><span className="font-semibold">เหตุผลที่ยกเลิก:</span> {item.cancellation_reason}</span>
                             </p>
                           )}
                         </div>

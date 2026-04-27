@@ -21,7 +21,7 @@ class CancelPickupJobRequest(BaseModel):
 class SchedulePickupRequest(BaseModel):
     pickup_window_start_at: datetime
     pickup_window_end_at: datetime
-    destination_factory_id: str = Field(min_length=1, max_length=64)
+    destination_factory_id: str | None = Field(default=None, min_length=1, max_length=64)
     notes: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
@@ -32,7 +32,7 @@ class SchedulePickupRequest(BaseModel):
 
 
 class ConfirmFactoryIntakeRequest(BaseModel):
-    pickup_job_id: str = Field(min_length=1, max_length=64)
+    submission_id: str = Field(min_length=1, max_length=64)
     measured_weight_kg: float = Field(gt=0, le=100_000)
     discrepancy_note: str | None = Field(default=None, max_length=1000)
 

@@ -16,24 +16,23 @@ const BASE_BADGE_CLASS =
 function getStatusBadgeClass(status: string): string {
   const normalized = status.trim().toLowerCase();
 
-  if (normalized === 'warehouse_rejected' || normalized === 'cancelled') {
+  if (normalized === 'rejected' || normalized === 'cancelled') {
     return 'border-red-200 bg-red-100 text-red-800';
   }
 
   if (
-    normalized === 'warehouse_approved' ||
-    normalized === 'reward_delivered' ||
-    normalized === 'points_credited' ||
+    normalized === 'approved' ||
+    normalized === 'done' ||
     normalized === 'ready'
   ) {
     return 'border-emerald-200 bg-emerald-100 text-emerald-800';
   }
 
-  if (normalized === 'delivered_to_factory' || normalized === 'factory_confirmed') {
+  if (normalized === 'delivered') {
     return 'border-blue-200 bg-blue-100 text-blue-800';
   }
 
-  if (normalized === 'picked_up' || normalized === 'out_for_delivery') {
+  if (normalized === 'received' || normalized === 'out_for_delivery') {
     return 'border-cyan-200 bg-cyan-100 text-cyan-800';
   }
 
@@ -41,7 +40,7 @@ function getStatusBadgeClass(status: string): string {
     normalized === 'submitted' ||
     normalized === 'requested' ||
     normalized === 'pickup_scheduled' ||
-    normalized === 'reward_delivery_scheduled'
+    normalized === 'delivery_scheduled'
   ) {
     return 'border-amber-200 bg-amber-100 text-amber-800';
   }
@@ -53,16 +52,14 @@ const STATUS_ICON_MAP: Record<string, React.ComponentType<{ className?: string }
   submitted: Clock,
   requested: Clock,
   pickup_scheduled: Clock,
-  reward_delivery_scheduled: Clock,
-  picked_up: Truck,
+  delivery_scheduled: Clock,
+  received: Truck,
   out_for_delivery: Truck,
-  delivered_to_factory: Package,
-  factory_confirmed: Factory,
-  warehouse_approved: CheckCircle2,
-  reward_delivered: CheckCircle2,
-  points_credited: Coins,
+  delivered: Package,
+  approved: CheckCircle2,
+  done: Coins,
   ready: CheckCircle2,
-  warehouse_rejected: XCircle,
+  rejected: XCircle,
   cancelled: XCircle,
 };
 

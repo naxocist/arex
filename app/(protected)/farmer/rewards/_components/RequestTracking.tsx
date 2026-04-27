@@ -28,54 +28,42 @@ import { formatDateTime } from '@/app/_lib/utils';
 function formatRewardRequestStatus(status: string): string {
   const map: Record<string, string> = {
     requested: 'รอคลังตรวจสอบ',
-    warehouse_approved: 'คลังอนุมัติแล้ว',
-    warehouse_rejected: 'คลังปฏิเสธ',
+    approved: 'คลังอนุมัติแล้ว',
+    rejected: 'คลังปฏิเสธ',
     cancelled: 'ยกเลิกแล้ว',
-  };
-  return map[status] ?? status;
-}
-
-function formatDeliveryStatus(status: string): string {
-  const map: Record<string, string> = {
-    reward_delivery_scheduled: 'จัดรอบส่งแล้ว',
+    delivery_scheduled: 'จัดรอบส่งแล้ว',
     out_for_delivery: 'กำลังนำส่ง',
-    reward_delivered: 'ส่งมอบสำเร็จ',
-    cancelled: 'ยกเลิก',
+    done: 'ส่งมอบสำเร็จ',
   };
   return map[status] ?? status;
 }
 
-type DeliveryJob = NonNullable<FarmerRewardRequestItem['delivery_jobs']>[0];
-
-/** True when this request is fully finished (delivered, rejected, or cancelled). */
+/** True when this request is fully finished (done, rejected, or cancelled). */
 function isRequestDone(r: FarmerRewardRequestItem): boolean {
-  if (r.status === 'warehouse_rejected' || r.status === 'cancelled') return true;
-  const dj = r.delivery_jobs?.[0];
-  return r.status === 'warehouse_approved' && dj?.status === 'reward_delivered';
+  return r.status === 'done' || r.status === 'rejected' || r.status === 'cancelled';
 }
 
 /** Numeric priority for sorting by effective status (lower = more urgent). */
 function statusPriority(r: FarmerRewardRequestItem): number {
   if (r.status === 'cancelled') return 60;
-  if (r.status === 'warehouse_rejected') return 50;
-  const dj = r.delivery_jobs?.[0];
-  if (dj?.status === 'reward_delivered') return 40;
-  if (dj?.status === 'out_for_delivery') return 10;
-  if (dj?.status === 'reward_delivery_scheduled') return 20;
-  if (r.status === 'warehouse_approved') return 30;
+  if (r.status === 'rejected') return 50;
+  if (r.status === 'done') return 40;
+  if (r.status === 'out_for_delivery') return 10;
+  if (r.status === 'delivery_scheduled') return 20;
+  if (r.status === 'approved') return 30;
   return 0; // requested
 }
 
 // ─── DeliveryProgress ────────────────────────────────────────────────────────
 
-function DeliveryProgress({ deliveryJob }: { deliveryJob: DeliveryJob }) {
+function DeliveryProgress({ request }: { request: FarmerRewardRequestItem }) {
   const steps = [
-    { status: 'reward_delivery_scheduled', label: 'จัดรอบส่ง', time: deliveryJob.planned_delivery_at },
-    { status: 'out_for_delivery', label: 'กำลังนำส่ง', time: deliveryJob.out_for_delivery_at },
-    { status: 'reward_delivered', label: 'ส่งมอบแล้ว', time: deliveryJob.delivered_at },
+    { status: 'delivery_scheduled', label: 'จัดรอบส่ง', time: request.scheduled_delivery_at },
+    { status: 'out_for_delivery', label: 'กำลังนำส่ง', time: request.out_for_delivery_at },
+    { status: 'done', label: 'ส่งมอบแล้ว', time: request.delivered_at },
   ];
-  const currentIdx = steps.findIndex((s) => s.status === deliveryJob.status);
-  const isDelivered = deliveryJob.status === 'reward_delivered';
+  const currentIdx = steps.findIndex((s) => s.status === request.status);
+  const isDelivered = request.status === 'done';
 
   return (
     <div className="rounded-2xl bg-stone-50 px-4 py-3.5">
@@ -281,31 +269,19 @@ export default function RequestTracking({
           >
             <div className="divide-y divide-stone-100">
               {filteredRequests.map((request) => {
-                const deliveryJob = request.delivery_jobs?.[0] ?? null;
                 const rewardName = rewardNameById[request.reward_id] ?? 'รางวัลที่เลือก';
                 const rewardImg = rewardsCatalog.find((r) => r.id === request.reward_id)?.image_url ?? null;
                 const canCancel = request.status === 'requested';
-                const hasDelivery = deliveryJob && deliveryJob.status !== 'cancelled';
+                const hasDelivery = request.status === 'delivery_scheduled' || request.status === 'out_for_delivery' || request.status === 'done';
                 const isExpanded = expandedRequestId === request.id;
                 const isPending = request.status === 'requested';
-                const isApproved = request.status === 'warehouse_approved';
-                const isDelivered = deliveryJob?.status === 'reward_delivered';
-                const isRejected = request.status === 'warehouse_rejected';
+                const isApproved = request.status === 'approved';
+                const isDelivered = request.status === 'done';
+                const isRejected = request.status === 'rejected';
                 const isCancelled = request.status === 'cancelled';
 
-                // Effective status badge to show
-                let badgeStatus: string;
-                let badgeLabel: string;
-                if (isApproved && hasDelivery) {
-                  badgeStatus = deliveryJob.status;
-                  badgeLabel = formatDeliveryStatus(deliveryJob.status);
-                } else if (isApproved && !hasDelivery) {
-                  badgeStatus = 'pickup_scheduled';
-                  badgeLabel = 'รอจัดส่ง';
-                } else {
-                  badgeStatus = request.status;
-                  badgeLabel = formatRewardRequestStatus(request.status);
-                }
+                const badgeStatus = request.status;
+                const badgeLabel = formatRewardRequestStatus(request.status);
 
                 return (
                   <article key={request.id}>
@@ -436,7 +412,7 @@ export default function RequestTracking({
                             )}
 
                             {/* Delivery progress stepper */}
-                            {hasDelivery && <DeliveryProgress deliveryJob={deliveryJob} />}
+                            {hasDelivery && <DeliveryProgress request={request} />}
 
                             {/* Cancel button */}
                             {canCancel && (

@@ -224,7 +224,7 @@ export default function FactoryIntake() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'confirmed'>('pending');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [confirmedSort, setConfirmedSort] = useState<{ key: 'confirmed_at' | 'material'; dir: SortDir }>({ key: 'confirmed_at', dir: 'desc' });
+  const [confirmedSort, setConfirmedSort] = useState<{ key: 'factory_confirmed_at' | 'material'; dir: SortDir }>({ key: 'factory_confirmed_at', dir: 'desc' });
 
   const confirm = (msg: string, onConfirm: () => void) => setConfirmPending({ message: msg, onConfirm });
 
@@ -243,9 +243,9 @@ export default function FactoryIntake() {
       setWeightByJobId((prev) => {
         const next = { ...prev };
         for (const item of res.queue) {
-          if (!next[item.pickup_job_id]) {
+          if (!next[item.id]) {
             const kg = quantityToKg(Number(item.quantity_value), item.quantity_to_kg_factor);
-            if (kg !== null) next[item.pickup_job_id] = String(kg);
+            if (kg !== null) next[item.id] = String(kg);
           }
         }
         return next;
@@ -260,14 +260,14 @@ export default function FactoryIntake() {
   useEffect(() => { void loadQueue(); }, []);
 
   const handleConfirm = async (item: FactoryPendingIntakeItem) => {
-    const inputWeight = Number(weightByJobId[item.pickup_job_id]);
+    const inputWeight = Number(weightByJobId[item.id]);
     if (!Number.isFinite(inputWeight) || inputWeight <= 0) {
       setToast({ tone: 'error', message: 'กรุณาระบุน้ำหนักจริง (กิโลกรัม) ให้ถูกต้อง', id: ++toastId.current });
       return;
     }
-    setConfirmingJobId(item.pickup_job_id);
+    setConfirmingJobId(item.id);
     try {
-      await factoryApi.confirmIntake({ pickup_job_id: item.pickup_job_id, measured_weight_kg: inputWeight });
+      await factoryApi.confirmIntake({ submission_id: item.id, measured_weight_kg: inputWeight });
       setToast({ tone: 'success', message: 'ยืนยันรับเข้าโรงงานสำเร็จแล้ว', id: ++toastId.current });
       await loadQueue(true);
     } catch (err) {
@@ -289,7 +289,7 @@ export default function FactoryIntake() {
   const sortedConfirmed = useMemo(() => [...confirmed].sort((a, b) => {
     const mul = confirmedSort.dir === 'asc' ? 1 : -1;
     if (confirmedSort.key === 'material') return mul * (a.material_name_th ?? a.material_type).localeCompare(b.material_name_th ?? b.material_type);
-    return mul * (new Date(a.confirmed_at).getTime() - new Date(b.confirmed_at).getTime());
+    return mul * (new Date(a.factory_confirmed_at).getTime() - new Date(b.factory_confirmed_at).getTime());
   }), [confirmed, confirmedSort]);
 
   const tabs = [
@@ -382,15 +382,15 @@ export default function FactoryIntake() {
               queue.map((item) => {
                 const materialName = item.material_name_th ?? formatMaterial(item.material_type);
                 const estimatedKg = quantityToKg(Number(item.quantity_value), item.quantity_to_kg_factor);
-                const arrivalDate = item.delivered_factory_at ?? item.planned_pickup_at;
-                const isConfirming = confirmingJobId === item.pickup_job_id;
-                const isExp = expandedId === item.pickup_job_id;
+                const arrivalDate = item.delivered_at ?? item.scheduled_pickup_at;
+                const isConfirming = confirmingJobId === item.id;
+                const isExp = expandedId === item.id;
                 return (
-                  <div key={item.pickup_job_id}>
+                  <div key={item.id}>
                     <IntakeCard
                       accent="amber"
                       isExpanded={isExp}
-                      onToggle={() => setExpandedId((cur) => cur === item.pickup_job_id ? null : item.pickup_job_id)}
+                      onToggle={() => setExpandedId((cur) => cur === item.id ? null : item.id)}
                       expandedContent={
                         <div className="space-y-4">
                           {/* Weight input + confirm */}
@@ -405,9 +405,9 @@ export default function FactoryIntake() {
                                   type="number"
                                   min="0"
                                   step="0.01"
-                                  value={weightByJobId[item.pickup_job_id] ?? ''}
+                                  value={weightByJobId[item.id] ?? ''}
                                   onChange={(e) =>
-                                    setWeightByJobId((prev) => ({ ...prev, [item.pickup_job_id]: e.target.value }))
+                                    setWeightByJobId((prev) => ({ ...prev, [item.id]: e.target.value }))
                                   }
                                   placeholder="0.00"
                                   className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-base font-semibold outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 min-h-[48px]"
@@ -416,7 +416,7 @@ export default function FactoryIntake() {
                             </div>
                             <motion.button
                               type="button"
-                              onClick={() => confirm(`ยืนยันรับเข้าโรงงาน ${Number(weightByJobId[item.pickup_job_id] || 0).toLocaleString('th-TH')} กก.?`, () => void handleConfirm(item))}
+                              onClick={() => confirm(`ยืนยันรับเข้าโรงงาน ${Number(weightByJobId[item.id] || 0).toLocaleString('th-TH')} กก.?`, () => void handleConfirm(item))}
                               disabled={isConfirming}
                               className="flex min-h-[48px] shrink-0 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
                               whileTap={{ scale: 0.97 }}
@@ -502,7 +502,7 @@ export default function FactoryIntake() {
             {!isLoading && sortedConfirmed.length > 0 && (
               <SortHeaderBar
                 cols={[
-                  { key: 'confirmed_at' as const, label: 'วันยืนยัน', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
+                  { key: 'factory_confirmed_at' as const, label: 'วันยืนยัน', dirLabels: ['เก่าก่อน', 'ใหม่ก่อน'] },
                   { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
                 ]}
                 sort={confirmedSort}
@@ -520,13 +520,13 @@ export default function FactoryIntake() {
             ) : (
               sortedConfirmed.map((item) => {
                 const materialName = item.material_name_th ?? formatMaterial(item.material_type);
-                const isExp = expandedId === item.intake_id;
+                const isExp = expandedId === item.id;
                 return (
-                  <div key={item.intake_id}>
+                  <div key={item.id}>
                     <IntakeCard
                       accent="emerald"
                       isExpanded={isExp}
-                      onToggle={() => setExpandedId((cur) => cur === item.intake_id ? null : item.intake_id)}
+                      onToggle={() => setExpandedId((cur) => cur === item.id ? null : item.id)}
                       expandedContent={
                         <div className="grid gap-3 sm:grid-cols-3 text-sm">
                           <div>
@@ -568,7 +568,7 @@ export default function FactoryIntake() {
                           </span>
                           <span className="flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
                             <CalendarRange className="h-3 w-3 text-stone-400" />
-                            ยืนยันเมื่อ {formatDate(item.confirmed_at)}
+                            ยืนยันเมื่อ {formatDate(item.factory_confirmed_at)}
                           </span>
                         </div>
                         {/* Row 3: location (dimmed) */}

@@ -89,70 +89,39 @@ class FactoryService(BaseService):
             if not my_factory_id:
                 raise WorkflowError("Factory record not found")
 
-            pickup_jobs_arrived = (
-                self.client.table("pickup_jobs")
+            # Submissions delivered to this factory, awaiting weight confirmation
+            arrived_rows = (
+                self.client.table("material_submissions")
                 .select(
-                    "id, submission_id, logistics_profile_id, destination_factory_id, status, "
-                    "planned_pickup_at, picked_up_at, delivered_factory_at"
+                    "id, farmer_profile_id, material_type, quantity_value, quantity_unit, "
+                    "pickup_location_text, image_url, logistics_profile_id, "
+                    "scheduled_pickup_at, received_at, delivered_at, status"
                 )
-                .eq("status", "delivered_to_factory")
+                .eq("status", "delivered")
                 .eq("destination_factory_id", my_factory_id)
-                .order("delivered_factory_at", desc=True)
+                .order("delivered_at", desc=True)
                 .execute()
             ).data or []
 
-            factory_intakes = (
-                self.client.table("intakes")
-                .select("id, pickup_job_id, factory_profile_id, measured_weight_kg, discrepancy_note, status, confirmed_at")
+            # Submissions already confirmed (done) by this factory user
+            confirmed_rows = (
+                self.client.table("material_submissions")
+                .select(
+                    "id, farmer_profile_id, material_type, quantity_value, quantity_unit, "
+                    "pickup_location_text, image_url, factory_profile_id, "
+                    "measured_weight_kg, discrepancy_note, factory_confirmed_at, status"
+                )
+                .eq("status", "done")
                 .eq("factory_profile_id", factory_profile_id)
-                .order("confirmed_at", desc=True)
+                .order("factory_confirmed_at", desc=True)
                 .execute()
             ).data or []
 
-            intake_pickup_job_ids = list({
-                str(item["pickup_job_id"])
-                for item in factory_intakes
-                if item.get("pickup_job_id") is not None
-            })
-
-            pickup_jobs_confirmed: list[dict[str, Any]] = []
-            if intake_pickup_job_ids:
-                pickup_jobs_confirmed = (
-                    self.client.table("pickup_jobs")
-                    .select(
-                        "id, submission_id, logistics_profile_id, destination_factory_id, status, "
-                        "planned_pickup_at, picked_up_at, delivered_factory_at"
-                    )
-                    .in_("id", intake_pickup_job_ids)
-                    .execute()
-                ).data or []
-
-            pickup_jobs_by_id: dict[str, dict[str, Any]] = {}
-            for row in [*pickup_jobs_arrived, *pickup_jobs_confirmed]:
-                row_id = row.get("id")
-                if row_id is not None:
-                    pickup_jobs_by_id[str(row_id)] = row
-
-            submission_ids = list({
-                str(row["submission_id"])
-                for row in pickup_jobs_by_id.values()
-                if row.get("submission_id") is not None
-            })
-
-            submissions: list[dict[str, Any]] = []
-            submissions_by_id: dict[str, dict[str, Any]] = {}
-            if submission_ids:
-                submissions = (
-                    self.client.table("submissions")
-                    .select("id, material_type, quantity_value, quantity_unit, pickup_location_text, image_url")
-                    .in_("id", submission_ids)
-                    .execute()
-                ).data or []
-                submissions_by_id = {str(row["id"]): row for row in submissions if row.get("id")}
+            all_submissions = [*arrived_rows, *confirmed_rows]
 
             material_codes = list({
                 str(row.get("material_type"))
-                for row in submissions
+                for row in all_submissions
                 if row.get("material_type") is not None
             })
             material_names_by_code: dict[str, str] = {}
@@ -168,7 +137,7 @@ class FactoryService(BaseService):
 
             unit_codes = list({
                 str(row["quantity_unit"])
-                for row in submissions
+                for row in all_submissions
                 if row.get("quantity_unit") is not None
             })
             units_by_code: dict[str, dict[str, Any]] = {}
@@ -183,56 +152,44 @@ class FactoryService(BaseService):
                         units_by_code[str(row["code"])] = row
 
             queue: list[dict[str, Any]] = []
-            for job in pickup_jobs_arrived:
-                submission = submissions_by_id.get(str(job.get("submission_id")))
-                if submission is None:
-                    continue
-                unit_code = submission.get("quantity_unit")
+            for row in arrived_rows:
+                unit_code = row.get("quantity_unit")
                 unit_meta = units_by_code.get(str(unit_code)) if unit_code is not None else None
                 queue.append({
-                    "pickup_job_id": str(job["id"]),
-                    "submission_id": str(job.get("submission_id")),
-                    "logistics_profile_id": str(job.get("logistics_profile_id")),
-                    "status": job.get("status"),
-                    "planned_pickup_at": job.get("planned_pickup_at"),
-                    "picked_up_at": job.get("picked_up_at"),
-                    "delivered_factory_at": job.get("delivered_factory_at"),
-                    "material_type": submission.get("material_type"),
-                    "material_name_th": material_names_by_code.get(str(submission.get("material_type") or "")),
-                    "quantity_value": submission.get("quantity_value"),
-                    "quantity_unit": submission.get("quantity_unit"),
+                    "id": str(row["id"]),
+                    "logistics_profile_id": str(row.get("logistics_profile_id") or ""),
+                    "status": row.get("status"),
+                    "scheduled_pickup_at": row.get("scheduled_pickup_at"),
+                    "received_at": row.get("received_at"),
+                    "delivered_at": row.get("delivered_at"),
+                    "material_type": row.get("material_type"),
+                    "material_name_th": material_names_by_code.get(str(row.get("material_type") or "")),
+                    "quantity_value": row.get("quantity_value"),
+                    "quantity_unit": row.get("quantity_unit"),
                     "quantity_to_kg_factor": unit_meta.get("to_kg_factor") if unit_meta else None,
-                    "pickup_location_text": submission.get("pickup_location_text"),
-                    "image_url": resolve_image_url(submission.get("image_url")),
+                    "pickup_location_text": row.get("pickup_location_text"),
+                    "image_url": resolve_image_url(row.get("image_url")),
                 })
 
             confirmed: list[dict[str, Any]] = []
             confirmed_weight_kg_total = 0.0
-            for intake in factory_intakes:
-                job = pickup_jobs_by_id.get(str(intake.get("pickup_job_id") or ""))
-                if job is None:
-                    continue
-                submission = submissions_by_id.get(str(job.get("submission_id")))
-                if submission is None:
-                    continue
-                measured_weight_kg = float(intake.get("measured_weight_kg") or 0)
+            for row in confirmed_rows:
+                measured_weight_kg = float(row.get("measured_weight_kg") or 0)
                 confirmed_weight_kg_total += measured_weight_kg
                 confirmed.append({
-                    "intake_id": str(intake.get("id")),
-                    "pickup_job_id": str(intake.get("pickup_job_id") or ""),
-                    "submission_id": str(job.get("submission_id")),
-                    "material_type": submission.get("material_type"),
-                    "material_name_th": material_names_by_code.get(str(submission.get("material_type") or "")),
-                    "quantity_value": submission.get("quantity_value"),
-                    "quantity_unit": submission.get("quantity_unit"),
+                    "id": str(row["id"]),
+                    "material_type": row.get("material_type"),
+                    "material_name_th": material_names_by_code.get(str(row.get("material_type") or "")),
+                    "quantity_value": row.get("quantity_value"),
+                    "quantity_unit": row.get("quantity_unit"),
                     "measured_weight_kg": measured_weight_kg,
                     "measured_weight_ton": round(measured_weight_kg / 1000, 3),
-                    "pickup_location_text": submission.get("pickup_location_text"),
-                    "confirmed_at": intake.get("confirmed_at"),
-                    "status": intake.get("status"),
-                    "factory_profile_id": intake.get("factory_profile_id"),
-                    "discrepancy_note": intake.get("discrepancy_note"),
-                    "image_url": resolve_image_url(submission.get("image_url")),
+                    "pickup_location_text": row.get("pickup_location_text"),
+                    "factory_confirmed_at": row.get("factory_confirmed_at"),
+                    "status": row.get("status"),
+                    "factory_profile_id": row.get("factory_profile_id"),
+                    "discrepancy_note": row.get("discrepancy_note"),
+                    "image_url": resolve_image_url(row.get("image_url")),
                 })
 
             arrived_estimated_weight_kg_total = 0.0
@@ -270,30 +227,11 @@ class FactoryService(BaseService):
         self, factory_profile_id: str, payload: ConfirmFactoryIntakeRequest
     ) -> dict[str, Any]:
         try:
-            my_factory = self.get_or_create_factory_for_profile(factory_profile_id)
-            my_factory_id = str(my_factory.get("id") or "")
-            if not my_factory_id:
-                raise WorkflowError("Factory record not found")
-
-            pickup_job_rows = (
-                self.client.table("pickup_jobs")
-                .select("id, destination_factory_id")
-                .eq("id", payload.pickup_job_id)
-                .limit(1)
-                .execute()
-            ).data or []
-            if not pickup_job_rows:
-                raise WorkflowError("Pickup job not found")
-
-            destination_factory_id = pickup_job_rows[0].get("destination_factory_id")
-            if destination_factory_id is not None and str(destination_factory_id) != my_factory_id:
-                raise WorkflowError("Pickup job is assigned to another factory")
-
             return _first_row(
                 self.client.rpc(
-                    "confirm_factory_intake",
+                    "confirm_intake",
                     {
-                        "p_pickup_job_id": payload.pickup_job_id,
+                        "p_submission_id": payload.submission_id,
                         "p_factory_profile_id": factory_profile_id,
                         "p_measured_weight_kg": payload.measured_weight_kg,
                         "p_discrepancy_note": payload.discrepancy_note,
@@ -302,7 +240,6 @@ class FactoryService(BaseService):
             )
         except Exception as exc:
             raise WorkflowError(f"Failed to confirm factory intake: {exc}") from exc
-
 
     def list_material_preferences(self, factory_profile_id: str) -> list[dict[str, Any]]:
         try:

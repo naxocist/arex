@@ -51,8 +51,8 @@ function formatMaterial(materialType: string): string {
 function formatPickupJobStatus(status: string): string {
   const map: Record<string, string> = {
     pickup_scheduled: 'กำลังไปรับวัสดุ',
-    picked_up: 'รับวัสดุแล้ว',
-    delivered_to_factory: 'ส่งถึงโรงงานแล้ว',
+    received: 'รับวัสดุแล้ว',
+    delivered: 'ส่งถึงโรงงานแล้ว',
   };
   return map[status] ?? status;
 }
@@ -97,7 +97,7 @@ export default function PickupJobsTab({
 }: Props) {
   const reduceMotion = useReducedMotion();
 
-  const [sort, setSort] = useState<{ key: 'planned_pickup_at' | 'material' | 'status' | 'weight' | 'distance'; dir: SortDir }>({ key: 'planned_pickup_at', dir: 'asc' });
+  const [sort, setSort] = useState<{ key: 'scheduled_pickup_at' | 'material' | 'status' | 'weight' | 'distance'; dir: SortDir }>({ key: 'scheduled_pickup_at', dir: 'asc' });
   const [distMode, setDistMode] = useState<'leg1' | 'leg2' | 'sum'>('leg1');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRangeById, setEditRangeById] = useState<Record<string, DateRangeValue>>({});
@@ -113,7 +113,7 @@ export default function PickupJobsTab({
     setSort((cur) => cur.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
   }
 
-  const active = items.filter((i) => i.status !== 'delivered_to_factory');
+  const active = items.filter((i) => i.status !== 'delivered');
 
   const sorted = [...active].sort((a, b) => {
     const mul = sort.dir === 'asc' ? 1 : -1;
@@ -130,7 +130,7 @@ export default function PickupJobsTab({
       };
       return mul * (getDist(a) - getDist(b));
     }
-    return mul * (new Date(a.planned_pickup_at ?? 0).getTime() - new Date(b.planned_pickup_at ?? 0).getTime());
+    return mul * (new Date(a.scheduled_pickup_at ?? 0).getTime() - new Date(b.scheduled_pickup_at ?? 0).getTime());
   });
 
   return (
@@ -140,7 +140,7 @@ export default function PickupJobsTab({
       {!isLoading && active.length > 0 && (
         <SortHeaderBar
           cols={[
-            { key: 'planned_pickup_at' as const, label: 'วันนัดรับ', dirLabels: ['เร็วก่อน', 'ช้าก่อน'] },
+            { key: 'scheduled_pickup_at' as const, label: 'วันนัดรับ', dirLabels: ['เร็วก่อน', 'ช้าก่อน'] },
             { key: 'material' as const, label: 'วัสดุ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
             { key: 'weight' as const, label: 'น้ำหนัก', dirLabels: ['น้อยก่อน', 'มากก่อน'] },
             { key: 'status' as const, label: 'สถานะ', dirLabels: ['ก→ฮ', 'ฮ→ก'] },
@@ -176,7 +176,7 @@ export default function PickupJobsTab({
         sorted.map((item) => {
           const isExp = expandedId === item.id;
           const isBusy = updatingId === item.id;
-          const isLive = item.status === 'picked_up';
+          const isLive = item.status === 'received';
 
           const getRouteSegments = () => {
             const segments: Array<{ label: string; distanceKm: number | null }> = [];
@@ -202,7 +202,7 @@ export default function PickupJobsTab({
               item.farmer_phone ? `เบอร์โทร: ${item.farmer_phone}` : null,
               `จุดรับวัสดุ: ${item.pickup_location_text || '-'}`,
               hasValidCoordinates(item.pickup_lat, item.pickup_lng) ? `แผนที่จุดรับ: ${buildGoogleMapsUrl(item.pickup_lat as number, item.pickup_lng as number)}` : null,
-              `วันนัดรับ: ${formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}`,
+              `วันนัดรับ: ${formatDateRange(item.scheduled_pickup_at, item.pickup_window_end_at)}`,
               item.destination_factory_name_th ? `` : null,
               item.destination_factory_name_th ? `โรงงานปลายทาง: ${item.destination_factory_name_th}` : null,
               item.destination_factory_location_text ? `ที่อยู่โรงงาน: ${item.destination_factory_location_text}` : null,
@@ -241,7 +241,7 @@ export default function PickupJobsTab({
                 accent={isLive ? 'sky' : 'sky'}
                 expandedContent={
                   <div className="space-y-3">
-                    {item.status !== 'delivered_to_factory' && (
+                    {item.status !== 'delivered' && (
                       <div className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2.5">
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0 ${item.status === 'pickup_scheduled' ? 'bg-sky-500 text-white' : 'bg-emerald-500 text-white'}`}>
@@ -251,8 +251,8 @@ export default function PickupJobsTab({
                         </div>
                         <ArrowRight className="h-3.5 w-3.5 text-stone-300 shrink-0" />
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0 ${item.status === 'picked_up' ? 'bg-emerald-500 text-white' : 'bg-stone-200 text-stone-400'}`}>2</span>
-                          <span className={`text-xs font-semibold ${item.status === 'picked_up' ? 'text-emerald-700' : 'text-stone-400'}`}>ส่งโรงงาน</span>
+                          <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shrink-0 ${item.status === 'received' ? 'bg-emerald-500 text-white' : 'bg-stone-200 text-stone-400'}`}>2</span>
+                          <span className={`text-xs font-semibold ${item.status === 'received' ? 'text-emerald-700' : 'text-stone-400'}`}>ส่งโรงงาน</span>
                         </div>
                         <div className="ml-auto">
                           {item.status === 'pickup_scheduled' && (
@@ -265,7 +265,7 @@ export default function PickupJobsTab({
                               {isBusy ? 'กำลังอัปเดต...' : 'กดเมื่อรับวัสดุแล้ว'}
                             </motion.button>
                           )}
-                          {item.status === 'picked_up' && (
+                          {item.status === 'received' && (
                             <motion.button type="button"
                               onClick={() => confirm('ยืนยันว่าส่งถึงโรงงานแล้ว?', () => onMarkDeliveredToFactory(item.id))}
                               disabled={isBusy}
@@ -295,7 +295,7 @@ export default function PickupJobsTab({
                             onClick={() => {
                               if (editingId === item.id) { setEditingId(null); return; }
                               setEditingId(item.id);
-                              setEditRangeById((p) => ({ ...p, [item.id]: { from: isoToDateOnly(item.planned_pickup_at), to: isoToDateOnly(item.pickup_window_end_at) } }));
+                              setEditRangeById((p) => ({ ...p, [item.id]: { from: isoToDateOnly(item.scheduled_pickup_at), to: isoToDateOnly(item.pickup_window_end_at) } }));
                               setEditFactoryById((p) => ({ ...p, [item.id]: item.destination_factory_id ?? '' }));
                             }}
                             className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors"
@@ -439,7 +439,7 @@ export default function PickupJobsTab({
                   <div className="flex items-center gap-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400 min-w-0 flex-1">
                       <span className="font-bold text-sky-700">{Number(item.quantity_value).toLocaleString('th-TH')} {fallbackThaiUnit(item.quantity_unit)}</span>
-                      <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดรับ {formatDateRange(item.planned_pickup_at, item.pickup_window_end_at)}</span>
+                      <span className="flex items-center gap-0.5"><CalendarRange className="h-3 w-3" />นัดรับ {formatDateRange(item.scheduled_pickup_at, item.pickup_window_end_at)}</span>
                       {item.farmer_display_name && (
                         <span className="flex items-center gap-0.5">
                           <User className="h-3 w-3" />{item.farmer_display_name}

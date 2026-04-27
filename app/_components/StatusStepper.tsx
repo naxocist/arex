@@ -4,10 +4,9 @@ import { cn } from '@/app/_lib/utils';
 type SubmissionStatus =
   | 'submitted'
   | 'pickup_scheduled'
-  | 'picked_up'
-  | 'delivered_to_factory'
-  | 'factory_confirmed'
-  | 'points_credited';
+  | 'received'
+  | 'delivered'
+  | 'done';
 
 interface Step {
   label: string;
@@ -17,8 +16,8 @@ interface Step {
 
 const STEPS: Step[] = [
   { label: 'ส่งคำขอแล้ว', statuses: ['submitted'], Icon: CheckCircle2 },
-  { label: 'อยู่ระหว่างขนส่ง', statuses: ['pickup_scheduled', 'picked_up', 'delivered_to_factory'], Icon: Truck },
-  { label: 'ปิดงานแล้ว', statuses: ['factory_confirmed', 'points_credited'], Icon: Coins },
+  { label: 'อยู่ระหว่างขนส่ง', statuses: ['pickup_scheduled', 'received', 'delivered'], Icon: Truck },
+  { label: 'ปิดงานแล้ว', statuses: ['done'], Icon: Coins },
 ];
 
 function getActiveStep(currentStatus: string): number {

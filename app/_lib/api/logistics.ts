@@ -16,24 +16,22 @@ export const logisticsApi = {
     apiRequest<{ jobs: LogisticsRewardDeliveryJobItem[]; actor: string }>('/logistics/reward-delivery-jobs', options),
   schedulePickup: (submissionId: string, payload: SchedulePickupPayload) =>
     apiRequest<SchedulePickupResponse>(`/logistics/pickup-jobs/${submissionId}/schedule`, { method: 'POST', body: JSON.stringify(payload) }),
-  markPickedUp: (pickupJobId: string) =>
-    apiRequest(`/logistics/pickup-jobs/${pickupJobId}/picked-up`, { method: 'POST' }),
-  markDeliveredToFactory: (pickupJobId: string) =>
-    apiRequest(`/logistics/pickup-jobs/${pickupJobId}/delivered-to-factory`, { method: 'POST' }),
+  markPickedUp: (submissionId: string) =>
+    apiRequest(`/logistics/pickup-jobs/${submissionId}/picked-up`, { method: 'POST' }),
+  markDeliveredToFactory: (submissionId: string) =>
+    apiRequest(`/logistics/pickup-jobs/${submissionId}/delivered-to-factory`, { method: 'POST' }),
   scheduleRewardDelivery: (requestId: string, payload: ScheduleRewardDeliveryPayload) =>
     apiRequest<ScheduleRewardDeliveryResponse>(`/logistics/reward-delivery-jobs/${requestId}/schedule`, { method: 'POST', body: JSON.stringify(payload) }),
-  markRewardOutForDelivery: (deliveryJobId: string) =>
-    apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/out-for-delivery`, { method: 'POST' }),
-  markRewardDelivered: (deliveryJobId: string) =>
-    apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/delivered`, { method: 'POST' }),
-  reschedulePickup: (pickupJobId: string, payload: SchedulePickupPayload) =>
-    apiRequest(`/logistics/pickup-jobs/${pickupJobId}/reschedule`, { method: 'PATCH', body: JSON.stringify(payload) }),
-  rescheduleDeliveryJob: (deliveryJobId: string, payload: ScheduleRewardDeliveryPayload) =>
-    apiRequest(`/logistics/reward-delivery-jobs/${deliveryJobId}/reschedule`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  markRewardOutForDelivery: (requestId: string) =>
+    apiRequest(`/logistics/reward-delivery-jobs/${requestId}/out-for-delivery`, { method: 'POST' }),
+  markRewardDelivered: (requestId: string) =>
+    apiRequest(`/logistics/reward-delivery-jobs/${requestId}/delivered`, { method: 'POST' }),
+  reschedulePickup: (submissionId: string, payload: SchedulePickupPayload) =>
+    apiRequest(`/logistics/pickup-jobs/${submissionId}/reschedule`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  rescheduleDeliveryJob: (requestId: string, payload: ScheduleRewardDeliveryPayload) =>
+    apiRequest(`/logistics/reward-delivery-jobs/${requestId}/reschedule`, { method: 'PATCH', body: JSON.stringify(payload) }),
   cancelSubmission: (submissionId: string, reason?: string) =>
     apiRequest(`/logistics/submissions/${submissionId}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason ?? null }) }),
-  cancelPickupJob: (pickupJobId: string, reason?: string) =>
-    apiRequest(`/logistics/pickup-jobs/${pickupJobId}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason ?? null }) }),
   getCancelledPickupJobs: (options?: RequestBehaviorOptions) =>
     apiRequest<{ jobs: LogisticsCancelledPickupJobItem[]; actor: string }>('/logistics/pickup-jobs/cancelled', options),
   getRouteDistance: (fromLat: number, fromLng: number, toLat: number, toLng: number) =>

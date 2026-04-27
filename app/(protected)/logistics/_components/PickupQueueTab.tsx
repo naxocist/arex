@@ -36,7 +36,6 @@ interface Props {
   schedulingId: string | null;
   cancellingId: string | null;
   onSchedule: (submissionId: string, range: DateRangeValue, factoryId: string) => void;
-  onCancel: (pickupJobId: string, reason: string) => void;
   onCancelSubmission: (submissionId: string, reason: string) => void;
   confirm: (message: string, onConfirm: () => void) => void;
 }
@@ -52,7 +51,6 @@ export default function PickupQueueTab({
   schedulingId,
   cancellingId,
   onSchedule,
-  onCancel,
   onCancelSubmission,
   confirm,
 }: Props) {
@@ -228,7 +226,7 @@ export default function PickupQueueTab({
                         {schedulingId === item.id ? 'กำลังจัดคิว...' : 'ยืนยันจัดคิวรับวัสดุ'}
                       </motion.button>
 
-                      {(item.status === 'submitted' || (item.status === 'pickup_scheduled' && item.pickup_job_id)) && (
+                      {(item.status === 'submitted' || item.status === 'pickup_scheduled') && (
                         cancelingId === item.id ? (
                           <div className="space-y-2 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
                             <p className="text-xs font-semibold text-rose-700">ระบุเหตุผลการยกเลิก (จำเป็น)</p>
@@ -244,20 +242,16 @@ export default function PickupQueueTab({
                             <div className="flex gap-2">
                               <button
                                 type="button"
-                                disabled={cancellingId === (item.pickup_job_id ?? item.id) || !(cancelReasonById[item.id] ?? '').trim()}
+                                disabled={cancellingId === item.id || !(cancelReasonById[item.id] ?? '').trim()}
                                 onClick={() => {
                                   const reason = (cancelReasonById[item.id] ?? '').trim();
                                   if (!reason) return;
-                                  if (item.status === 'pickup_scheduled' && item.pickup_job_id) {
-                                    onCancel(item.pickup_job_id, reason);
-                                  } else {
-                                    onCancelSubmission(item.id, reason);
-                                  }
+                                  onCancelSubmission(item.id, reason);
                                   setCancelingId(null);
                                 }}
                                 className="flex-1 rounded-lg bg-rose-500 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-600 disabled:opacity-40"
                               >
-                                {cancellingId === (item.pickup_job_id ?? item.id) ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}
+                                {cancellingId === item.id ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}
                               </button>
                               <button
                                 type="button"
@@ -272,7 +266,7 @@ export default function PickupQueueTab({
                           <button
                             type="button"
                             onClick={() => setCancelingId(item.id)}
-                            disabled={cancellingId === (item.pickup_job_id ?? item.id)}
+                            disabled={cancellingId === item.id}
                             className="flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold text-rose-500 hover:bg-rose-50 transition-colors disabled:opacity-40"
                           >
                             <X className="h-3.5 w-3.5" />

@@ -9,8 +9,8 @@ from app.services._base import BaseService
 class DistanceService(BaseService):
     """Handles OSRM route lookups and the two distance cache tables.
 
-    logistics_to_farmer_distances  — per-provider, varies by logistics location
-    submission_factory_distances   — provider-independent, farmer pickup → factory
+    logistics_to_farmer_distances          — per-provider, varies by logistics location
+    material_submission_factory_distances  — provider-independent, farmer pickup → factory
     """
 
     def _fetch_osrm_distance(
@@ -70,7 +70,7 @@ class DistanceService(BaseService):
         distance_km: float | None,
     ) -> None:
         try:
-            self.client.table("submission_factory_distances").upsert({
+            self.client.table("material_submission_factory_distances").upsert({
                 "submission_id": submission_id,
                 "factory_id": factory_id,
                 "distance_km": distance_km,
@@ -105,7 +105,7 @@ class DistanceService(BaseService):
     ) -> float | None:
         try:
             rows = (
-                self.client.table("submission_factory_distances")
+                self.client.table("material_submission_factory_distances")
                 .select("distance_km")
                 .eq("submission_id", submission_id)
                 .eq("factory_id", factory_id)
@@ -116,61 +116,53 @@ class DistanceService(BaseService):
         except Exception:
             return None
 
-    def _update_pickup_job_distances(self, pickup_job_id: str) -> None:
+    def _update_submission_distances(self, submission_id: str) -> None:
+        """Recompute logistics→farmer and farmer→factory distances for a material_submission."""
         try:
-            job_rows = (
-                self.client.table("pickup_jobs")
-                .select("id, logistics_profile_id, submission_id, destination_factory_id")
-                .eq("id", pickup_job_id)
+            sub_rows = (
+                self.client.table("material_submissions")
+                .select("id, logistics_profile_id, destination_factory_id, pickup_lat, pickup_lng")
+                .eq("id", submission_id)
                 .limit(1)
                 .execute()
             ).data or []
-            if not job_rows:
+            if not sub_rows:
                 return
-            job = job_rows[0]
+            sub = sub_rows[0]
 
-            logistics_rows = (
-                self.client.table("org_accounts")
-                .select("lat, lng")
-                .eq("profile_id", job["logistics_profile_id"])
-                .eq("type", "logistics")
-                .limit(1)
-                .execute()
-            ).data or []
-            logistics = logistics_rows[0] if logistics_rows else {}
+            logistics_profile_id = sub.get("logistics_profile_id")
+            destination_factory_id = sub.get("destination_factory_id")
+            f_lat, f_lng = sub.get("pickup_lat"), sub.get("pickup_lng")
 
-            submission_rows = (
-                self.client.table("submissions")
-                .select("pickup_lat, pickup_lng")
-                .eq("id", job["submission_id"])
-                .limit(1)
-                .execute()
-            ).data or []
-            submission = submission_rows[0] if submission_rows else {}
+            if logistics_profile_id:
+                logistics_rows = (
+                    self.client.table("org_accounts")
+                    .select("lat, lng")
+                    .eq("profile_id", logistics_profile_id)
+                    .eq("type", "logistics")
+                    .limit(1)
+                    .execute()
+                ).data or []
+                logistics = logistics_rows[0] if logistics_rows else {}
+                log_lat, log_lng = logistics.get("lat"), logistics.get("lng")
+                lid = str(logistics_profile_id)
+                sid = str(submission_id)
+                d1 = self._fetch_osrm_distance(log_lat, log_lng, f_lat, f_lng) if all(v is not None for v in [log_lat, log_lng, f_lat, f_lng]) else None
+                self._upsert_to_farmer(lid, "material_submission", sid, d1)
 
-            factory_rows = (
-                self.client.table("org_accounts")
-                .select("lat, lng")
-                .eq("id", job["destination_factory_id"])
-                .eq("type", "factory")
-                .limit(1)
-                .execute()
-            ).data or [] if job.get("destination_factory_id") else []
-            factory = factory_rows[0] if factory_rows else {}
-
-            log_lat, log_lng = logistics.get("lat"), logistics.get("lng")
-            f_lat, f_lng = submission.get("pickup_lat"), submission.get("pickup_lng")
-            fac_lat, fac_lng = factory.get("lat"), factory.get("lng")
-
-            lid = str(job["logistics_profile_id"])
-            sid = str(job["submission_id"])
-            fac_id = str(job["destination_factory_id"]) if job.get("destination_factory_id") else None
-
-            d1 = self._fetch_osrm_distance(log_lat, log_lng, f_lat, f_lng) if all(v is not None for v in [log_lat, log_lng, f_lat, f_lng]) else None
-            self._upsert_to_farmer(lid, "submission", sid, d1)
-
-            if fac_id:
-                # Check cache before calling OSRM — farmer→factory doesn't vary by provider
+            if destination_factory_id:
+                fac_rows = (
+                    self.client.table("org_accounts")
+                    .select("lat, lng")
+                    .eq("id", destination_factory_id)
+                    .eq("type", "factory")
+                    .limit(1)
+                    .execute()
+                ).data or []
+                factory = fac_rows[0] if fac_rows else {}
+                fac_lat, fac_lng = factory.get("lat"), factory.get("lng")
+                fac_id = str(destination_factory_id)
+                sid = str(submission_id)
                 cached = self._fetch_submission_factory_distance(sid, fac_id)
                 if cached is None:
                     d2 = self._fetch_osrm_distance(f_lat, f_lng, fac_lat, fac_lng) if all(v is not None for v in [f_lat, f_lng, fac_lat, fac_lng]) else None
@@ -178,48 +170,39 @@ class DistanceService(BaseService):
         except Exception:
             pass
 
-    def _update_delivery_job_distance(self, delivery_job_id: str) -> None:
+    def _update_reward_request_distance(self, request_id: str) -> None:
+        """Recompute logistics→farmer distance for a reward_request."""
         try:
-            job_rows = (
-                self.client.table("delivery_jobs")
-                .select("id, logistics_profile_id, reward_request_id")
-                .eq("id", delivery_job_id)
+            req_rows = (
+                self.client.table("reward_requests")
+                .select("id, logistics_profile_id, delivery_lat, delivery_lng")
+                .eq("id", request_id)
                 .limit(1)
                 .execute()
             ).data or []
-            if not job_rows:
+            if not req_rows:
                 return
-            job = job_rows[0]
+            req = req_rows[0]
+
+            logistics_profile_id = req.get("logistics_profile_id")
+            if not logistics_profile_id:
+                return
 
             logistics_rows = (
                 self.client.table("org_accounts")
                 .select("lat, lng")
-                .eq("profile_id", job["logistics_profile_id"])
+                .eq("profile_id", logistics_profile_id)
                 .eq("type", "logistics")
                 .limit(1)
                 .execute()
             ).data or []
             logistics = logistics_rows[0] if logistics_rows else {}
 
-            request_rows = (
-                self.client.table("reward_requests")
-                .select("delivery_lat, delivery_lng")
-                .eq("id", job["reward_request_id"])
-                .limit(1)
-                .execute()
-            ).data or []
-            request = request_rows[0] if request_rows else {}
-
             log_lat, log_lng = logistics.get("lat"), logistics.get("lng")
-            d_lat, d_lng = request.get("delivery_lat"), request.get("delivery_lng")
+            d_lat, d_lng = req.get("delivery_lat"), req.get("delivery_lng")
 
             d = self._fetch_osrm_distance(log_lat, log_lng, d_lat, d_lng) if all(v is not None for v in [log_lat, log_lng, d_lat, d_lng]) else None
-            self._upsert_to_farmer(
-                str(job["logistics_profile_id"]),
-                "reward_request",
-                str(job["reward_request_id"]),
-                d,
-            )
+            self._upsert_to_farmer(str(logistics_profile_id), "reward_request", str(request_id), d)
         except Exception:
             pass
 
@@ -227,28 +210,21 @@ class DistanceService(BaseService):
         self, logistics_profile_id: str, new_lat: float, new_lng: float
     ) -> None:
         try:
-            pickup_jobs = (
-                self.client.table("pickup_jobs")
-                .select("submission_id")
+            active_subs = (
+                self.client.table("material_submissions")
+                .select("id, pickup_lat, pickup_lng")
                 .eq("logistics_profile_id", logistics_profile_id)
-                .in_("status", ["pickup_scheduled", "picked_up"])
+                .in_("status", ["pickup_scheduled", "received"])
                 .limit(50)
                 .execute()
             ).data or []
 
-            if pickup_jobs:
-                sids = list({str(j["submission_id"]) for j in pickup_jobs if j.get("submission_id")})
-                sub_rows = (
-                    self.client.table("submissions")
-                    .select("id, pickup_lat, pickup_lng")
-                    .in_("id", sids)
-                    .execute()
-                ).data or []
-                valid = [(r, r["pickup_lat"], r["pickup_lng"]) for r in sub_rows if r.get("pickup_lat") is not None and r.get("pickup_lng") is not None]
+            if active_subs:
+                valid = [(r, r["pickup_lat"], r["pickup_lng"]) for r in active_subs if r.get("pickup_lat") is not None and r.get("pickup_lng") is not None]
                 if valid:
                     distances = self._fetch_osrm_distances_batch(new_lat, new_lng, [(la, ln) for _, la, ln in valid])
                     upserts = [
-                        {"logistics_profile_id": logistics_profile_id, "reference_type": "submission", "reference_id": str(r["id"]), "distance_km": km}
+                        {"logistics_profile_id": logistics_profile_id, "reference_type": "material_submission", "reference_id": str(r["id"]), "distance_km": km}
                         for (r, _, _), km in zip(valid, distances)
                     ]
                     if upserts:
@@ -257,24 +233,17 @@ class DistanceService(BaseService):
                         except Exception:
                             pass
 
-            delivery_jobs = (
-                self.client.table("delivery_jobs")
-                .select("reward_request_id")
+            active_reqs = (
+                self.client.table("reward_requests")
+                .select("id, delivery_lat, delivery_lng")
                 .eq("logistics_profile_id", logistics_profile_id)
-                .in_("status", ["reward_delivery_scheduled", "out_for_delivery"])
+                .in_("status", ["delivery_scheduled", "out_for_delivery"])
                 .limit(50)
                 .execute()
             ).data or []
 
-            if delivery_jobs:
-                rids = list({str(j["reward_request_id"]) for j in delivery_jobs if j.get("reward_request_id")})
-                req_rows = (
-                    self.client.table("reward_requests")
-                    .select("id, delivery_lat, delivery_lng")
-                    .in_("id", rids)
-                    .execute()
-                ).data or []
-                valid = [(r, r["delivery_lat"], r["delivery_lng"]) for r in req_rows if r.get("delivery_lat") is not None and r.get("delivery_lng") is not None]
+            if active_reqs:
+                valid = [(r, r["delivery_lat"], r["delivery_lng"]) for r in active_reqs if r.get("delivery_lat") is not None and r.get("delivery_lng") is not None]
                 if valid:
                     distances = self._fetch_osrm_distances_batch(new_lat, new_lng, [(la, ln) for _, la, ln in valid])
                     upserts = [
@@ -297,36 +266,27 @@ class DistanceService(BaseService):
     def _populate_queue_distances(self, logistics_profile_id: str, lat: float, lng: float) -> None:
         try:
             submissions = (
-                self.client.table("submissions")
+                self.client.table("material_submissions")
                 .select("id, pickup_lat, pickup_lng")
                 .in_("status", ["submitted", "pickup_scheduled"])
                 .execute()
             ).data or []
 
-            request_ids_with_jobs = {
-                str(row["reward_request_id"])
-                for row in (
-                    self.client.table("delivery_jobs")
-                    .select("reward_request_id")
-                    .neq("status", "cancelled")
-                    .execute()
-                ).data or []
-                if row.get("reward_request_id")
-            }
+            # Reward requests approved but not yet assigned to any logistics provider
             reward_requests = (
                 self.client.table("reward_requests")
                 .select("id, delivery_lat, delivery_lng")
-                .eq("status", "warehouse_approved")
+                .eq("status", "approved")
+                .is_("logistics_profile_id", "null")
                 .execute()
             ).data or []
-            reward_requests = [r for r in reward_requests if str(r.get("id", "")) not in request_ids_with_jobs]
 
             valid_submissions = [(s, s["pickup_lat"], s["pickup_lng"]) for s in submissions if s.get("pickup_lat") is not None and s.get("pickup_lng") is not None]
             if valid_submissions:
                 dests = [(s_lat, s_lng) for _, s_lat, s_lng in valid_submissions]
                 distances = self._fetch_osrm_distances_batch(lat, lng, dests)
                 upserts = [
-                    {"logistics_profile_id": logistics_profile_id, "reference_type": "submission", "reference_id": str(s["id"]), "distance_km": km}
+                    {"logistics_profile_id": logistics_profile_id, "reference_type": "material_submission", "reference_id": str(s["id"]), "distance_km": km}
                     for (s, _, _), km in zip(valid_submissions, distances)
                 ]
                 if upserts:
@@ -336,7 +296,7 @@ class DistanceService(BaseService):
                         pass
             for s in submissions:
                 if s.get("pickup_lat") is None or s.get("pickup_lng") is None:
-                    self._upsert_to_farmer(logistics_profile_id, "submission", str(s["id"]), None)
+                    self._upsert_to_farmer(logistics_profile_id, "material_submission", str(s["id"]), None)
 
             valid_requests = [(r, r["delivery_lat"], r["delivery_lng"]) for r in reward_requests if r.get("delivery_lat") is not None and r.get("delivery_lng") is not None]
             if valid_requests:
@@ -359,31 +319,22 @@ class DistanceService(BaseService):
 
     def recalculate_distances_for_factory(self, factory_id: str, fac_lat: float, fac_lng: float) -> None:
         try:
-            job_rows = (
-                self.client.table("pickup_jobs")
-                .select("submission_id")
+            sub_rows = (
+                self.client.table("material_submissions")
+                .select("id, pickup_lat, pickup_lng")
                 .eq("destination_factory_id", factory_id)
-                .in_("status", ["pickup_scheduled", "picked_up", "delivered_to_factory"])
+                .in_("status", ["pickup_scheduled", "received", "delivered"])
                 .limit(100)
                 .execute()
             ).data or []
 
-            sids = list({str(j["submission_id"]) for j in job_rows if j.get("submission_id")})
-            if not sids:
+            if not sub_rows:
                 return
-
-            sub_rows = (
-                self.client.table("submissions")
-                .select("id, pickup_lat, pickup_lng")
-                .in_("id", sids)
-                .execute()
-            ).data or []
 
             valid = [(r, r["pickup_lat"], r["pickup_lng"]) for r in sub_rows if r.get("pickup_lat") is not None and r.get("pickup_lng") is not None]
             if not valid:
                 return
 
-            # farmer→factory: source is farmer pickup, destination is factory
             distances = self._fetch_osrm_distances_batch(fac_lat, fac_lng, [(la, ln) for _, la, ln in valid])
             upserts = [
                 {"submission_id": str(r["id"]), "factory_id": factory_id, "distance_km": km}
@@ -391,7 +342,7 @@ class DistanceService(BaseService):
             ]
             if upserts:
                 try:
-                    self.client.table("submission_factory_distances").upsert(upserts).execute()
+                    self.client.table("material_submission_factory_distances").upsert(upserts).execute()
                 except Exception:
                     pass
         except Exception:

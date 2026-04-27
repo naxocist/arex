@@ -93,7 +93,7 @@ class FarmerService(BaseService):
                 raise WorkflowError("Pickup location coordinates are required")
 
             submission = _first_row(
-                self.client.table("submissions")
+                self.client.table("material_submissions")
                 .insert({
                     "farmer_profile_id": farmer_profile_id,
                     "material_type": material_code,
@@ -111,7 +111,7 @@ class FarmerService(BaseService):
             )
 
             self.client.table("status_events").insert({
-                "entity_type": "submission",
+                "entity_type": "material_submission",
                 "entity_id": submission["id"],
                 "from_status": None,
                 "to_status": "submitted",
@@ -129,105 +129,22 @@ class FarmerService(BaseService):
     def list_farmer_submissions(self, farmer_profile_id: str) -> list[dict[str, Any]]:
         try:
             submissions = (
-                self.client.table("submissions")
+                self.client.table("material_submissions")
                 .select(
-                    "id, material_type, quantity_value, quantity_unit, pickup_location_text, "
-                    "pickup_lat, pickup_lng, status, created_at, image_url"
+                    "id, material_type, quantity_value, quantity_unit, "
+                    "pickup_location_text, pickup_lat, pickup_lng, status, created_at, image_url, "
+                    "scheduled_pickup_at, pickup_window_end_at, cancellation_reason, "
+                    "received_at, delivered_at, factory_confirmed_at, credited_points, "
+                    "measured_weight_kg, logistics_profile_id, destination_factory_id"
                 )
                 .eq("farmer_profile_id", farmer_profile_id)
                 .order("created_at", desc=True)
                 .execute()
             ).data or []
 
-            if not submissions:
-                return []
-
-            submission_ids = [str(item["id"]) for item in submissions if item.get("id")]
-
-            # Fetch cancel reasons from status_events for cancelled submissions
-            cancelled_ids = [str(item["id"]) for item in submissions if item.get("status") == "cancelled" and item.get("id")]
-            cancel_reason_by_submission: dict[str, str | None] = {}
-            if cancelled_ids:
-                events = (
-                    self.client.table("status_events")
-                    .select("entity_id, note")
-                    .eq("entity_type", "submission")
-                    .eq("to_status", "cancelled")
-                    .in_("entity_id", cancelled_ids)
-                    .order("event_at", desc=True)
-                    .execute()
-                ).data or []
-                for ev in events:
-                    eid = str(ev.get("entity_id") or "")
-                    if eid and eid not in cancel_reason_by_submission:
-                        cancel_reason_by_submission[eid] = ev.get("note") or None
-
-            pickup_jobs = (
-                self.client.table("pickup_jobs")
-                .select("id, submission_id, planned_pickup_at, pickup_window_end_at, status, created_at")
-                .in_("submission_id", submission_ids)
-                .neq("status", "cancelled")
-                .order("created_at", desc=True)
-                .execute()
-            ).data or []
-
-            latest_pickup_by_submission: dict[str, dict[str, Any]] = {}
-            for job in pickup_jobs:
-                sid = str(job.get("submission_id")) if job.get("submission_id") else None
-                if sid is None or sid in latest_pickup_by_submission:
-                    continue
-                latest_pickup_by_submission[sid] = job
-
-            # Map pickup_job_id → submission_id for points lookup
-            job_id_to_submission_id: dict[str, str] = {
-                str(job["id"]): str(job["submission_id"])
-                for job in pickup_jobs
-                if job.get("id") and job.get("submission_id")
-            }
-
-            # Fetch intakes for those pickup_jobs to get intake IDs
-            pickup_job_ids = list(job_id_to_submission_id.keys())
-            points_by_submission: dict[str, int] = {}
-            if pickup_job_ids:
-                intakes = (
-                    self.client.table("intakes")
-                    .select("id, pickup_job_id")
-                    .in_("pickup_job_id", pickup_job_ids)
-                    .execute()
-                ).data or []
-                intake_id_to_submission_id: dict[str, str] = {
-                    str(intake["id"]): job_id_to_submission_id[str(intake["pickup_job_id"])]
-                    for intake in intakes
-                    if intake.get("id") and str(intake.get("pickup_job_id")) in job_id_to_submission_id
-                }
-                if intake_id_to_submission_id:
-                    ledger_rows = (
-                        self.client.table("points_ledger")
-                        .select("reference_id, points_amount")
-                        .eq("entry_type", "intake_credit")
-                        .in_("reference_id", list(intake_id_to_submission_id.keys()))
-                        .execute()
-                    ).data or []
-                    for row in ledger_rows:
-                        intake_id = str(row.get("reference_id") or "")
-                        sid = intake_id_to_submission_id.get(intake_id)
-                        if sid:
-                            points_by_submission[sid] = int(row.get("points_amount") or 0)
-
             return [
                 {
                     **item,
-                    "pickup_window_start_at": latest_pickup_by_submission.get(
-                        str(item.get("id")) if item.get("id") else "", {}
-                    ).get("planned_pickup_at"),
-                    "pickup_window_end_at": latest_pickup_by_submission.get(
-                        str(item.get("id")) if item.get("id") else "", {}
-                    ).get("pickup_window_end_at"),
-                    "pickup_job_status": latest_pickup_by_submission.get(
-                        str(item.get("id")) if item.get("id") else "", {}
-                    ).get("status"),
-                    "credited_points": points_by_submission.get(str(item.get("id") or ""), None),
-                    "cancel_reason": cancel_reason_by_submission.get(str(item.get("id") or ""), None),
                     "image_url": resolve_image_url(item.get("image_url")),
                 }
                 for item in submissions
@@ -238,7 +155,7 @@ class FarmerService(BaseService):
     def delete_submission(self, farmer_profile_id: str, submission_id: str) -> dict[str, Any]:
         try:
             rows = (
-                self.client.table("submissions")
+                self.client.table("material_submissions")
                 .select("id, status, farmer_profile_id, image_url")
                 .eq("id", submission_id)
                 .eq("farmer_profile_id", farmer_profile_id)
@@ -251,7 +168,7 @@ class FarmerService(BaseService):
             if submission["status"] != "submitted":
                 raise WorkflowError("Only submissions with status 'submitted' can be deleted")
 
-            self.client.table("submissions").delete().eq("id", submission_id).execute()
+            self.client.table("material_submissions").delete().eq("id", submission_id).execute()
 
             image_path = submission.get("image_url")
             if image_path and not image_path.startswith("http"):
@@ -277,7 +194,6 @@ class FarmerService(BaseService):
             available_points = points_response.data
             if isinstance(available_points, list):
                 if available_points and isinstance(available_points[0], dict):
-                    # PostgREST scalar compatibility fallback.
                     available_points = next(iter(available_points[0].values()), 0)
                 else:
                     available_points = 0
@@ -304,8 +220,8 @@ class FarmerService(BaseService):
                     "id, reward_id, quantity, requested_points, status, requested_at, "
                     "warehouse_decision_at, rejection_reason, "
                     "delivery_location_text, delivery_lat, delivery_lng, "
-                    "delivery_jobs(id, status, planned_delivery_at, delivery_window_end_at, "
-                    "out_for_delivery_at, delivered_at)"
+                    "logistics_profile_id, scheduled_delivery_at, delivery_window_end_at, "
+                    "out_for_delivery_at, delivered_at"
                 )
                 .eq("farmer_profile_id", farmer_profile_id)
                 .order("requested_at", desc=True)
@@ -344,7 +260,6 @@ class FarmerService(BaseService):
                     {
                         "p_request_id": request_id,
                         "p_farmer_profile_id": farmer_profile_id,
-                        "p_reason": "Cancelled by farmer",
                     },
                 ).execute().data
             )

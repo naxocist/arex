@@ -71,19 +71,8 @@ def cancel_submission(
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
-    result = workflow_service.cancel_submitted_submission(submission_id, current_user.user_id, payload.reason)
+    result = workflow_service.cancel_submission(submission_id, current_user.user_id, payload.reason)
     return {"message": "Submission cancelled", "result": result}
-
-
-@router.post("/pickup-jobs/{pickup_job_id}/cancel")
-def cancel_pickup_job(
-    pickup_job_id: str,
-    payload: CancelPickupJobRequest,
-    current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
-    workflow_service: LogisticsService = Depends(get_logistics_service),
-) -> dict[str, Any]:
-    result = workflow_service.cancel_pickup_job(pickup_job_id, current_user.user_id, payload.reason)
-    return {"message": "Pickup job cancelled", "result": result}
 
 
 @router.get("/pickup-jobs/cancelled")
@@ -91,49 +80,49 @@ def get_cancelled_pickup_jobs(
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
-    return {"jobs": workflow_service.list_cancelled_pickup_jobs(current_user.user_id), "actor": current_user.role.value}
+    return {"jobs": workflow_service.list_cancelled_submissions(current_user.user_id), "actor": current_user.role.value}
 
 
-@router.patch("/pickup-jobs/{pickup_job_id}/reschedule")
-def reschedule_pickup_job(
-    pickup_job_id: str,
+@router.patch("/pickup-jobs/{submission_id}/reschedule")
+def reschedule_pickup(
+    submission_id: str,
     payload: SchedulePickupRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
-    result = workflow_service.reschedule_pickup_job(pickup_job_id, payload)
-    return {"message": "Pickup job rescheduled", "result": result}
+    result = workflow_service.reschedule_pickup(submission_id, current_user.user_id, payload)
+    return {"message": "Pickup rescheduled", "result": result}
 
 
-@router.patch("/reward-delivery-jobs/{delivery_job_id}/reschedule")
-def reschedule_delivery_job(
-    delivery_job_id: str,
+@router.patch("/reward-delivery-jobs/{request_id}/reschedule")
+def reschedule_reward_delivery(
+    request_id: str,
     payload: ScheduleRewardDeliveryRequest,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
-    result = workflow_service.reschedule_delivery_job(delivery_job_id, payload)
-    return {"message": "Delivery job rescheduled", "result": result}
+    result = workflow_service.reschedule_reward_delivery(request_id, current_user.user_id, payload)
+    return {"message": "Reward delivery rescheduled", "result": result}
 
 
-@router.post("/pickup-jobs/{pickup_job_id}/delivered-to-factory")
+@router.post("/pickup-jobs/{submission_id}/delivered-to-factory")
 def mark_delivered_to_factory(
-    pickup_job_id: str,
+    submission_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
-    result = workflow_service.mark_delivered_to_factory(pickup_job_id, current_user.user_id)
+    result = workflow_service.mark_delivered_to_factory(submission_id, current_user.user_id)
     return {"message": "Material marked as delivered to factory", "result": result}
 
 
-@router.post("/pickup-jobs/{pickup_job_id}/picked-up")
+@router.post("/pickup-jobs/{submission_id}/picked-up")
 def mark_picked_up(
-    pickup_job_id: str,
+    submission_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
-    result = workflow_service.mark_pickup_picked_up(pickup_job_id, current_user.user_id)
-    return {"message": "Pickup marked as picked up", "result": result}
+    result = workflow_service.mark_pickup_received(submission_id, current_user.user_id)
+    return {"message": "Pickup marked as received", "result": result}
 
 
 @router.post("/reward-delivery-jobs/{request_id}/schedule")
@@ -147,23 +136,23 @@ def schedule_reward_delivery(
     return {"message": "Reward delivery scheduled", "result": result}
 
 
-@router.post("/reward-delivery-jobs/{delivery_job_id}/out-for-delivery")
+@router.post("/reward-delivery-jobs/{request_id}/out-for-delivery")
 def mark_reward_out_for_delivery(
-    delivery_job_id: str,
+    request_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
-    result = workflow_service.mark_reward_out_for_delivery(delivery_job_id, current_user.user_id)
+    result = workflow_service.mark_reward_out_for_delivery(request_id, current_user.user_id)
     return {"message": "Reward job marked out for delivery", "result": result}
 
 
-@router.post("/reward-delivery-jobs/{delivery_job_id}/delivered")
+@router.post("/reward-delivery-jobs/{request_id}/delivered")
 def mark_reward_delivered(
-    delivery_job_id: str,
+    request_id: str,
     current_user: AuthenticatedUser = Depends(require_roles(Role.LOGISTICS)),
     workflow_service: LogisticsService = Depends(get_logistics_service),
 ) -> dict[str, Any]:
-    result = workflow_service.mark_reward_delivered(delivery_job_id, current_user.user_id)
+    result = workflow_service.mark_reward_delivered(request_id, current_user.user_id)
     return {"message": "Reward delivered to farmer", "result": result}
 
 

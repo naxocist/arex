@@ -73,7 +73,7 @@ class WarehouseService(BaseService):
                     "requested_at, delivery_location_text, delivery_lat, delivery_lng, "
                     "warehouse_decision_at, rejection_reason"
                 )
-                .in_("status", ["warehouse_approved", "warehouse_rejected"])
+                .in_("status", ["approved", "rejected"])
                 .order("requested_at", desc=True)
                 .execute()
             ).data or []
