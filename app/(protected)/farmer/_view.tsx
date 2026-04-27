@@ -337,7 +337,7 @@ export default function FarmerHome() {
           <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start justify-between gap-2 sm:block">
               <div>
-                <p className="text-sm font-medium text-white/70">PMUC Coin คงเหลือ</p>
+                <p className="text-sm font-medium text-white/70">PMUC Point คงเหลือ</p>
                 <div className="mt-1 flex items-end gap-1.5">
                   {availablePoints === null ? (
                     <div className="h-10 w-28 animate-pulse rounded-full bg-white/20" />

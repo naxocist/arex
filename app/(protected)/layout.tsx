@@ -43,9 +43,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={'/assets/' + encodeURIComponent('อว_logo.png')} alt="กระทรวง อว." className="h-9 w-9 object-contain" />
+                    <img src="/assets/MHESI.png" alt="กระทรวง อว." className="h-9 w-9 object-contain" />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/assets/pmuc_logo.png" alt="บพข." className="h-7 w-auto object-contain" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/assets/lawdee.png" alt="LAWDEE" className="h-8 w-auto object-contain" />
                   </div>
                   <div className="h-8 w-px bg-stone-200" />
                   <div>

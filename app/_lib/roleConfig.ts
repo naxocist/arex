@@ -37,7 +37,7 @@ export const roleMeta: Record<UserRole, RoleMeta> = {
     id: 'farmer',
     label: 'เกษตรกร',
     shortLabel: 'Farmer',
-    description: 'แจ้งวัสดุ ติดตามสถานะ และแลกรางวัลจาก PMUC Coin',
+    description: 'แจ้งวัสดุ ติดตามสถานะ และแลกรางวัลจาก PMUC Point',
     accentClassName: 'text-green-900 bg-green-100 border-green-200',
     softClassName: 'from-green-100 via-white to-blue-50',
   },

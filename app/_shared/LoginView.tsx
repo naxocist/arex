@@ -241,7 +241,7 @@ export default function LoginView() {
             <h1 className="mt-1 text-4xl font-light tracking-tight text-primary">ยินดีต้อนรับ</h1>
             <p className="mt-2 text-base leading-relaxed text-on-surface-variant">
               แพลตฟอร์มแลกเปลี่ยนวัสดุเหลือใช้ทางการเกษตร<br />
-              ส่งวัสดุ รับ PMUC Coin และแลกรับรางวัล
+              ส่งวัสดุ รับ PMUC Point และแลกรับรางวัล
             </p>
             {/* Motto */}
             <div className="mt-5">
@@ -260,13 +260,14 @@ export default function LoginView() {
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-bold uppercase tracking-wider text-stone-400">เจ้าของระบบ</span>
               <div className="flex items-center gap-3 rounded-xl border border-outline-variant/20 bg-white px-4 py-3 shadow-sm">
+                <img src="/assets/MHESI.png" alt="อว. Logo" className="h-8 w-8 object-contain shrink-0" />
                 <img src="/assets/pmuc_logo.png" alt="บพข (PMUC) Logo" className="h-8 w-auto object-contain shrink-0" />
-                <div className="text-left min-w-0">
+                <div className="text-left shrink-0">
                   <p className="text-xs font-bold leading-tight text-stone-700">บพข.</p>
-                  <p className="text-[11px] leading-tight text-stone-400">ภายใต้ อว.</p>
+                  <p className="text-[11px] leading-tight text-stone-400 whitespace-nowrap">ภายใต้ อว.</p>
                 </div>
                 <div className="h-6 w-px bg-stone-200 shrink-0" />
-                <img src="/assets/อว_logo.png" alt="อว. Logo" className="h-8 w-8 object-contain shrink-0" />
+                <img src="/assets/lawdee.png" alt="LAWDEE Logo" className="h-12 w-auto object-contain shrink-0" />
                 <div className="text-left min-w-0">
                   <p className="text-xs font-bold leading-tight text-stone-700">LAWDEE CO., LTD.</p>
                   <p className="text-[11px] leading-tight text-stone-400">ผู้ร่วมพัฒนาระบบ</p>
@@ -325,12 +326,12 @@ export default function LoginView() {
 
             {/* Org badges — single compact row */}
             <div className="flex items-center gap-2 rounded-xl border border-outline-variant/20 bg-white px-3 py-2 shadow-sm self-start">
-              <img src="/assets/pmuc_logo.png" alt="บพข" className="h-5 object-contain" />
+              <img src="/assets/pmuc_logo.png" alt="บพข" className="h-10 object-contain" />
               <span className="text-[9px] font-bold text-stone-600">บพข.</span>
               <div className="h-4 w-px bg-stone-200" />
-              <img src="/assets/อว_logo.png" alt="อว." className="h-4 object-contain opacity-60" />
+              <img src="/assets/MHESI.png" alt="อว." className="h-4 object-contain opacity-60" />
               <div className="h-4 w-px bg-stone-200" />
-              <span className="text-[9px] font-bold text-stone-600">LAWDEE</span>
+              <img src="/assets/lawdee-nobg.png" alt="LAWDEE" className="h-5 object-contain" />
               <div className="h-4 w-px bg-stone-200" />
               <img src="/assets/cedt_logo.png" alt="CEDT" className="h-5 object-contain" />
               <span className="text-[9px] font-bold text-stone-600">CEDT</span>

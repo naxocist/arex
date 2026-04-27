@@ -128,7 +128,7 @@ export default function FarmerRewards() {
           <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start justify-between gap-2 sm:block">
               <div>
-                <p className="text-sm font-medium text-white/70">PMUC Coin คงเหลือ</p>
+                <p className="text-sm font-medium text-white/70">PMUC Point คงเหลือ</p>
                 <div className="mt-1 flex items-end gap-1.5">
                   <span className="text-4xl font-light tabular-nums text-white sm:text-5xl">{availablePoints.toLocaleString('th-TH')}</span>
                   <span className="mb-1.5 text-base font-medium text-white/70">แต้ม</span>

@@ -67,8 +67,8 @@ export default function RewardCatalog({ rewards, availablePoints, requestingRewa
       fields: [
         { label: 'ของรางวัล', value: reward.name_th },
         { label: 'จำนวน', value: `${rewardQty} ชิ้น` },
-        { label: 'แต้มที่ใช้', value: `${totalCost.toLocaleString('th-TH')} PMUC Coin` },
-        { label: 'แต้มคงเหลือหลังแลก', value: `${after.toLocaleString('th-TH')} PMUC Coin` },
+        { label: 'แต้มที่ใช้', value: `${totalCost.toLocaleString('th-TH')} PMUC Point` },
+        { label: 'แต้มคงเหลือหลังแลก', value: `${after.toLocaleString('th-TH')} PMUC Point` },
         { label: 'สถานที่รับ', value: locationText },
       ],
       _back: { reward, locationText, lat, lng },
