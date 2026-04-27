@@ -18,8 +18,8 @@ class ExecutiveService(BaseService):
     def get_executive_overview(self) -> dict[str, Any]:
         try:
             submissions = (
-                self.client.table("submissions")
-                .select("id, farmer_profile_id, material_type, quantity_value, quantity_unit, status")
+                self.client.table("material_submissions")
+                .select("id, farmer_profile_id, material_type, quantity_value, quantity_unit, status, measured_weight_kg")
                 .execute()
             ).data or []
             reward_requests = (
@@ -27,14 +27,8 @@ class ExecutiveService(BaseService):
                 .select("id, status, requested_points")
                 .execute()
             ).data or []
-            pickup_jobs = (
-                self.client.table("pickup_jobs").select("id, status").execute()
-            ).data or []
             points_ledger = (
                 self.client.table("points_ledger").select("entry_type, points_amount").execute()
-            ).data or []
-            intakes = (
-                self.client.table("intakes").select("measured_weight_kg").execute()
             ).data or []
             units = (
                 self.client.table("measurement_units").select("code, to_kg_factor").execute()
@@ -113,12 +107,12 @@ class ExecutiveService(BaseService):
                 rr_status[st] = rr_status.get(st, 0) + 1
                 pts = int(_to_float(r.get("requested_points")))
                 reward_requested_points_total += pts
-                if st == "warehouse_approved":
+                if st == "approved":
                     reward_approved_points_total += pts
             reward_requests_status_summary = {
                 "requested": rr_status.get("requested", 0),
-                "warehouse_approved": rr_status.get("warehouse_approved", 0),
-                "warehouse_rejected": rr_status.get("warehouse_rejected", 0),
+                "approved": rr_status.get("approved", 0),
+                "rejected": rr_status.get("rejected", 0),
                 "cancelled": rr_status.get("cancelled", 0),
             }
 
@@ -137,22 +131,25 @@ class ExecutiveService(BaseService):
                 elif entry_type == "reward_release":
                     points_reserved_total -= amt
 
-            factory_confirmed_weight_kg_total = sum(_to_float(r.get("measured_weight_kg")) for r in intakes)
-            pj_status: dict[str, int] = {}
-            for r in pickup_jobs:
+            ms_status: dict[str, int] = {}
+            factory_confirmed_weight_kg_total = 0.0
+            for r in submissions:
                 st = r.get("status") or ""
-                pj_status[st] = pj_status.get(st, 0) + 1
+                ms_status[st] = ms_status.get(st, 0) + 1
+                if st == "done":
+                    factory_confirmed_weight_kg_total += _to_float(r.get("measured_weight_kg"))
+
             pickup_jobs_status_summary = {
-                "pickup_scheduled": pj_status.get("pickup_scheduled", 0),
-                "picked_up": pj_status.get("picked_up", 0),
-                "delivered_to_factory": pj_status.get("delivered_to_factory", 0),
+                "pickup_scheduled": ms_status.get("pickup_scheduled", 0),
+                "received": ms_status.get("received", 0),
+                "delivered": ms_status.get("delivered", 0),
             }
 
             return {
                 "submissions_total": len(submissions),
                 "unique_farmers_total": len(unique_farmers),
                 "submissions_pending_pickup": submissions_pending_pickup,
-                "pickup_jobs_active": sum(pj_status.get(s, 0) for s in {"pickup_scheduled", "picked_up", "delivered_to_factory"}),
+                "pickup_jobs_active": sum(ms_status.get(s, 0) for s in {"pickup_scheduled", "received", "delivered"}),
                 "pickup_jobs_status_summary": pickup_jobs_status_summary,
                 "reward_requests_pending_warehouse": rr_status.get("requested", 0),
                 "submitted_weight_estimated_kg_total": round(submitted_weight_estimated_kg_total, 3),
